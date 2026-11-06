@@ -170,8 +170,8 @@ interface Props {
 export function DespesasDepartamentoEvolucaoTab({ year, month }: Props) {
   const [subBrand, setSubBrand] = useState<SubBrand>('vw');
   const [loading, setLoading] = useState(true);
-  const [vwAsync, setVwAsync] = useState<Record<string, { curr: DreLines; prev: DreLines }>>({});
-  const [audiAsync, setAudiAsync] = useState<Record<string, { curr: DreLines; prev: DreLines }>>({});
+  const [vwAsync, setVwAsync] = useState<Record<string, { curr: DreLines; currRaw: DreLines; prev: DreLines }>>({});
+  const [audiAsync, setAudiAsync] = useState<Record<string, { curr: DreLines; currRaw: DreLines; prev: DreLines }>>({});
 
   const prevYear = year - 1;
   const upToMonth = month === 0 ? 12 : month;
@@ -186,24 +186,26 @@ export function DespesasDepartamentoEvolucaoTab({ year, month }: Props) {
     const audiDeptKeys = Object.keys(AUDI_DEPT_TO_DEPT);
 
     Promise.all([
-      Promise.all(vwDeptKeys.map(async k => ({
-        key: k,
-        d: await loadCanonicalDreData('vw', year, VW_DEPT_TO_DEPT[k], await loadDREDataAsync(yr, VW_DEPT_TO_DEPT[k], 'vw')),
-      }))),
+      Promise.all(vwDeptKeys.map(async k => {
+        const raw = await loadDREDataAsync(yr, VW_DEPT_TO_DEPT[k], 'vw');
+        const canon = await loadCanonicalDreData('vw', year, VW_DEPT_TO_DEPT[k], raw);
+        return { key: k, canon, raw };
+      })),
       Promise.all(vwDeptKeys.map(k => loadDREDataAsync(prevYr, VW_DEPT_TO_DEPT[k], 'vw').then(d => ({ key: k, d })))),
-      Promise.all(audiDeptKeys.map(async k => ({
-        key: k,
-        d: await loadCanonicalDreData('audi', year, AUDI_DEPT_TO_DEPT[k], await loadDREDataAsync(yr, AUDI_DEPT_TO_DEPT[k], 'audi')),
-      }))),
+      Promise.all(audiDeptKeys.map(async k => {
+        const raw = await loadDREDataAsync(yr, AUDI_DEPT_TO_DEPT[k], 'audi');
+        const canon = await loadCanonicalDreData('audi', year, AUDI_DEPT_TO_DEPT[k], raw);
+        return { key: k, canon, raw };
+      })),
       Promise.all(audiDeptKeys.map(k => loadDREDataAsync(prevYr, AUDI_DEPT_TO_DEPT[k], 'audi').then(d => ({ key: k, d })))),
     ]).then(([vwCurrAsync, vwPrevAsync, audiCurrAsync, audiPrevAsync]) => {
-      const vwMap: Record<string, { curr: DreLines; prev: DreLines }> = {};
-      for (const { key, d } of vwCurrAsync) vwMap[key] = { curr: d, prev: null };
+      const vwMap: Record<string, { curr: DreLines; currRaw: DreLines; prev: DreLines }> = {};
+      for (const { key, canon, raw } of vwCurrAsync) vwMap[key] = { curr: canon, currRaw: raw, prev: null };
       for (const { key, d } of vwPrevAsync) vwMap[key] = { ...vwMap[key], prev: d };
       setVwAsync(vwMap);
 
-      const audiMap: Record<string, { curr: DreLines; prev: DreLines }> = {};
-      for (const { key, d } of audiCurrAsync) audiMap[key] = { curr: d, prev: null };
+      const audiMap: Record<string, { curr: DreLines; currRaw: DreLines; prev: DreLines }> = {};
+      for (const { key, canon, raw } of audiCurrAsync) audiMap[key] = { curr: canon, currRaw: raw, prev: null };
       for (const { key, d } of audiPrevAsync) audiMap[key] = { ...audiMap[key], prev: d };
       setAudiAsync(audiMap);
 
@@ -215,6 +217,16 @@ export function DespesasDepartamentoEvolucaoTab({ year, month }: Props) {
   const brandColor = subBrand === 'vw' ? '#001e50' : subBrand === 'audi' ? '#bb0a30' : '#7c3aed';
   const brandColorDark = subBrand === 'vw' ? '#001238' : subBrand === 'audi' ? '#9a0827' : '#5b21b6';
 
+  // Valor de um grupo num mês, com cobertura: usa o canônico (Base Gerencial)
+  // quando o mês está coberto; caso contrário, cai no DRE cru do departamento
+  // (mesma fonte da aba Receita e do comparativo do ano anterior).
+  function groupValueFromPair(canon: DreLines, raw: DreLines, mIdx: number, groupKey: string): number {
+    const canonGroups = extractExpenseGroupsByMonth(canon ?? null, mIdx);
+    const canonTotal = EXPENSE_GROUPS.reduce((s, g) => s + (canonGroups[g.key] ?? 0), 0);
+    if (canonTotal !== 0) return canonGroups[groupKey] ?? 0;
+    return extractExpenseGroupsByMonth(raw ?? null, mIdx)[groupKey] ?? 0;
+  }
+
   function getGroupValue(
     mIdx: number,
     deptKey: string,
@@ -222,22 +234,24 @@ export function DespesasDepartamentoEvolucaoTab({ year, month }: Props) {
     groupKey: string,
   ): number {
     if (subBrand === 'vw') {
-      const lines = usePrev ? vwAsync[deptKey]?.prev : vwAsync[deptKey]?.curr;
-      return extractExpenseGroupsByMonth(lines ?? null, mIdx)[groupKey] ?? 0;
+      if (usePrev) return extractExpenseGroupsByMonth(vwAsync[deptKey]?.prev ?? null, mIdx)[groupKey] ?? 0;
+      return groupValueFromPair(vwAsync[deptKey]?.curr ?? null, vwAsync[deptKey]?.currRaw ?? null, mIdx, groupKey);
     }
 
     if (subBrand === 'audi') {
-      const lines = usePrev ? audiAsync[deptKey]?.prev : audiAsync[deptKey]?.curr;
-      return extractExpenseGroupsByMonth(lines ?? null, mIdx)[groupKey] ?? 0;
+      if (usePrev) return extractExpenseGroupsByMonth(audiAsync[deptKey]?.prev ?? null, mIdx)[groupKey] ?? 0;
+      return groupValueFromPair(audiAsync[deptKey]?.curr ?? null, audiAsync[deptKey]?.currRaw ?? null, mIdx, groupKey);
     }
 
-    const vwLines = usePrev ? vwAsync[deptKey]?.prev : vwAsync[deptKey]?.curr;
-    const vwVal = extractExpenseGroupsByMonth(vwLines ?? null, mIdx)[groupKey] ?? 0;
+    const vwVal = usePrev
+      ? extractExpenseGroupsByMonth(vwAsync[deptKey]?.prev ?? null, mIdx)[groupKey] ?? 0
+      : groupValueFromPair(vwAsync[deptKey]?.curr ?? null, vwAsync[deptKey]?.currRaw ?? null, mIdx, groupKey);
 
     if (deptKey === 'direta') return vwVal;
 
-    const audiLines = usePrev ? audiAsync[deptKey]?.prev : audiAsync[deptKey]?.curr;
-    const audiVal = extractExpenseGroupsByMonth(audiLines ?? null, mIdx)[groupKey] ?? 0;
+    const audiVal = usePrev
+      ? extractExpenseGroupsByMonth(audiAsync[deptKey]?.prev ?? null, mIdx)[groupKey] ?? 0
+      : groupValueFromPair(audiAsync[deptKey]?.curr ?? null, audiAsync[deptKey]?.currRaw ?? null, mIdx, groupKey);
     return vwVal + audiVal;
   }
 
