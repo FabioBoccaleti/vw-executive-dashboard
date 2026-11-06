@@ -9,6 +9,10 @@
 5. Expanda uma conta com vários departamentos. A soma dos departamentos deve corresponder ao valor da conta; cada departamento soma ambas as revendas. Contas com um só departamento mostram seu nome sem expansão.
 6. As regras de departamento e de Tipo Item seguem as configurações de **Importar Dados**. Centros de custo sem regra aparecem como **sem classificação**, sem descartar suas despesas. Totais de conta, centro de custo, revenda e Tipo Item não devem ser somados em duplicidade.
 7. Clique em **Ocultar Custo Fixo Pinheiros** e confira que a aba desaparece. Ao sair da Base Gerencial e voltar, ela deve começar oculta novamente. As abas existentes de Audi e VW não devem mudar.
+8. Sem configuração salva, nenhuma conta deve ser considerada despesa fixa. Clique em **Selecionar despesas fixas** para mostrar todas as contas do período com checkboxes. Marque as desejadas e clique em **Salvar seleção**; **Cancelar** descarta a edição. Durante a edição, os totais mostram uma prévia apenas das contas marcadas.
+9. Fora da edição, contas não marcadas e grupos sem contas marcadas ficam ocultos. Total, subtotais, quantidade de contas, grupos e departamentos consideram somente a seleção. Abra a edição novamente para recuperar contas ocultas.
+10. A seleção é salva pelo código da conta, independentemente da descrição, mês ou ano. Contas novas começam desmarcadas e a seleção de contas ausentes no período não é perdida ao salvar outras. Em produção, a configuração usa o armazenamento compartilhado e deve reaparecer em outros usuários/dispositivos ao abrir a aba. No desenvolvimento local, o cliente KV existente usa IndexedDB neste navegador.
+11. Em caso de erro ao carregar a seleção, não deve aparecer um relatório com totais. Em caso de erro ao salvar, a edição deve permanecer aberta com as marcações preservadas para tentar novamente, sem mensagem de sucesso.
 
 ## ✅ Testes Automatizados Passando
 

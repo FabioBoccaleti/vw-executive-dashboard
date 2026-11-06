@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { kvKeys } from '@/lib/kvClient';
-import { getBaseGerencialMes } from '@/components/BaseGerencialDashboard/baseGerencialStorage';
+import { getBaseGerencialMes, loadPinheirosContasFixas, savePinheirosContasFixas } from '@/components/BaseGerencialDashboard/baseGerencialStorage';
 import { BaseGerencialDashboard } from '@/components/BaseGerencialDashboard';
 import { CustoFixoPinheirosTab } from '@/components/BaseGerencialDashboard/CustoFixoPinheirosTab';
 import {
@@ -11,10 +11,12 @@ import {
 } from '@/components/BaseGerencialDashboard/baseGerencialDataProcessor';
 
 vi.mock('@/lib/kvClient', () => ({ kvKeys: vi.fn().mockResolvedValue([]) }));
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), info: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/BaseGerencialDashboard/baseGerencialStorage', async importOriginal => ({
   ...await importOriginal<typeof import('@/components/BaseGerencialDashboard/baseGerencialStorage')>(),
   getBaseGerencialMes: vi.fn().mockResolvedValue(null),
+  loadPinheirosContasFixas: vi.fn(),
+  savePinheirosContasFixas: vi.fn(),
 }));
 vi.mock('@/components/BaseGerencialDashboard/baseGerencialDataProcessor', () => ({
   processCustoFixoPinheirosData: vi.fn(),
@@ -50,6 +52,10 @@ beforeEach(() => {
   vi.mocked(kvKeys).mockReset().mockResolvedValue([]);
   vi.mocked(getBaseGerencialMes).mockReset().mockResolvedValue(null);
   vi.mocked(processCustoFixoPinheirosData).mockReset().mockResolvedValue(dados);
+  vi.mocked(loadPinheirosContasFixas).mockReset().mockResolvedValue(['51101', '51102']);
+  vi.mocked(savePinheirosContasFixas).mockReset().mockResolvedValue(undefined);
+  vi.mocked(toast.error).mockClear();
+  vi.mocked(toast.success).mockClear();
 });
 afterEach(() => {
   cleanup();
@@ -64,7 +70,7 @@ describe('Custo Fixo Pinheiros — interface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar Custo Fixo Pinheiros' }));
     const tab = screen.getByRole('button', { name: 'Custo Fixo Pinheiros' });
     expect(tab.previousElementSibling).toHaveTextContent('DRE');
-    await screen.findByText('Total das Despesas');
+    await screen.findByText('Total das Despesas Fixas');
     fireEvent.click(screen.getByRole('button', { name: 'VW' }));
     expect(screen.queryByRole('button', { name: /Custo Fixo Pinheiros/ })).not.toBeInTheDocument();
     expect(screen.getByText('vw: veiculos_novos')).toBeInTheDocument();
@@ -73,7 +79,7 @@ describe('Custo Fixo Pinheiros — interface', () => {
     expect(screen.queryByRole('button', { name: 'Custo Fixo Pinheiros' })).not.toBeInTheDocument();
     expect(screen.getByText('DRE existente')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar Custo Fixo Pinheiros' }));
-    await screen.findByText('Total das Despesas');
+    await screen.findByText('Total das Despesas Fixas');
     unmount();
     render(<BaseGerencialDashboard onChangeBrand={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Audi' }));
@@ -84,7 +90,7 @@ describe('Custo Fixo Pinheiros — interface', () => {
     render(<BaseGerencialDashboard onChangeBrand={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Audi' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar Custo Fixo Pinheiros' }));
-    await screen.findByText('Total das Despesas');
+    await screen.findByText('Total das Despesas Fixas');
     expect(processCustoFixoPinheirosData).toHaveBeenLastCalledWith(new Date().getFullYear(), new Date().getMonth() + 1);
     fireEvent.click(screen.getByRole('button', { name: 'Set' }));
     await screen.findByText(`Setembro / ${new Date().getFullYear()}`);
@@ -145,7 +151,7 @@ describe('Custo Fixo Pinheiros — interface', () => {
 
   it('expande apenas contas com vários departamentos e mostra o departamento único sem expansão', async () => {
     const { container } = render(<CustoFixoPinheirosTab year={2026} mes={9} />);
-    await screen.findByText('Total das Despesas');
+    await screen.findByText('Total das Despesas Fixas');
     const detalhes = container.querySelectorAll('details');
     expect(detalhes).toHaveLength(1);
     expect(detalhes[0]).not.toHaveAttribute('open');
@@ -170,7 +176,7 @@ describe('Custo Fixo Pinheiros — interface', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     render(<CustoFixoPinheirosTab year={2026} mes={9} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Erro ao carregar Custo Fixo Pinheiros');
-    expect(screen.queryByText('Total das Despesas')).not.toBeInTheDocument();
+    expect(screen.queryByText('Total das Despesas Fixas')).not.toBeInTheDocument();
     expect(log).toHaveBeenCalledWith('Erro ao carregar Custo Fixo Pinheiros:', erro);
     expect(toast.error).toHaveBeenCalled();
   });
@@ -182,9 +188,129 @@ describe('Custo Fixo Pinheiros — interface', () => {
     );
     const { rerender } = render(<CustoFixoPinheirosTab year={2026} mes={8} />);
     rerender(<CustoFixoPinheirosTab year={2026} mes={9} />);
-    await screen.findByText('Total das Despesas');
+    await screen.findByText('Total das Despesas Fixas');
     await act(async () => { concluirAnterior({ grupos: [], total: 0 }); });
     expect(screen.getByText('51102 - FERIAS')).toBeInTheDocument();
     expect(screen.queryByText('Nenhuma despesa encontrada')).not.toBeInTheDocument();
+  });
+
+  it('começa sem contas selecionadas e salva somente as marcadas, ocultando contas e grupos restantes', async () => {
+    vi.mocked(loadPinheirosContasFixas).mockResolvedValue([]);
+    vi.mocked(processCustoFixoPinheirosData).mockResolvedValue({
+      ...dados,
+      grupos: [...dados.grupos, {
+        tipo: 'despesas_ocupacao', subtotal: -800,
+        contas: [{ conta: '51201 - ALUGUEL', valor: -800, departamentos: [{ departamento: 'Diretoria', valor: -800 }] }],
+      }],
+    });
+    render(<CustoFixoPinheirosTab year={2026} mes={9} />);
+    await screen.findByText('Nenhuma despesa fixa selecionada neste período');
+    expect(screen.queryByRole('region', { name: 'Despesas c/ Pessoal' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('pinheiros-total')).toHaveTextContent('R$ 0,00');
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar despesas fixas' }));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+    for (const checkbox of screen.getAllByRole('checkbox')) expect(checkbox).not.toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: /51102 - FERIAS/ }));
+    expect(screen.getByTestId('pinheiros-total')).toHaveTextContent(/-.*50,00/);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar seleção' }));
+    await screen.findByRole('button', { name: 'Selecionar despesas fixas' });
+    expect(savePinheirosContasFixas).toHaveBeenCalledExactlyOnceWith(['51102']);
+    expect(screen.queryByText(/51101 - SALARIOS/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Despesas c/ Ocupação' })).not.toBeInTheDocument();
+    const grupo = screen.getByRole('region', { name: 'Despesas c/ Pessoal' });
+    expect(within(grupo).getAllByText(/50,00/)).toHaveLength(3);
+    expect(screen.queryByText('Diretoria')).not.toBeInTheDocument();
+    expect(screen.getByText('1 grupos selecionados no período')).toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledExactlyOnceWith('Seleção de despesas fixas salva.');
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar despesas fixas' }));
+    expect(screen.getByRole('checkbox', { name: /51102 - FERIAS/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /51101 - SALARIOS/ })).not.toBeChecked();
+  });
+
+  it('restaura seleção compartilhada em outro ano e mantém códigos ausentes ao salvar', async () => {
+    let salvas = ['51101', '59999'];
+    vi.mocked(loadPinheirosContasFixas).mockImplementation(async () => [...salvas]);
+    vi.mocked(savePinheirosContasFixas).mockImplementation(async contas => { salvas = [...contas]; });
+    const { unmount } = render(<CustoFixoPinheirosTab year={2026} mes={9} />);
+    await screen.findByText('Total das Despesas Fixas');
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar despesas fixas' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /51102 - FERIAS/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar seleção' }));
+    await screen.findByRole('button', { name: 'Selecionar despesas fixas' });
+    expect(salvas).toEqual(['51101', '59999', '51102']);
+    unmount();
+    vi.mocked(processCustoFixoPinheirosData).mockResolvedValue({
+      total: -120, grupos: [{
+        tipo: 'despesas_pessoal', subtotal: -120,
+        contas: [
+          { conta: '51101 - SALARIOS RENOMEADOS', valor: -100, departamentos: [{ departamento: 'Oficina', valor: -100 }] },
+          { conta: '51103 - CONTA NOVA', valor: -20, departamentos: [{ departamento: 'Oficina', valor: -20 }] },
+        ],
+      }],
+    });
+    render(<CustoFixoPinheirosTab year={2027} mes={1} />);
+    await screen.findByText('51101 - SALARIOS RENOMEADOS');
+    expect(screen.queryByText('51103 - CONTA NOVA')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pinheiros-total')).toHaveTextContent(/-.*100,00/);
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar despesas fixas' }));
+    expect(screen.getByRole('checkbox', { name: /51101 - SALARIOS RENOMEADOS/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /51103 - CONTA NOVA/ })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar seleção' }));
+    await screen.findByRole('button', { name: 'Selecionar despesas fixas' });
+    expect(salvas).toEqual(['51101', '59999', '51102']);
+  });
+
+  it('permite desmarcar todas e cancelar sem alterar a seleção salva', async () => {
+    render(<CustoFixoPinheirosTab year={2026} mes={9} />);
+    await screen.findByText('Total das Despesas Fixas');
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar despesas fixas' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /51101 - SALARIOS/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /51102 - FERIAS/ }));
+    expect(screen.getByTestId('pinheiros-total')).toHaveTextContent('R$ 0,00');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.getByTestId('pinheiros-total')).toHaveTextContent(/-.*350,00/);
+    expect(savePinheirosContasFixas).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar despesas fixas' }));
+    expect(screen.getByRole('checkbox', { name: /51101 - SALARIOS/ })).toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: /51101 - SALARIOS/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /51102 - FERIAS/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar seleção' }));
+    await screen.findByText('Nenhuma despesa fixa selecionada neste período');
+    expect(savePinheirosContasFixas).toHaveBeenCalledExactlyOnceWith([]);
+    expect(screen.queryAllByRole('region')).toHaveLength(0);
+  });
+
+  it('bloqueia edição durante o salvamento e preserva marcações se ele falhar, permitindo tentar novamente', async () => {
+    let rejeitar: (error: Error) => void = () => {};
+    vi.mocked(savePinheirosContasFixas).mockReturnValueOnce(new Promise((_, reject) => { rejeitar = reject; }));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<CustoFixoPinheirosTab year={2026} mes={9} />);
+    await screen.findByText('Total das Despesas Fixas');
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar despesas fixas' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /51101 - SALARIOS/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar seleção' }));
+    expect(screen.getByRole('button', { name: 'Salvando...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled();
+    for (const checkbox of screen.getAllByRole('checkbox')) expect(checkbox).toBeDisabled();
+    const erro = new Error('Falha ao salvar');
+    await act(async () => { rejeitar(erro); });
+    expect(screen.getByRole('checkbox', { name: /51101 - SALARIOS/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /51102 - FERIAS/ })).toBeChecked();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Não foi possível salvar a seleção. Tente novamente.');
+    expect(log).toHaveBeenCalledWith('Erro ao salvar despesas fixas de Pinheiros:', erro);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar seleção' }));
+    await screen.findByRole('button', { name: 'Selecionar despesas fixas' });
+    expect(savePinheirosContasFixas).toHaveBeenLastCalledWith(['51102']);
+  });
+
+  it('não permite sobrescrever a seleção se o carregamento dela falhar', async () => {
+    vi.mocked(loadPinheirosContasFixas).mockRejectedValue(new Error('Falha na seleção'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<CustoFixoPinheirosTab year={2026} mes={9} />);
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('button', { name: 'Selecionar despesas fixas' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pinheiros-total')).not.toBeInTheDocument();
+    expect(savePinheirosContasFixas).not.toHaveBeenCalled();
   });
 });

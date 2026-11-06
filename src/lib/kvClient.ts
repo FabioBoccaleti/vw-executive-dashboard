@@ -72,14 +72,18 @@ const getApiBaseUrl = (): string => {
 
 // ─── API pública ───────────────────────────────────────────────────────────
 
-export async function kvGet<T = unknown>(key: string): Promise<T | null> {
+export async function kvGet<T = unknown>(key: string, options?: { throwOnError?: boolean }): Promise<T | null> {
   if (IS_DEV) return idbGet<T>(key);
   try {
     const response = await fetch(`${getApiBaseUrl()}/api/kv/get?key=${encodeURIComponent(key)}`);
-    if (!response.ok) { console.error(`KV GET error: ${response.status}`); return null; }
+    if (!response.ok) { throw new Error(`KV GET error: ${response.status}`); }
     const data = await response.json();
     return data.value as T | null;
-  } catch (error) { console.error('KV GET error:', error); return null; }
+  } catch (error) {
+    console.error('KV GET error:', error);
+    if (options?.throwOnError) throw error;
+    return null;
+  }
 }
 
 export async function kvSet(key: string, value: unknown): Promise<boolean> {

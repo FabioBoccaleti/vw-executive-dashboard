@@ -46,6 +46,22 @@ export interface BaseGerencialDreAdjustment {
 const KEY_PREFIX = 'basege';
 const DRE_ADJUSTMENTS_KEY = `${KEY_PREFIX}:dre-adjustments`;
 const DRE_CACHE_PATTERN = `${KEY_PREFIX}:dre-cache:*`;
+const PINHEIROS_CONTAS_FIXAS_KEY = `${KEY_PREFIX}:pinheiros:contas-fixas`;
+
+export async function loadPinheirosContasFixas(): Promise<string[]> {
+  const contas = await kvGet<string[]>(PINHEIROS_CONTAS_FIXAS_KEY, { throwOnError: true });
+  if (contas === null) return [];
+  if (!Array.isArray(contas) || contas.some(conta => typeof conta !== 'string' || !/^\d+$/.test(conta))) {
+    throw new Error('Seleção de despesas fixas de Pinheiros inválida.');
+  }
+  return contas;
+}
+
+export async function savePinheirosContasFixas(contas: string[]): Promise<void> {
+  if (!await kvSet(PINHEIROS_CONTAS_FIXAS_KEY, [...new Set(contas)])) {
+    throw new Error('Não foi possível salvar as despesas fixas de Pinheiros.');
+  }
+}
 
 export interface BaseGerencialDreCache {
   version: 3;
