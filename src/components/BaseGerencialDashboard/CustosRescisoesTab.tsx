@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer } from 'lucide-react';
 import { processDepartamentoData } from './baseGerencialDataProcessor';
-import { getAllImportedMesesData, type Marca, type DeptoClassificacao } from './baseGerencialStorage';
+import { getAllImportedMesesData, getBaseGerencialMes, type Marca, type DeptoClassificacao } from './baseGerencialStorage';
+
+const MONTH_NAMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
 
 // Contas de custos de rescisões a demonstrar (contas principais, 10 dígitos).
 const ACCOUNTS = [
@@ -51,21 +56,45 @@ export function CustosRescisoesTab({ marca, year }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<RowData[]>([]);
+  // 0 = Ano todo; 1-12 = mês específico.
+  const [month, setMonth] = useState<number>(0);
+  const [resolvedYear, setResolvedYear] = useState<number | null>(null);
+
+  // Ao entrar na aba (ou trocar o ano), define o mês mais recente com dados
+  // importados como seleção inicial (0 = Ano todo quando não há nenhum mês).
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    (async () => {
+      const checks = await Promise.all(
+        Array.from({ length: 12 }, (_, i) => getBaseGerencialMes(year, i + 1)),
+      );
+      if (!active) return;
+      let latest = 0;
+      for (let m = 12; m >= 1; m--) {
+        if (checks[m - 1]) { latest = m; break; }
+      }
+      setMonth(latest);
+      setResolvedYear(year);
+    })();
+    return () => { active = false; };
+  }, [year]);
 
   useEffect(() => {
+    if (resolvedYear !== year) return; // aguarda resolver o mês default do ano
     let active = true;
     setLoading(true);
     setError(null);
 
     (async () => {
       try {
-        // Processa cada departamento no ano todo (mes = 0), respeitando a
-        // classificação de revenda e as regras por departamento. Em paralelo,
-        // carrega todos os meses importados (de qualquer ano) para obter a
-        // descrição completa das contas mesmo quando o ano selecionado não tem
-        // movimento.
+        // Processa cada departamento no período selecionado (mês, ou 0 = ano
+        // todo), respeitando a classificação de revenda e as regras por
+        // departamento. Em paralelo, carrega todos os meses importados (de
+        // qualquer ano) para obter a descrição completa das contas mesmo quando
+        // o período selecionado não tem movimento.
         const [results, allMeses] = await Promise.all([
-          Promise.all(DEPTS.map(d => processDepartamentoData(marca, d.key, year, 0))),
+          Promise.all(DEPTS.map(d => processDepartamentoData(marca, d.key, year, month))),
           getAllImportedMesesData(),
         ]);
         if (!active) return;
@@ -116,49 +145,55 @@ export function CustosRescisoesTab({ marca, year }: Props) {
     })();
 
     return () => { active = false; };
-  }, [marca, year]);
+  }, [marca, year, month, resolvedYear]);
 
   const columnTotals: Record<string, number> = {};
   DEPTS.forEach(d => { columnTotals[d.key] = rows.reduce((s, r) => s + (r.values[d.key] ?? 0), 0); });
   const grandTotal = rows.reduce((s, r) => s + r.total, 0);
 
   const marcaLabel = marca === 'vw' ? 'VW' : 'Audi';
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-white rounded-xl border border-red-200 shadow-sm">
-        <div className="text-center space-y-2 px-6">
-          <p className="text-red-600 font-semibold">Erro ao carregar os dados</p>
-          <p className="text-slate-500 text-sm">{error}</p>
-        </div>
-      </div>
-    );
-  }
+  const periodoLabel = month === 0 ? `Ano ${year}` : `${MONTH_NAMES[month - 1]}/${year}`;
 
   return (
     <div className="flex-1 min-h-0 overflow-auto bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="mb-3 flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-base font-bold text-slate-800">Custos de Rescisões</h2>
-          <p className="text-xs text-slate-500">{marcaLabel} · Ano {year} · Valores em R$</p>
+          <p className="text-xs text-slate-500">{marcaLabel} · {periodoLabel} · Valores em R$</p>
         </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shrink-0"
-        >
-          <Printer className="h-3.5 w-3.5" /> Imprimir PDF
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mês</label>
+            <select
+              value={month}
+              onChange={e => setMonth(Number(e.target.value))}
+              className="rounded border border-slate-200 px-2 py-1.5 text-[11px] font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            >
+              <option value={0}>Ano todo</option>
+              {MONTH_NAMES.map((n, i) => (<option key={i} value={i + 1}>{n}</option>))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 rounded border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            <Printer className="h-3.5 w-3.5" /> Imprimir PDF
+          </button>
+        </div>
       </div>
 
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+        </div>
+      ) : error ? (
+        <div className="text-center space-y-2 px-6 py-20">
+          <p className="text-red-600 font-semibold">Erro ao carregar os dados</p>
+          <p className="text-slate-500 text-sm">{error}</p>
+        </div>
+      ) : (
+        <>
       <table className="w-full min-w-[1000px] border-collapse text-[11px]">
         <thead>
           <tr className="bg-slate-800 text-white">
@@ -208,27 +243,29 @@ export function CustosRescisoesTab({ marca, year }: Props) {
             columnTotals={columnTotals}
             grandTotal={grandTotal}
             marcaLabel={marcaLabel}
-            year={year}
+            periodoLabel={periodoLabel}
           />,
           document.getElementById('print-root')!,
         )}
+        </>
+      )}
     </div>
   );
 }
 
-function PrintView({ rows, columnTotals, grandTotal, marcaLabel, year }: {
+function PrintView({ rows, columnTotals, grandTotal, marcaLabel, periodoLabel }: {
   rows: RowData[];
   columnTotals: Record<string, number>;
   grandTotal: number;
   marcaLabel: string;
-  year: number;
+  periodoLabel: string;
 }) {
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', colorScheme: 'only light' as React.CSSProperties['colorScheme'] }}>
       <div className="print-page">
         <div style={{ backgroundColor: '#065f46', color: 'white', padding: '8px 12px', marginBottom: '6px' }}>
           <div style={{ fontWeight: 700, fontSize: '12pt' }}>Custos de Rescisões — {marcaLabel}</div>
-          <div style={{ fontSize: '8pt', opacity: 0.85 }}>Ano {year} · Valores em R$</div>
+          <div style={{ fontSize: '8pt', opacity: 0.85 }}>{periodoLabel} · Valores em R$</div>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
           <thead>
