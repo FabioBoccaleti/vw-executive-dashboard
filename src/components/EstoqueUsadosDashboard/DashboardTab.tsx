@@ -212,8 +212,18 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
     clone.style.display = 'block';
     let printHTML = clone.outerHTML;
 
-    // ── Página 2: histórico (até 10 lançamentos) ──────────────────────────
-    const recentDates = historyDates.slice(0, 10);
+    // ── Página 2+: histórico (lançamentos dos últimos 60 dias) ────────────
+    // Janela de 60 dias corridos contada a partir do lançamento mais recente.
+    let recentDates: string[] = [];
+    if (historyDates.length > 0) {
+      const refStr = historyDates[0]; // 'YYYY-MM-DD' (mais recente)
+      const refDate = new Date(`${refStr}T00:00:00`);
+      const cutoff = new Date(refDate);
+      cutoff.setDate(cutoff.getDate() - 60);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const cutoffStr = `${cutoff.getFullYear()}-${pad(cutoff.getMonth() + 1)}-${pad(cutoff.getDate())}`;
+      recentDates = historyDates.filter(d => d >= cutoffStr);
+    }
     if (recentDates.length > 0) {
       const keys = recentDates.map(d => `estoque_usados:entry:${d}`);
       let histEntries: EstoqueUsadosEntry[] = [];
@@ -237,6 +247,10 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
           { label: 'Novos Venc. Audi',  fn: (e: EstoqueUsadosEntry) => fmtBRL(e.audiNovosProximoVencimento ?? 0) },
         ];
 
+        const periodoLabel = histEntries.length > 1
+          ? `${histEntries.length} lançamentos · de ${formatDateBR(histEntries[histEntries.length - 1].date)} a ${formatDateBR(histEntries[0].date)} (últimos 60 dias)`
+          : `1 lançamento · ${formatDateBR(histEntries[0].date)} (últimos 60 dias)`;
+
         const theadCells = cols.map(c => `<th>${c.label}</th>`).join('');
         const tbodyRows  = histEntries.map((e, i) => {
           const cells = cols.map((c, ci) =>
@@ -245,14 +259,20 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
           return `<tr class="${i % 2 === 0 ? 'even' : ''}">${cells}</tr>`;
         }).join('');
 
+        // O banner "Histórico" e o cabeçalho das colunas ficam no <thead>, que o
+        // navegador repete automaticamente no topo de cada página impressa.
         printHTML += `
           <div class="hist-page">
-            <div class="hist-header">
-              <div class="hist-title">Histórico</div>
-              <div class="hist-subtitle">Últimos ${histEntries.length} lançamento${histEntries.length > 1 ? 's' : ''} registrado${histEntries.length > 1 ? 's' : ''}</div>
-            </div>
             <table class="hist-table">
-              <thead><tr>${theadCells}</tr></thead>
+              <thead>
+                <tr class="hist-banner">
+                  <th colspan="${cols.length}">
+                    <div class="hist-title">Histórico</div>
+                    <div class="hist-subtitle">${periodoLabel}</div>
+                  </th>
+                </tr>
+                <tr class="hist-cols">${theadCells}</tr>
+              </thead>
               <tbody>${tbodyRows}</tbody>
             </table>
           </div>`;
@@ -285,36 +305,45 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
       #print-root .flex-1 { flex: none !important; height: auto !important; }
       #print-root .min-h-0 { min-height: 0 !important; }
 
-      /* ── Página 2: Histórico ── */
+      /* ── Página 2+: Histórico ── */
       .hist-page {
         page-break-before: always;
         padding: 0;
         font-family: Inter, system-ui, sans-serif;
-      }
-      .hist-header {
-        background: linear-gradient(135deg, #001e50 0%, #6b0018 100%);
-        padding: 14px 20px;
-        color: white;
-        margin-bottom: 16px;
-      }
-      .hist-title {
-        font-size: 20px;
-        font-weight: 700;
-      }
-      .hist-subtitle {
-        font-size: 10px;
-        opacity: 0.7;
-        margin-top: 2px;
       }
       .hist-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 11px;
       }
-      .hist-table thead tr {
+      /* O thead (banner + colunas) repete no topo de cada página impressa. */
+      .hist-table thead {
+        display: table-header-group;
+      }
+      .hist-table tr.hist-banner th {
+        background: linear-gradient(135deg, #001e50 0%, #6b0018 100%);
+        padding: 14px 20px;
+        text-align: left;
+        border: none;
+        text-transform: none;
+        letter-spacing: normal;
+      }
+      .hist-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #ffffff;
+      }
+      .hist-subtitle {
+        font-size: 10px;
+        color: #ffffff;
+        opacity: 0.7;
+        margin-top: 2px;
+        font-weight: 400;
+      }
+      .hist-table tr.hist-cols {
         background: #f1f5f9;
       }
-      .hist-table th {
+      .hist-table tr.hist-cols th {
         padding: 8px 12px;
         text-align: center;
         font-size: 9px;
@@ -324,7 +353,8 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
         color: #475569;
         border-bottom: 2px solid #e2e8f0;
       }
-      .hist-table th:first-child { text-align: left; }
+      .hist-table tr.hist-cols th:first-child { text-align: left; }
+      .hist-table tbody tr { page-break-inside: avoid; }
       .hist-table td {
         padding: 7px 12px;
         text-align: center;
