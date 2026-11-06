@@ -212,18 +212,10 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
     clone.style.display = 'block';
     let printHTML = clone.outerHTML;
 
-    // ── Página 2+: histórico (lançamentos dos últimos 60 dias) ────────────
-    // Janela de 60 dias corridos contada a partir do lançamento mais recente.
-    let recentDates: string[] = [];
-    if (historyDates.length > 0) {
-      const refStr = historyDates[0]; // 'YYYY-MM-DD' (mais recente)
-      const refDate = new Date(`${refStr}T00:00:00`);
-      const cutoff = new Date(refDate);
-      cutoff.setDate(cutoff.getDate() - 60);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const cutoffStr = `${cutoff.getFullYear()}-${pad(cutoff.getMonth() + 1)}-${pad(cutoff.getDate())}`;
-      recentDates = historyDates.filter(d => d >= cutoffStr);
-    }
+    // ── Página 2+: histórico (últimos 60 dias com números registrados) ─────
+    // Mesmo critério da aba Histórico: os 60 lançamentos mais recentes
+    // (dias que tiveram valores registrados), por contagem — não por calendário.
+    const recentDates = historyDates.slice(0, 60);
     if (recentDates.length > 0) {
       const keys = recentDates.map(d => `estoque_usados:entry:${d}`);
       let histEntries: EstoqueUsadosEntry[] = [];
@@ -248,8 +240,8 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
         ];
 
         const periodoLabel = histEntries.length > 1
-          ? `${histEntries.length} lançamentos · de ${formatDateBR(histEntries[histEntries.length - 1].date)} a ${formatDateBR(histEntries[0].date)} (últimos 60 dias)`
-          : `1 lançamento · ${formatDateBR(histEntries[0].date)} (últimos 60 dias)`;
+          ? `${histEntries.length} lançamentos · de ${formatDateBR(histEntries[histEntries.length - 1].date)} a ${formatDateBR(histEntries[0].date)} (últimos 60 dias com lançamentos)`
+          : `1 lançamento · ${formatDateBR(histEntries[0].date)} (últimos 60 dias com lançamentos)`;
 
         const theadCells = cols.map(c => `<th>${c.label}</th>`).join('');
         const tbodyRows  = histEntries.map((e, i) => {
