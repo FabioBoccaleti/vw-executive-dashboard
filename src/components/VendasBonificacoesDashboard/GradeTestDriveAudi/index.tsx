@@ -437,6 +437,19 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
     [veiculos],
   );
 
+  const hoje = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const resumoEstoque = useMemo(() => {
+    const emEstoque = veiculos.filter(v => !v.vendido);
+    const disponiveis = emEstoque.filter(v => situacaoVendaVeiculo(v, grades, hoje) === 'disponivel');
+    const soma = (lista: VeiculoGrade[]) => lista.reduce((acc, v) => acc + v.valorCompra, 0);
+    return {
+      totalQtd: emEstoque.length,
+      totalValor: soma(emEstoque),
+      dispQtd: disponiveis.length,
+      dispValor: soma(disponiveis),
+    };
+  }, [veiculos, grades, hoje]);
+
   return (
     <div className="space-y-6">
       <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-4">
@@ -484,6 +497,18 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
         <p className="text-sm text-slate-400">Nenhum veículo cadastrado.</p>
       ) : (
         <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Car className="w-4 h-4 text-cyan-700" />Em estoque (total)</div>
+            <p className="mt-1 text-lg font-bold text-cyan-800">{formatCurrency(resumoEstoque.totalValor)}</p>
+            <p className="text-xs text-slate-500">{resumoEstoque.totalQtd} veículo(s)</p>
+          </div>
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Car className="w-4 h-4 text-emerald-700" />Disponível para venda</div>
+            <p className="mt-1 text-lg font-bold text-emerald-800">{formatCurrency(resumoEstoque.dispValor)}</p>
+            <p className="text-xs text-slate-500">{resumoEstoque.dispQtd} veículo(s) · liberados</p>
+          </div>
+        </div>
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-bold text-slate-800">Veículos cadastrados ({ordenados.length})</h3>
           <button
@@ -530,7 +555,12 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
                   <td className="px-3 py-2">
                     {veiculo.vendido
                       ? <span className="inline-flex items-center rounded-full bg-slate-200 text-slate-700 px-2 py-0.5 text-[11px] font-semibold">Vendido {formatDate(veiculo.dataVenda)}</span>
-                      : <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[11px] font-semibold">Em estoque</span>}
+                      : <div className="flex flex-col items-start gap-1">
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[11px] font-semibold">Em estoque</span>
+                          {situacaoVendaVeiculo(veiculo, grades, hoje) === 'disponivel'
+                            ? <span className="inline-flex items-center rounded-full bg-sky-100 text-sky-700 px-2 py-0.5 text-[10px] font-semibold">Liberado p/ venda</span>
+                            : <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-semibold">Aguardando liberação</span>}
+                        </div>}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center justify-end gap-2">
