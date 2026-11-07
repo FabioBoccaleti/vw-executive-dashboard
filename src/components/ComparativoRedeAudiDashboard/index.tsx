@@ -545,7 +545,7 @@ function isExpense(label: string) {
 const DEPARTAMENTO_SECTIONS = ['nv', 'uv', 'pa', 'ac', 'paac', 'me', 'bp', 'mebp'];
 
 const SECTION_LABELS: Record<string, string> = {
-  tot: 'TOTAL',
+  tot: 'Demonstração Resultado Geral',
   totadj: 'TOTAL ADJ',
   nv: 'NOVOS',
   uv: 'USADOS',
@@ -564,6 +564,118 @@ function sectionLabel(name: string) {
 
 function isBalSection(name: string) {
   return normalizeName(name) === 'bal';
+}
+
+function isTotAdjSection(name: string) {
+  return normalizeName(name) === 'totadj';
+}
+
+function isTotSection(name: string) {
+  return normalizeName(name) === 'tot';
+}
+
+function isEbitdaRow(label: string) {
+  return normalizeName(label) === 'ebitda';
+}
+
+// Linhas financeiras da seção TOT que podem ser zeradas na simulação.
+const ZERO_FINANCEIRO_FIELDS = [
+  { field: 'estoques', norm: 'totalgeraljurossobreestoquesfinanciados', label: 'Zerar Juros sobre Estoques Financiados' },
+  { field: 'passivo', norm: 'totalgeraljurossobrepassivocirculante', label: 'Zerar Juros sobre Passivo Circulante' },
+  { field: 'longoPrazo', norm: 'totalgeraljurosdelongoprazo', label: 'Zerar Juros de Longo Prazo' },
+  { field: 'outrosJuros', norm: 'totalgeraloutrosjuros', label: 'Zerar Outros Juros' },
+  { field: 'outrasFin', norm: 'totalgeraloutrasreceitasdespesasfinanceiras', label: 'Zerar Outras Receitas / Despesas Financeiras' },
+] as const;
+
+// Componentes somados em "TOTAL GERAL DE JUROS".
+const JUROS_COMPONENT_NORMS = [
+  'totalgeraljurossobreestoquesfinanciados',
+  'totalgeraljurossobrepassivocirculante',
+  'totalgeraljurosdelongoprazo',
+  'totalgeraloutrosjuros',
+];
+const OUTRAS_FINANCEIRAS_NORM = 'totalgeraloutrasreceitasdespesasfinanceiras';
+
+// Linhas somadas no card recolhível "Mostrar total de despesas".
+const DESPESAS_RESUMO_NORMS = new Set([
+  'totalgeraldespesasdiretaspessoal',
+  'totalgeraldespesasoperacionaisdiretas',
+  'totalgeraldespesasoperacionaisindiretas',
+  'totalgeraldespesasindiretasdeativos',
+]);
+
+interface ZeroFinanceiroOptions {
+  estoques: boolean;
+  passivo: boolean;
+  longoPrazo: boolean;
+  outrosJuros: boolean;
+  outrasFin: boolean;
+}
+
+/**
+ * Simulação da seção "Demonstração Resultado Geral": zera as linhas financeiras
+ * selecionadas (AC Lapa e grupo de comparação) e recalcula os subtotais e resultados
+ * dependentes abaixo delas (TOTAL GERAL DE JUROS, TOTAL RESULTADO FINANCEIRO,
+ * LUCRO ANTES IR (LAIR) e RESULTADO LÍQUIDO DO EXERCÍCIO), ajustando os percentuais.
+ */
+function applyZeroFinanceiro(rows: DemonstrativoRow[], options: ZeroFinanceiroOptions): DemonstrativoRow[] {
+  if (!options.estoques && !options.passivo && !options.longoPrazo && !options.outrosJuros && !options.outrasFin) return rows;
+
+  const zeroNorms = new Set<string>();
+  if (options.estoques) zeroNorms.add('totalgeraljurossobreestoquesfinanciados');
+  if (options.passivo) zeroNorms.add('totalgeraljurossobrepassivocirculante');
+  if (options.longoPrazo) zeroNorms.add('totalgeraljurosdelongoprazo');
+  if (options.outrosJuros) zeroNorms.add('totalgeraloutrosjuros');
+  if (options.outrasFin) zeroNorms.add(OUTRAS_FINANCEIRAS_NORM);
+
+  const result = rows.map(row => ({ ...row }));
+  const byNorm = new Map<string, DemonstrativoRow>();
+  result.forEach(row => byNorm.set(normalizeName(row.label), row));
+
+  const receitaLiquidaRow = result.find(row => { const n = normalizeName(row.label); return n.startsWith('total') && n.includes('receitaliquida'); });
+  const rlSorana = receitaLiquidaRow?.sorana ?? null;
+  const rlBase = receitaLiquidaRow?.base ?? null;
+
+  const sumNullable = (values: Array<number | null>) => {
+    let acc: number | null = null;
+    for (const value of values) { if (value === null) continue; acc = (acc ?? 0) + value; }
+    return acc;
+  };
+  const subNullable = (a: number | null, b: number | null) => (a === null && b === null ? null : (a ?? 0) - (b ?? 0));
+  const getField = (norm: string, key: 'sorana' | 'base') => byNorm.get(norm)?.[key] ?? null;
+  const setLine = (norm: string, sorana: number | null, base: number | null) => {
+    const row = byNorm.get(norm);
+    if (!row) return;
+    row.sorana = sorana;
+    row.base = base;
+    if (row.hasPercent) {
+      row.soranaPercent = rlSorana ? (sorana ?? 0) / rlSorana * 100 : null;
+      row.basePercent = rlBase ? (base ?? 0) / rlBase * 100 : null;
+    }
+  };
+
+  result.forEach(row => {
+    if (!zeroNorms.has(normalizeName(row.label))) return;
+    row.sorana = 0;
+    row.base = 0;
+    if (row.hasPercent) { row.soranaPercent = 0; row.basePercent = 0; }
+  });
+
+  const totalJurosSorana = sumNullable(JUROS_COMPONENT_NORMS.map(norm => getField(norm, 'sorana')));
+  const totalJurosBase = sumNullable(JUROS_COMPONENT_NORMS.map(norm => getField(norm, 'base')));
+  setLine('totalgeraldejuros', totalJurosSorana, totalJurosBase);
+
+  const resultadoFinSorana = sumNullable([totalJurosSorana, getField(OUTRAS_FINANCEIRAS_NORM, 'sorana')]);
+  const resultadoFinBase = sumNullable([totalJurosBase, getField(OUTRAS_FINANCEIRAS_NORM, 'base')]);
+  setLine('totalresultadofinanceiro', resultadoFinSorana, resultadoFinBase);
+
+  const lairSorana = subNullable(getField('lucrooperliquido', 'sorana'), resultadoFinSorana);
+  const lairBase = subNullable(getField('lucrooperliquido', 'base'), resultadoFinBase);
+  setLine('lucroantesirlair', lairSorana, lairBase);
+
+  setLine('resultadoliquidodoexercicio', subNullable(lairSorana, getField('impostossobrelucros', 'sorana')), subNullable(lairBase, getField('impostossobrelucros', 'base')));
+
+  return result;
 }
 
 function complementaresCutoffIndex(sectionName: string, rows: DemonstrativoRow[]) {
@@ -590,11 +702,26 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const [loading, setLoading] = useState(false);
   const [showComplementares, setShowComplementares] = useState(false);
   const [showBal, setShowBal] = useState(false);
+  const [showTotAdj, setShowTotAdj] = useState(false);
+  const [showEbitda, setShowEbitda] = useState(false);
+  const [showDespesasResumo, setShowDespesasResumo] = useState(false);
+  const [zeroEstoques, setZeroEstoques] = useState(false);
+  const [zeroPassivo, setZeroPassivo] = useState(false);
+  const [zeroLongoPrazo, setZeroLongoPrazo] = useState(false);
+  const [zeroOutrosJuros, setZeroOutrosJuros] = useState(false);
+  const [zeroOutrasFin, setZeroOutrasFin] = useState(false);
   const options = periodOptions(periodicity);
   const baseGroup = GROUPS.find(group => group.key === comparisonBase) as GroupDef;
 
   useEffect(() => {
     setShowComplementares(false);
+    setShowEbitda(false);
+    setShowDespesasResumo(false);
+    setZeroEstoques(false);
+    setZeroPassivo(false);
+    setZeroLongoPrazo(false);
+    setZeroOutrosJuros(false);
+    setZeroOutrasFin(false);
   }, [sectionIndex]);
 
   useEffect(() => {
@@ -664,15 +791,28 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const summaryCards = [
     { title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') && !label.includes('oreceitas') },
     { title: 'Margem de Contribuição I', match: (label: string) => label.includes('margemcontribuicaoi') },
-    { title: 'Lucro Operacional', match: (label: string) => label.includes('lucrooperacional') },
+    { title: 'LUCRO OPER. LÍQUIDO', match: (label: string) => label.includes('lucrooperliquido') },
     { title: 'Lucro antes do IR (LAIR)', match: (label: string) => label.includes('lair') },
   ];
 
   const currentSectionName = sections[Math.min(sectionIndex, Math.max(0, sections.length - 1))] ?? '';
-  const resultadoIndex = complementaresCutoffIndex(currentSectionName, rows);
-  const hasComplementares = resultadoIndex >= 0 && resultadoIndex < rows.length - 1;
-  const mainRows = hasComplementares ? rows.slice(0, resultadoIndex + 1) : rows;
-  const complementaresRows = hasComplementares ? rows.slice(resultadoIndex + 1) : [];
+  const isTot = isTotSection(currentSectionName);
+  const displayRows = isTot
+    ? applyZeroFinanceiro(rows, { estoques: zeroEstoques, passivo: zeroPassivo, longoPrazo: zeroLongoPrazo, outrosJuros: zeroOutrosJuros, outrasFin: zeroOutrasFin })
+    : rows;
+  const resultadoIndex = complementaresCutoffIndex(currentSectionName, displayRows);
+  const hasComplementares = resultadoIndex >= 0 && resultadoIndex < displayRows.length - 1;
+  const mainRows = hasComplementares ? displayRows.slice(0, resultadoIndex + 1) : displayRows;
+  const complementaresRows = hasComplementares ? displayRows.slice(resultadoIndex + 1) : [];
+
+  const despesasResumo = (() => {
+    if (!isTot) return null;
+    const totais = displayRows.filter(row => DESPESAS_RESUMO_NORMS.has(normalizeName(row.label)));
+    if (totais.length === 0) return null;
+    const soma = (field: 'sorana' | 'base' | 'soranaPercent' | 'basePercent') =>
+      totais.reduce<number | null>((total, row) => { const value = row[field]; return value === null ? total : (total ?? 0) + value; }, null);
+    return { sorana: soma('sorana'), base: soma('base'), soranaPercent: soma('soranaPercent'), basePercent: soma('basePercent') };
+  })();
 
   return (
     <div className="space-y-4">
@@ -685,23 +825,38 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
         <label className="text-xs font-semibold text-slate-600">Período<select value={periodNumber} onChange={event => setPeriodNumber(Number(event.target.value))} className="block mt-1 border border-slate-300 rounded px-3 py-2 text-sm">{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <div className="text-xs font-semibold text-slate-600">Comparar com<div className="mt-1 inline-flex rounded border border-slate-300 overflow-hidden">{GROUPS.map(group => <button key={group.key} onClick={() => setComparisonBase(group.key)} className={`px-3 py-2 text-sm font-semibold ${comparisonBase === group.key ? 'bg-[#c8102e] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>{group.short}</button>)}</div></div>
       </div>
-      {sections.length > 0 && <div className="flex gap-1 overflow-x-auto border-b border-slate-200 items-center">{sections.map((name, index) => (isBalSection(name) && !showBal) ? null : <button key={name} onClick={() => setSectionIndex(index)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sectionIndex === index ? 'border-[#c8102e] text-[#c8102e]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{sectionLabel(name)}</button>)}{sections.some(isBalSection) && <button type="button" onClick={() => setShowBal(value => {
+      {sections.length > 0 && <div className="flex gap-1 overflow-x-auto border-b border-slate-200 items-center">{sections.map((name, index) => ((isBalSection(name) && !showBal) || (isTotAdjSection(name) && !showTotAdj)) ? null : <button key={name} onClick={() => setSectionIndex(index)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sectionIndex === index ? 'border-[#c8102e] text-[#c8102e]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{sectionLabel(name)}</button>)}<div className="ml-auto flex items-center gap-1">{sections.some(isTotAdjSection) && <button type="button" onClick={() => setShowTotAdj(value => {
+        const next = !value;
+        if (!next) {
+          const totAdjIndex = sections.findIndex(isTotAdjSection);
+          if (sectionIndex === totAdjIndex) setSectionIndex(0);
+        }
+        return next;
+      })} className="whitespace-nowrap px-2 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600" title={showTotAdj ? 'Ocultar aba TOTAL ADJ' : 'Mostrar aba TOTAL ADJ'}>{showTotAdj ? '✕ Ocultar TOTAL ADJ' : '••• TOTAL ADJ'}</button>}{sections.some(isBalSection) && <button type="button" onClick={() => setShowBal(value => {
         const next = !value;
         if (!next) {
           const balIndex = sections.findIndex(isBalSection);
           if (sectionIndex === balIndex) setSectionIndex(0);
         }
         return next;
-      })} className="ml-auto whitespace-nowrap px-2 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600" title={showBal ? 'Ocultar aba BAL' : 'Mostrar aba BAL'}>{showBal ? '✕ Ocultar BAL' : '••• BAL'}</button>}</div>}
+      })} className="whitespace-nowrap px-2 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600" title={showBal ? 'Ocultar aba BAL' : 'Mostrar aba BAL'}>{showBal ? '✕ Ocultar BAL' : '••• BAL'}</button>}</div></div>}
+      {isTot && <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600"><span className="text-slate-400">Simulação:</span><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zeroEstoques} onChange={event => setZeroEstoques(event.target.checked)} className="accent-[#c8102e]" />Zerar Juros sobre Estoques Financiados</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zeroPassivo} onChange={event => setZeroPassivo(event.target.checked)} className="accent-[#c8102e]" />Zerar Juros sobre Passivo Circulante</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zeroLongoPrazo} onChange={event => setZeroLongoPrazo(event.target.checked)} className="accent-[#c8102e]" />Zerar Juros de Longo Prazo</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zeroOutrosJuros} onChange={event => setZeroOutrosJuros(event.target.checked)} className="accent-[#c8102e]" />Zerar Outros Juros</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zeroOutrasFin} onChange={event => setZeroOutrasFin(event.target.checked)} className="accent-[#c8102e]" />Zerar Outras Receitas / Despesas Financeiras</label></div>}
       {loading ? <div className="py-12 text-center text-slate-500">Calculando demonstrativo...</div> : rows.length === 0 ? <div className="py-12 text-center text-slate-500">Não há dados para o período selecionado.</div> : <>
         <div className="grid gap-3 md:grid-cols-4">
           {summaryCards.map(card => {
-            const row = rows.find(item => card.match(normalizeName(item.label)));
+            const row = displayRows.find(item => card.match(normalizeName(item.label)));
             if (!row) return null;
             return <div key={card.title} className="rounded-lg border border-red-100 bg-red-50 px-4 py-3"><p className="text-xs text-slate-500">{card.title}</p><p className="mt-1 text-sm font-bold text-[#a60d26]">AC Lapa: {formatValor(row.sorana)}{row.soranaPercent != null ? ` (${formatNumber(row.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{baseGroup.label}: {formatValor(row.base)}{row.basePercent != null ? ` (${formatNumber(row.basePercent, true)})` : ''}</p></div>;
           })}
         </div>
-        <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-[#c8102e] text-white"><tr>{['Indicador', 'AC Lapa', 'AC Lapa %', `${baseGroup.label} sem Sorana`, `${baseGroup.short} %`, `Dif. x ${baseGroup.short}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{mainRows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} />)}{hasComplementares && <tr><td colSpan={6} className="border border-slate-200 bg-slate-100 px-3 py-2"><button type="button" onClick={() => setShowComplementares(value => !value)} className="text-xs font-semibold text-[#c8102e] hover:text-[#a60d26]">{showComplementares ? '▾ Ocultar indicadores complementares' : `▸ Mostrar indicadores complementares — ${complementaresRows.length} linhas`}</button></td></tr>}{hasComplementares && showComplementares && complementaresRows.map((row, index) => <DemonstrativoTableRow key={`comp-${row.label}-${index}`} row={row} />)}</tbody></table></div>
+        {despesasResumo && <div><button type="button" onClick={() => setShowDespesasResumo(value => !value)} className="text-xs font-semibold text-[#c8102e] hover:text-[#a60d26]">{showDespesasResumo ? '▾ Ocultar total de despesas' : '▸ Mostrar total de despesas (Pessoal + Diretas + Indiretas + Ativos)'}</button>{showDespesasResumo && <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 md:max-w-sm"><p className="text-xs text-slate-500">Total de Despesas (Pessoal + Diretas + Indiretas + Ativos)</p><p className="mt-1 text-sm font-bold text-[#a60d26]">AC Lapa: {formatValor(despesasResumo.sorana)}{despesasResumo.soranaPercent != null ? ` (${formatNumber(despesasResumo.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{baseGroup.label}: {formatValor(despesasResumo.base)}{despesasResumo.basePercent != null ? ` (${formatNumber(despesasResumo.basePercent, true)})` : ''}</p></div>}</div>}
+        <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-[#c8102e] text-white"><tr>{['Indicador', 'AC Lapa', 'AC Lapa %', `${baseGroup.label} sem Sorana`, `${baseGroup.short} %`, `Dif. x ${baseGroup.short}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{mainRows.flatMap((row, index) => {
+          if (isTotSection(currentSectionName) && isEbitdaRow(row.label)) {
+            const toggle = <tr key={`ebitda-toggle-${index}`}><td colSpan={6} className="px-3 py-0.5 leading-none"><button type="button" onClick={() => setShowEbitda(value => !value)} className="text-[10px] text-slate-300 hover:text-[#c8102e] transition-colors" title={showEbitda ? 'Ocultar EBITDA' : 'Mostrar EBITDA'}>{showEbitda ? '▾' : '▸'}</button></td></tr>;
+            return showEbitda ? [toggle, <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} />] : [toggle];
+          }
+          return [<DemonstrativoTableRow key={`${row.label}-${index}`} row={row} />];
+        })}{hasComplementares && <tr><td colSpan={6} className="border border-slate-200 bg-slate-100 px-3 py-2"><button type="button" onClick={() => setShowComplementares(value => !value)} className="text-xs font-semibold text-[#c8102e] hover:text-[#a60d26]">{showComplementares ? '▾ Ocultar indicadores complementares' : `▸ Mostrar indicadores complementares — ${complementaresRows.length} linhas`}</button></td></tr>}{hasComplementares && showComplementares && complementaresRows.map((row, index) => <DemonstrativoTableRow key={`comp-${row.label}-${index}`} row={row} />)}</tbody></table></div>
       </>}
     </div>
   );
