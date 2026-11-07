@@ -544,6 +544,28 @@ function isExpense(label: string) {
 
 const DEPARTAMENTO_SECTIONS = ['nv', 'uv', 'pa', 'ac', 'paac', 'me', 'bp', 'mebp'];
 
+const SECTION_LABELS: Record<string, string> = {
+  tot: 'TOTAL',
+  totadj: 'TOTAL ADJ',
+  nv: 'NOVOS',
+  uv: 'USADOS',
+  pa: 'PEÇAS',
+  ac: 'ACESSORIOS',
+  paac: 'PEÇAS + ACESSORIOS',
+  me: 'MECANICA',
+  bp: 'FUNILARIA',
+  mebp: 'MECANICA + FUNILARIA',
+  bal: 'BAL',
+};
+
+function sectionLabel(name: string) {
+  return SECTION_LABELS[normalizeName(name)] ?? name;
+}
+
+function isBalSection(name: string) {
+  return normalizeName(name) === 'bal';
+}
+
 function complementaresCutoffIndex(sectionName: string, rows: DemonstrativoRow[]) {
   const section = normalizeName(sectionName);
   if (section === 'tot') {
@@ -567,6 +589,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const [rows, setRows] = useState<DemonstrativoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [showComplementares, setShowComplementares] = useState(false);
+  const [showBal, setShowBal] = useState(false);
   const options = periodOptions(periodicity);
   const baseGroup = GROUPS.find(group => group.key === comparisonBase) as GroupDef;
 
@@ -662,7 +685,14 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
         <label className="text-xs font-semibold text-slate-600">Período<select value={periodNumber} onChange={event => setPeriodNumber(Number(event.target.value))} className="block mt-1 border border-slate-300 rounded px-3 py-2 text-sm">{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <div className="text-xs font-semibold text-slate-600">Comparar com<div className="mt-1 inline-flex rounded border border-slate-300 overflow-hidden">{GROUPS.map(group => <button key={group.key} onClick={() => setComparisonBase(group.key)} className={`px-3 py-2 text-sm font-semibold ${comparisonBase === group.key ? 'bg-[#c8102e] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>{group.short}</button>)}</div></div>
       </div>
-      {sections.length > 0 && <div className="flex gap-1 overflow-x-auto border-b border-slate-200">{sections.map((name, index) => <button key={name} onClick={() => setSectionIndex(index)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sectionIndex === index ? 'border-[#c8102e] text-[#c8102e]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{name}</button>)}</div>}
+      {sections.length > 0 && <div className="flex gap-1 overflow-x-auto border-b border-slate-200 items-center">{sections.map((name, index) => (isBalSection(name) && !showBal) ? null : <button key={name} onClick={() => setSectionIndex(index)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sectionIndex === index ? 'border-[#c8102e] text-[#c8102e]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{sectionLabel(name)}</button>)}{sections.some(isBalSection) && <button type="button" onClick={() => setShowBal(value => {
+        const next = !value;
+        if (!next) {
+          const balIndex = sections.findIndex(isBalSection);
+          if (sectionIndex === balIndex) setSectionIndex(0);
+        }
+        return next;
+      })} className="ml-auto whitespace-nowrap px-2 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600" title={showBal ? 'Ocultar aba BAL' : 'Mostrar aba BAL'}>{showBal ? '✕ Ocultar BAL' : '••• BAL'}</button>}</div>}
       {loading ? <div className="py-12 text-center text-slate-500">Calculando demonstrativo...</div> : rows.length === 0 ? <div className="py-12 text-center text-slate-500">Não há dados para o período selecionado.</div> : <>
         <div className="grid gap-3 md:grid-cols-4">
           {summaryCards.map(card => {
