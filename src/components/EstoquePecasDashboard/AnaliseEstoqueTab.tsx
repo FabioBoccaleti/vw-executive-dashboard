@@ -9,6 +9,14 @@ import type { EstoquePecasMarca } from './EstoquePecasDashboard';
 import { getInventario, getMovimentacao, getLatestMonthWithBoth, type ImportedTable } from './estoquePecasStorage';
 import { buildAnalise, AGING_BUCKETS, type AnaliseResult, type AnaliseItem } from './estoqueAnalise';
 import { exportEstoqueExcel } from './estoqueExport';
+import { sumBalanceteAccounts } from '../AnaliseDespesasDashboard/analiseDespesasStorage';
+
+// Contas do balancete (passivo circulante) deduzidas do estoque para obter o "Estoque Pago".
+// Valores são negativos no balancete, por isso são somados ao valor do estoque.
+const ESTOQUE_PAGO_CONTAS: Record<'audi' | 'vw', string[]> = {
+  vw: ['2.1.1.01.02.002', '2.1.1.02.01.002'],
+  audi: ['2.1.1.01.02.002', '2.1.4.01.01.001'],
+};
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -64,6 +72,7 @@ export function AnaliseEstoqueTab({ marca }: Props) {
   const [movimentacao, setMovimentacao] = useState<ImportedTable | null>(null);
   const [prevInventario, setPrevInventario] = useState<ImportedTable | null>(null);
   const [prevMovimentacao, setPrevMovimentacao] = useState<ImportedTable | null>(null);
+  const [contasPagar, setContasPagar] = useState<number | null>(null);
 
   const [search, setSearch] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'parados' | 'movimentando' | 'sem_info'>('todos');
@@ -73,16 +82,19 @@ export function AnaliseEstoqueTab({ marca }: Props) {
     setLoading(true);
     try {
       const prev = prevMonthStr(month);
-      const [inv, mov, prevInv, prevMov] = await Promise.all([
+      const [y, mo] = month.split('-').map(Number);
+      const [inv, mov, prevInv, prevMov, pagar] = await Promise.all([
         getInventario(marca.id, month),
         getMovimentacao(marca.id, month),
         getInventario(marca.id, prev),
         getMovimentacao(marca.id, prev),
+        sumBalanceteAccounts(marca.id, y, mo, ESTOQUE_PAGO_CONTAS[marca.id]),
       ]);
       setInventario(inv);
       setMovimentacao(mov);
       setPrevInventario(prevInv);
       setPrevMovimentacao(prevMov);
+      setContasPagar(pagar);
     } finally {
       setLoading(false);
     }
@@ -220,6 +232,7 @@ export function AnaliseEstoqueTab({ marca }: Props) {
           analise={analise}
           prevAnalise={prevAnalise}
           month={month}
+          contasPagar={contasPagar}
           search={search}
           setSearch={setSearch}
           filtroStatus={filtroStatus}
@@ -236,12 +249,13 @@ export function AnaliseEstoqueTab({ marca }: Props) {
 const ABC_COLORS: Record<'A' | 'B' | 'C', string> = { A: '#16a34a', B: '#f59e0b', C: '#dc2626' };
 
 function AnaliseConteudo({
-  marca, analise, prevAnalise, month, search, setSearch, filtroStatus, setFiltroStatus, itensFiltrados,
+  marca, analise, prevAnalise, month, contasPagar, search, setSearch, filtroStatus, setFiltroStatus, itensFiltrados,
 }: {
   marca: EstoquePecasMarca;
   analise: AnaliseResult;
   prevAnalise: AnaliseResult | null;
   month: string;
+  contasPagar: number | null;
   search: string;
   setSearch: (v: string) => void;
   filtroStatus: 'todos' | 'parados' | 'movimentando' | 'sem_info';
@@ -251,6 +265,8 @@ function AnaliseConteudo({
   const [expandedFaixa, setExpandedFaixa] = useState<string | null>(null);
   const [expandedAbc, setExpandedAbc] = useState<'A' | 'B' | 'C' | null>(null);
   const [showAllParados, setShowAllParados] = useState(false);
+
+  const estoquePago = contasPagar == null ? null : analise.totalValor + contasPagar;
 
   const paradosOrdenados = useMemo(
     () => analise.itens.filter((it) => it.parado).sort((a, b) => b.valorTotal - a.valorTotal),
@@ -270,13 +286,22 @@ function AnaliseConteudo({
       </h3>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiCard
           icon={<Boxes className="w-5 h-5" />}
           color={marca.primary}
           label="Valor total em estoque"
           value={fmtCurrency(analise.totalValor)}
           sub={`${fmtInt(analise.totalSkus)} itens · ${fmtInt(analise.totalPecas)} peças`}
+        />
+        <KpiCard
+          icon={<Boxes className="w-5 h-5" />}
+          color="#0f766e"
+          label="Estoque Pago"
+          value={estoquePago == null ? '—' : fmtCurrency(estoquePago)}
+          sub={estoquePago == null
+            ? 'Balancete do mês não importado'
+            : `Deduz ${fmtCurrency(Math.abs(contasPagar ?? 0))} em contas a pagar`}
         />
         <KpiCard
           icon={<TrendingDown className="w-5 h-5" />}

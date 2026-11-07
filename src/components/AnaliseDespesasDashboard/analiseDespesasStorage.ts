@@ -245,8 +245,35 @@ export async function loadAnaliseDespesasRaw(
   }
 }
 
-/** Retorna mapa de quais períodos têm dados: "YYYY_MM" -> true */
-export async function loadAnaliseDespesasIndex(
+/**
+ * Soma o "Saldo Atual" das contas do balancete (circulante) informadas, para a
+ * marca/ano/mês. Usa a mesma extração do módulo de Rateio das Despesas Financeiras.
+ * Retorna null quando não há balancete importado para o período.
+ */
+export async function sumBalanceteAccounts(
+  brand: AnaliseBrand,
+  year: number,
+  month: number,
+  contaIds: string[],
+): Promise<number | null> {
+  const raw = await loadAnaliseDespesasRaw(brand, year, month);
+  if (!raw?.rawText) return null;
+  const wanted = new Set(contaIds.map((id) => id.trim()));
+  let sum = 0;
+  for (const line of raw.rawText.split('\n')) {
+    if (!line.trim()) continue;
+    const parts = line.split(';');
+    if (parts.length < 7) continue;
+    if (parts[0]?.trim() === 'T') continue;
+    const conta = (parts[1] ?? '').trim();
+    if (!wanted.has(conta)) continue;
+    const saldo = parseFloat((parts[6] || '0').trim().replace(/\./g, '').replace(',', '.')) || 0;
+    sum += saldo;
+  }
+  return sum;
+}
+
+/** Retorna mapa de quais períodos têm dados: "YYYY_MM" -> true */export async function loadAnaliseDespesasIndex(
   brand: AnaliseBrand,
 ): Promise<Record<string, boolean>> {
   try {
