@@ -4,7 +4,7 @@
  * Tipos:       analise_despesas_tipos_{brand}
  */
 
-import { kvGet, kvSet, kvKeys, kvBulkGet } from '@/lib/kvClient';
+import { kvGet, kvSet, kvKeys, kvBulkGet, kvDelete } from '@/lib/kvClient';
 
 export type AnaliseBrand = 'vw' | 'audi';
 
@@ -227,6 +227,20 @@ export async function saveAnaliseDespesas(
     return await kvSet(getKey(brand, year, month), payload);
   } catch (err) {
     console.error('Erro ao salvar análise despesas:', err);
+    return false;
+  }
+}
+
+/** Remove o balancete importado para marca/ano/mês. */
+export async function deleteAnaliseDespesas(
+  brand: AnaliseBrand,
+  year: number,
+  month: number,
+): Promise<boolean> {
+  try {
+    return await kvDelete(getKey(brand, year, month));
+  } catch (err) {
+    console.error('Erro ao excluir análise despesas:', err);
     return false;
   }
 }

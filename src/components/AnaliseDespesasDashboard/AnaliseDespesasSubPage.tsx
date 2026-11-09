@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, Trash2 } from 'lucide-react';
 import { DespesasTab } from '@/components/FluxoCaixaDashboard/DespesasTab';
 import {
   saveAnaliseDespesas,
@@ -8,6 +8,7 @@ import {
   saveAnaliseDespesasTipos,
   loadMultipleMonthsAnaliseDespesas,
   loadAnaliseDespesasIndex,
+  deleteAnaliseDespesas,
   type AnaliseBrand,
 } from './analiseDespesasStorage';
 
@@ -120,6 +121,7 @@ export function AnaliseDespesasSubPage({ brand, onBack }: AnaliseDespesasSubPage
   const [fileName, setFileName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [showTabela, setShowTabela] = useState(false);
@@ -225,6 +227,35 @@ export function AnaliseDespesasSubPage({ brand, onBack }: AnaliseDespesasSubPage
     }
   }
 
+  // ── Exclusão do balancete importado ───────────────────────────────────────
+  async function handleDelete() {
+    if (!data || deleting) return;
+    const periodo = `${MONTH_NAMES[selectedMonth - 1]}/${selectedYear}`;
+    const confirmed = window.confirm(
+      `Deseja realmente excluir o balancete importado de ${brandLabel} — ${periodo}?\n\nEsta ação não pode ser desfeita.`,
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    setDeleting(true);
+    try {
+      const ok = await deleteAnaliseDespesas(brand, selectedYear, selectedMonth);
+      if (!ok) {
+        setError('Não foi possível excluir o balancete. Tente novamente.');
+        return;
+      }
+      setData(null);
+      setFileName(null);
+      setShowTabela(false);
+      setDespesasView('normal');
+      await computeYtd(selectedYear, selectedMonth);
+    } catch (err: any) {
+      setError(err?.message ?? 'Erro ao excluir balancete.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
@@ -261,6 +292,18 @@ export function AnaliseDespesasSubPage({ brand, onBack }: AnaliseDespesasSubPage
             className="hidden"
             onChange={(e) => processFile(e.target.files?.[0])}
           />
+
+          {/* Excluir Balancete */}
+          {data && (
+            <button
+              onClick={handleDelete}
+              disabled={loading || saving || deleting}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="w-4 h-4" />
+              {deleting ? 'Excluindo…' : 'Excluir Balancete'}
+            </button>
+          )}
 
           {/* Seletor de Ano */}
           <select
