@@ -301,7 +301,7 @@ function AnaliseConteudo({
           value={estoquePago == null ? '—' : fmtCurrency(estoquePago)}
           sub={estoquePago == null
             ? 'Balancete do mês não importado'
-            : `Deduz ${fmtCurrency(Math.abs(contasPagar ?? 0))} em contas a pagar`}
+            : `${analise.totalValor > 0 ? fmtPct(estoquePago / analise.totalValor * 100) : '—'} do estoque · Deduz ${fmtCurrency(Math.abs(contasPagar ?? 0))} em contas a pagar`}
         />
         <KpiCard
           icon={<TrendingDown className="w-5 h-5" />}
