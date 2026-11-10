@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown, ChevronRight, Loader2, Wallet, AlertTriangle, CalendarClock,
-  Users, Receipt, TrendingUp, Filter, FileDown,
+  Users, Receipt, TrendingUp, Filter, FileDown, Save, Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -9,7 +9,8 @@ import {
 } from 'recharts';
 import type { DuplicatasMarca } from './DuplicatasReceberDashboard';
 import {
-  getAvailableMonths, getDuplicatas, getDepartamentoMap, type DuplicatasImport, type DepartamentoMap,
+  getAvailableMonths, getDuplicatas, getDepartamentoMap, getBaseDate, saveBaseDate,
+  type DuplicatasImport, type DepartamentoMap,
 } from './duplicatasStorage';
 import {
   parseDuplicatas, analyze, resumoPorDepartamento, resumoPorOrigem, startOfDay,
@@ -69,6 +70,8 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
   const [months, setMonths] = useState<string[]>([]);
   const [month, setMonth] = useState<string>('');
   const [baseDate, setBaseDate] = useState<string>('');
+  const [savedBaseDate, setSavedBaseDate] = useState<string>('');
+  const [savingBaseDate, setSavingBaseDate] = useState(false);
   const [data, setData] = useState<DuplicatasImport | null>(null);
   const [map, setMap] = useState<DepartamentoMap>({});
   const [loading, setLoading] = useState(true);
@@ -91,11 +94,35 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
     return () => { cancelled = true; };
   }, [marca.id]);
 
-  // Ao selecionar um mês, define a data-base para o último dia desse mês
-  // (o usuário ainda pode alterá-la manualmente depois).
+  // Ao selecionar um mês, carrega a data-base salva para a marca/mês.
+  // Se não houver nenhuma salva, usa o último dia do mês como padrão.
   useEffect(() => {
-    if (month) setBaseDate(lastDayOfMonthISO(month));
-  }, [month]);
+    if (!month) return;
+    let cancelled = false;
+    void getBaseDate(marca.id, month).then((saved) => {
+      if (cancelled) return;
+      const fallback = lastDayOfMonthISO(month);
+      setBaseDate(saved ?? fallback);
+      setSavedBaseDate(saved ?? '');
+    });
+    return () => { cancelled = true; };
+  }, [marca.id, month]);
+
+  const handleSaveBaseDate = useCallback(async () => {
+    if (!month || !baseDate) return;
+    setSavingBaseDate(true);
+    try {
+      const ok = await saveBaseDate(marca.id, month, baseDate);
+      if (ok) {
+        setSavedBaseDate(baseDate);
+        toast.success('Data-base salva.');
+      } else {
+        toast.error('Erro ao salvar a data-base.');
+      }
+    } finally {
+      setSavingBaseDate(false);
+    }
+  }, [marca.id, month, baseDate]);
 
   const loadData = useCallback(async () => {
     if (!month) { setData(null); setLoading(false); return; }
@@ -184,13 +211,37 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-500">Data-base (cálculo dos dias)</label>
-          <input
-            type="date"
-            value={baseDate}
-            onChange={(e) => setBaseDate(e.target.value || todayISO())}
-            className="border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2"
-            style={{ ['--tw-ring-color' as string]: marca.primary }}
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={baseDate}
+              onChange={(e) => setBaseDate(e.target.value || todayISO())}
+              className="border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2"
+              style={{ ['--tw-ring-color' as string]: marca.primary }}
+            />
+            {(() => {
+              const saved = !!baseDate && baseDate === savedBaseDate;
+              return (
+                <button
+                  type="button"
+                  onClick={handleSaveBaseDate}
+                  disabled={savingBaseDate || !baseDate || saved}
+                  title={saved ? 'Data-base salva' : 'Salvar data-base para este mês'}
+                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: marca.primary }}
+                >
+                  {savingBaseDate ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : saved ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {saved ? 'Salvo' : 'Salvar'}
+                </button>
+              );
+            })()}
+          </div>
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-500 flex items-center gap-1">

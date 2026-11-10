@@ -69,6 +69,32 @@ function isChassiHeader(value: string): boolean {
   return value.trim().toLowerCase().replace(/\.+$/, '') === 'chassi';
 }
 
+/**
+ * Extrai o Chassi (identificador imutável do veículo) de um registro header -> valor,
+ * normalizado para comparação estável (sem espaços, maiúsculo). Retorna '' se ausente.
+ */
+function chassiOf(record: Record<string, string>): string {
+  const key = Object.keys(record).find(isChassiHeader);
+  if (!key) return '';
+  return (record[key] ?? '').trim().toUpperCase();
+}
+
+/**
+ * Monta o mapa "chassi -> banco" dos veículos já em garantia. O casamento por Chassi
+ * (identificador imutável) garante que um veículo em garantia continue reconhecido
+ * mesmo após a importação de um novo arquivo de estoque, em que outras colunas
+ * (dias de estoque, preço, situação, etc.) podem ter mudado.
+ */
+function buildIncluidosMap(
+  itau: VeiculoGarantiaEntry[],
+  volks: VeiculoGarantiaEntry[],
+): Record<string, GarantiaBanco> {
+  const map: Record<string, GarantiaBanco> = {};
+  itau.forEach(e => { const c = chassiOf(e.record); if (c) map[c] = 'itau'; });
+  volks.forEach(e => { const c = chassiOf(e.record); if (c) map[c] = 'volks'; });
+  return map;
+}
+
 /** Compara um cabeçalho (ignorando caixa e pontuação final) a um nome base. */
 function headerMatches(header: string, name: string): boolean {
   return header.trim().toLowerCase().replace(/\.+$/, '') === name;
@@ -396,7 +422,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
   const [loading, setLoading] = useState(true);
   const [table, setTable] = useState<VehicleTable | null>(null);
   const [regras, setRegras] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
-  // Mapa id da linha -> banco em que já foi incluído.
+  // Mapa chassi do veículo -> banco em que já foi incluído.
   const [incluidos, setIncluidos] = useState<Record<string, GarantiaBanco>>({});
 
   const [target, setTarget] = useState<IncluirTarget | null>(null);
@@ -411,10 +437,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
 
   async function refreshIncluidos() {
     const [itau, volks, loadedLimites] = await Promise.all([listGarantia('itau'), listGarantia('volks'), getLimites()]);
-    const map: Record<string, GarantiaBanco> = {};
-    itau.forEach(e => { map[e.id] = 'itau'; });
-    volks.forEach(e => { map[e.id] = 'volks'; });
-    setIncluidos(map);
+    setIncluidos(buildIncluidosMap(itau, volks));
     setGarantiaItau(itau);
     setGarantiaVolks(volks);
     setLimites(loadedLimites);
@@ -434,10 +457,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
       if (cancelled) return;
       setTable(extractVehicleTable(data));
       setRegras(loadedRegras);
-      const map: Record<string, GarantiaBanco> = {};
-      itau.forEach(e => { map[e.id] = 'itau'; });
-      volks.forEach(e => { map[e.id] = 'volks'; });
-      setIncluidos(map);
+      setIncluidos(buildIncluidosMap(itau, volks));
       setGarantiaItau(itau);
       setGarantiaVolks(volks);
       setLimites(loadedLimites);
@@ -637,8 +657,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
               </tr>
             ) : (
               visibleRows.map((row, rowIndex) => {
-                const id = rowIdentity(buildRowRecord(table.headers, row));
-                const incluidoEm = incluidos[id];
+                const incluidoEm = incluidos[chassiOf(buildRowRecord(table.headers, row))];
                 return (
                   <tr key={rowIndex} className="odd:bg-white even:bg-slate-50">
                     {columnIndices.map(index => (
