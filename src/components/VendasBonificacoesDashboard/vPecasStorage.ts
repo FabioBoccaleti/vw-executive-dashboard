@@ -1,4 +1,4 @@
-import { kvGet, kvSet, kvKeys } from '@/lib/kvClient';
+import { kvGet, kvSet, kvKeys, kvDelete } from '@/lib/kvClient';
 import * as XLSX from 'xlsx';
 
 const KEY_VPECAS = 'registro_vpecas';
@@ -252,22 +252,71 @@ function negateCurrencyFields(data: Record<string, string>): Record<string, stri
   return result;
 }
 
+// ─── Devoluções: armazenamento fragmentado por período + chunks ──────────────
+// Mesmo esquema das vendas normais, para não estourar o limite de ~1 MB por
+// valor do Upstash. A chave única legada (KEY_VPECAS_DEVOLUCAO) é migrada na
+// primeira leitura.
+const KEY_DEVOL_META  = (p: string) => `registro_vpecas_devol_per_${p}_meta`;
+const KEY_DEVOL_CHUNK = (p: string, i: number) => `registro_vpecas_devol_per_${p}_c${i}`;
+
+function normalizeDevolRow(item: Record<string, unknown>): VPecasRow {
+  if (item.data && typeof item.data === 'object') {
+    return { ...(item as unknown as VPecasRow), isDevolucao: true };
+  }
+  const { id, periodoImport, highlight, annotation, isDevolucao: _d, ...fields } = item;
+  return {
+    id: String(id ?? crypto.randomUUID()),
+    periodoImport: periodoImport as string | undefined,
+    isDevolucao: true,
+    highlight: highlight as boolean | undefined,
+    annotation: annotation as string | undefined,
+    data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
+  } as VPecasRow;
+}
+
+async function saveDevolPeriodRows(periodo: string, rows: VPecasRow[]): Promise<boolean> {
+  const chunks: VPecasRow[][] = [];
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) chunks.push(rows.slice(i, i + CHUNK_SIZE));
+  const results = await Promise.all([
+    kvSet(KEY_DEVOL_META(periodo), { chunks: chunks.length }),
+    ...chunks.map((chunk, i) => kvSet(KEY_DEVOL_CHUNK(periodo, i), chunk)),
+  ]);
+  return results.every(Boolean);
+}
+
+async function loadDevolPeriodRows(periodo: string): Promise<VPecasRow[]> {
+  const meta = await kvGet<{ chunks: number }>(KEY_DEVOL_META(periodo));
+  if (!meta || !meta.chunks) return [];
+  const keys = Array.from({ length: meta.chunks }, (_, i) => KEY_DEVOL_CHUNK(periodo, i));
+  const chunks = await Promise.all(keys.map(k => kvGet<VPecasRow[]>(k)));
+  return chunks.filter((c): c is VPecasRow[] => Array.isArray(c)).flat().map(r => ({ ...r, isDevolucao: true }));
+}
+
+async function getAllDevolPeriods(): Promise<string[]> {
+  try {
+    const keys = await kvKeys('registro_vpecas_devol_per_*_meta');
+    return keys.map(k => k.replace('registro_vpecas_devol_per_', '').replace('_meta', ''));
+  } catch { return []; }
+}
+
 export async function loadVPecasDevolucaoRows(): Promise<VPecasRow[]> {
   try {
-    const rawData = await kvGet(KEY_VPECAS_DEVOLUCAO);
-    if (!Array.isArray(rawData)) return [];
-    return (rawData as Record<string, unknown>[]).map(item => {
-      if (item.data && typeof item.data === 'object') return { ...(item as unknown as VPecasRow), isDevolucao: true };
-      const { id, periodoImport, highlight, annotation, isDevolucao: _d, ...fields } = item as Record<string, unknown>;
-      return {
-        id: String(id ?? crypto.randomUUID()),
-        periodoImport: periodoImport as string | undefined,
-        isDevolucao: true,
-        highlight: highlight as boolean | undefined,
-        annotation: annotation as string | undefined,
-        data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
-      } as VPecasRow;
-    });
+    // Formato novo: fragmentado por período
+    const periods = await getAllDevolPeriods();
+    if (periods.length > 0) {
+      const arrays = await Promise.all(periods.map(loadDevolPeriodRows));
+      return arrays.flat();
+    }
+    // Migração: chave única legada → formato por período
+    const legacy = await kvGet(KEY_VPECAS_DEVOLUCAO);
+    if (!Array.isArray(legacy)) return [];
+    const rows = (legacy as Record<string, unknown>[]).map(normalizeDevolRow);
+    if (rows.length > 0) {
+      const migrated = await saveVPecasDevolucaoRows(rows);
+      // Só remove a chave antiga se a migração persistiu com sucesso
+      if (migrated) { try { await kvDelete(KEY_VPECAS_DEVOLUCAO); } catch { /* mantém legado */ } }
+    }
+    return rows;
   } catch {
     return [];
   }
@@ -275,8 +324,20 @@ export async function loadVPecasDevolucaoRows(): Promise<VPecasRow[]> {
 
 export async function saveVPecasDevolucaoRows(rows: VPecasRow[]): Promise<boolean> {
   try {
-    await kvSet(KEY_VPECAS_DEVOLUCAO, rows);
-    return true;
+    const byPeriod = new Map<string, VPecasRow[]>();
+    for (const r of rows) {
+      const p = r.periodoImport ?? 'sem-periodo';
+      byPeriod.set(p, [...(byPeriod.get(p) ?? []), r]);
+    }
+    const saveOps = [...byPeriod.entries()].map(([p, rs]) => saveDevolPeriodRows(p, rs));
+    // Limpa períodos que não têm mais linhas (ex: após deleteAll)
+    const existingPeriods = await getAllDevolPeriods();
+    const presentPeriods = new Set(byPeriod.keys());
+    const clearOps = existingPeriods
+      .filter(p => !presentPeriods.has(p))
+      .map(p => saveDevolPeriodRows(p, []));
+    const results = await Promise.all([...saveOps, ...clearOps]);
+    return results.every(Boolean);
   } catch {
     return false;
   }
@@ -285,13 +346,13 @@ export async function saveVPecasDevolucaoRows(rows: VPecasRow[]): Promise<boolea
 export async function appendVPecasDevolucaoRows(
   periodo: string,
   newRows: Omit<VPecasRow, 'id'>[],
-): Promise<{ added: number; removed: number }> {
+): Promise<{ added: number; removed: number; ok: boolean }> {
   const existing = await loadVPecasDevolucaoRows();
   const kept = existing.filter(r => r.periodoImport !== periodo);
   const removed = existing.length - kept.length;
   const toAdd: VPecasRow[] = newRows.map(r => ({ ...r, id: crypto.randomUUID(), periodoImport: periodo, isDevolucao: true }));
-  await saveVPecasDevolucaoRows([...kept, ...toAdd]);
-  return { added: toAdd.length, removed };
+  const ok = await saveVPecasDevolucaoRows([...kept, ...toAdd]);
+  return { added: toAdd.length, removed, ok };
 }
 
 // Parser TXT de devoluções: aceita apenas P07 e A07, nega campos monetários
