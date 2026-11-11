@@ -1,8 +1,35 @@
-﻿import { kvGet, kvSet } from '@/lib/kvClient';
 import * as XLSX from 'xlsx';
+import { saveChunkedByPeriod, loadChunkedByPeriod, clearChunked } from './chunkedKvStorage';
 
 const KEY_VPECAS_ITEM = 'registro_vpecas_item';
 const KEY_VPECAS_ITEM_DEVOLUCAO = 'registro_vpecas_item_devolucao';
+const ITEM_PREFIX       = 'registro_vpecas_item_per_';
+const ITEM_DEVOL_PREFIX = 'registro_vpecas_item_devol_per_';
+
+function normalizeItemRow(item: Record<string, unknown>): VPecasItemRow {
+  if (item.data && typeof item.data === 'object') return item as unknown as VPecasItemRow;
+  const { id, periodoImport, highlight, annotation, ...fields } = item;
+  return {
+    id: String(id ?? crypto.randomUUID()),
+    periodoImport: periodoImport as string | undefined,
+    highlight: highlight as boolean | undefined,
+    annotation: annotation as string | undefined,
+    data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
+  } as VPecasItemRow;
+}
+
+function normalizeItemDevolRow(item: Record<string, unknown>): VPecasItemRow {
+  if (item.data && typeof item.data === 'object') return { ...(item as unknown as VPecasItemRow), isDevolucao: true };
+  const { id, periodoImport, highlight, annotation, isDevolucao: _d, ...fields } = item;
+  return {
+    id: String(id ?? crypto.randomUUID()),
+    periodoImport: periodoImport as string | undefined,
+    isDevolucao: true,
+    highlight: highlight as boolean | undefined,
+    annotation: annotation as string | undefined,
+    data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
+  } as VPecasItemRow;
+}
 
 // Colunas armazenadas (apenas as utilizadas pelo dashboard)
 export const ITEM_HEADERS = [
@@ -35,32 +62,11 @@ export interface VPecasItemRow {
 
 // CRUD
 export async function loadVPecasItemRows(): Promise<VPecasItemRow[]> {
-  try {
-    const rawData = await kvGet(KEY_VPECAS_ITEM);
-    if (!Array.isArray(rawData)) return [];
-    return (rawData as Record<string, unknown>[]).map(item => {
-      if (item.data && typeof item.data === 'object') return item as unknown as VPecasItemRow;
-      const { id, periodoImport, highlight, annotation, ...fields } = item as Record<string, unknown>;
-      return {
-        id: String(id ?? crypto.randomUUID()),
-        periodoImport: periodoImport as string | undefined,
-        highlight: highlight as boolean | undefined,
-        annotation: annotation as string | undefined,
-        data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
-      } as VPecasItemRow;
-    });
-  } catch {
-    return [];
-  }
+  return loadChunkedByPeriod(ITEM_PREFIX, KEY_VPECAS_ITEM, normalizeItemRow);
 }
 
 export async function saveVPecasItemRows(rows: VPecasItemRow[]): Promise<boolean> {
-  try {
-    await kvSet(KEY_VPECAS_ITEM, rows);
-    return true;
-  } catch {
-    return false;
-  }
+  return saveChunkedByPeriod(ITEM_PREFIX, rows);
 }
 
 // ─── Limite de importação por departamento ───────────────────────────────────
@@ -105,7 +111,7 @@ export function filterTopItemsByDept(
 export async function importVPecasItemForPeriod(
   periodo: string,
   newRows: Omit<VPecasItemRow, 'id'>[],
-): Promise<{ added: number; removed: number; originalCount: number }> {
+): Promise<{ added: number; removed: number; originalCount: number; ok: boolean }> {
   const { filtered, originalCount } = filterTopItemsByDept(newRows);
   const existing = await loadVPecasItemRows();
   const kept = existing.filter(r => r.periodoImport !== periodo);
@@ -115,18 +121,19 @@ export async function importVPecasItemForPeriod(
     id: crypto.randomUUID(),
     periodoImport: periodo,
   }));
-  await saveVPecasItemRows([...kept, ...toAdd]);
-  return { added: toAdd.length, removed, originalCount };
+  const ok = await saveVPecasItemRows([...kept, ...toAdd]);
+  return { added: toAdd.length, removed, originalCount, ok };
 }
 
 // Excel import: substitui tudo
 export async function replaceVPecasItemRows(
   rows: Omit<VPecasItemRow, 'id'>[],
-): Promise<{ total: number; originalCount: number }> {
+): Promise<{ total: number; originalCount: number; ok: boolean }> {
   const { filtered, originalCount } = filterTopItemsByDept(rows);
   const withIds: VPecasItemRow[] = filtered.map(r => ({ ...r, id: crypto.randomUUID() }));
-  await saveVPecasItemRows(withIds);
-  return { total: withIds.length, originalCount };
+  await clearChunked(ITEM_PREFIX, KEY_VPECAS_ITEM);
+  const ok = await saveVPecasItemRows(withIds);
+  return { total: withIds.length, originalCount, ok };
 }
 
 // Parser TXT: uma linha de cabecalho, todas as linhas de dados comecam com digito
@@ -173,39 +180,17 @@ function negateMonetaryFields(data: Record<string, string>): Record<string, stri
 }
 
 export async function loadVPecasItemDevolucaoRows(): Promise<VPecasItemRow[]> {
-  try {
-    const rawData = await kvGet(KEY_VPECAS_ITEM_DEVOLUCAO);
-    if (!Array.isArray(rawData)) return [];
-    return (rawData as Record<string, unknown>[]).map(item => {
-      if (item.data && typeof item.data === 'object') return { ...(item as unknown as VPecasItemRow), isDevolucao: true };
-      const { id, periodoImport, highlight, annotation, isDevolucao: _d, ...fields } = item as Record<string, unknown>;
-      return {
-        id: String(id ?? crypto.randomUUID()),
-        periodoImport: periodoImport as string | undefined,
-        isDevolucao: true,
-        highlight: highlight as boolean | undefined,
-        annotation: annotation as string | undefined,
-        data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
-      } as VPecasItemRow;
-    });
-  } catch {
-    return [];
-  }
+  return loadChunkedByPeriod(ITEM_DEVOL_PREFIX, KEY_VPECAS_ITEM_DEVOLUCAO, normalizeItemDevolRow);
 }
 
 export async function saveVPecasItemDevolucaoRows(rows: VPecasItemRow[]): Promise<boolean> {
-  try {
-    await kvSet(KEY_VPECAS_ITEM_DEVOLUCAO, rows);
-    return true;
-  } catch {
-    return false;
-  }
+  return saveChunkedByPeriod(ITEM_DEVOL_PREFIX, rows);
 }
 
 export async function importVPecasItemDevolucaoForPeriod(
   periodo: string,
   newRows: Omit<VPecasItemRow, 'id'>[],
-): Promise<{ added: number; removed: number; originalCount: number }> {
+): Promise<{ added: number; removed: number; originalCount: number; ok: boolean }> {
   const { filtered, originalCount } = filterTopItemsByDept(newRows);
   const existing = await loadVPecasItemDevolucaoRows();
   const kept = existing.filter(r => r.periodoImport !== periodo);
@@ -216,8 +201,8 @@ export async function importVPecasItemDevolucaoForPeriod(
     periodoImport: periodo,
     isDevolucao: true,
   }));
-  await saveVPecasItemDevolucaoRows([...kept, ...toAdd]);
-  return { added: toAdd.length, removed, originalCount };
+  const ok = await saveVPecasItemDevolucaoRows([...kept, ...toAdd]);
+  return { added: toAdd.length, removed, originalCount, ok };
 }
 
 // Parser TXT de devoluções: aceita apenas P07 e A07, nega campos monetários

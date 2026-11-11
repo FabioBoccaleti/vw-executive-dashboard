@@ -1,4 +1,5 @@
 import { kvGet, kvSet, kvKeys } from '@/lib/kvClient';
+import { saveChunkedByPeriod, loadChunkedByPeriod } from './chunkedKvStorage';
 import * as XLSX from 'xlsx';
 
 const KEY_VPECAS_SEG = 'registro_vpecas_seg';
@@ -164,6 +165,21 @@ export async function replaceVPecasSegRows(
 }
 
 // ─── Devoluções ───────────────────────────────────────────────────────────────
+const SEG_DEVOL_PREFIX = 'registro_vpecas_seg_devol_per_';
+
+function normalizeSegDevolRow(item: Record<string, unknown>): VPecasSegRow {
+  if (item.data && typeof item.data === 'object') return { ...(item as unknown as VPecasSegRow), isDevolucao: true };
+  const { id, periodoImport, highlight, annotation, isDevolucao: _d, ...fields } = item;
+  return {
+    id: String(id ?? crypto.randomUUID()),
+    periodoImport: periodoImport as string | undefined,
+    isDevolucao: true,
+    highlight: highlight as boolean | undefined,
+    annotation: annotation as string | undefined,
+    data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
+  } as VPecasSegRow;
+}
+
 function negateCurrencyFields(data: Record<string, string>): Record<string, string> {
   const result = { ...data };
   for (const field of CURRENCY_FIELDS) {
@@ -176,45 +192,23 @@ function negateCurrencyFields(data: Record<string, string>): Record<string, stri
 }
 
 export async function loadVPecasSegDevolucaoRows(): Promise<VPecasSegRow[]> {
-  try {
-    const rawData = await kvGet(KEY_VPECAS_SEG_DEVOLUCAO);
-    if (!Array.isArray(rawData)) return [];
-    return (rawData as Record<string, unknown>[]).map(item => {
-      if (item.data && typeof item.data === 'object') return { ...(item as unknown as VPecasSegRow), isDevolucao: true };
-      const { id, periodoImport, highlight, annotation, isDevolucao: _d, ...fields } = item as Record<string, unknown>;
-      return {
-        id: String(id ?? crypto.randomUUID()),
-        periodoImport: periodoImport as string | undefined,
-        isDevolucao: true,
-        highlight: highlight as boolean | undefined,
-        annotation: annotation as string | undefined,
-        data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
-      } as VPecasSegRow;
-    });
-  } catch {
-    return [];
-  }
+  return loadChunkedByPeriod(SEG_DEVOL_PREFIX, KEY_VPECAS_SEG_DEVOLUCAO, normalizeSegDevolRow);
 }
 
 export async function saveVPecasSegDevolucaoRows(rows: VPecasSegRow[]): Promise<boolean> {
-  try {
-    await kvSet(KEY_VPECAS_SEG_DEVOLUCAO, rows);
-    return true;
-  } catch {
-    return false;
-  }
+  return saveChunkedByPeriod(SEG_DEVOL_PREFIX, rows);
 }
 
 export async function appendVPecasSegDevolucaoRows(
   periodo: string,
   newRows: Omit<VPecasSegRow, 'id'>[],
-): Promise<{ added: number; removed: number }> {
+): Promise<{ added: number; removed: number; ok: boolean }> {
   const existing = await loadVPecasSegDevolucaoRows();
   const kept = existing.filter(r => r.periodoImport !== periodo);
   const removed = existing.length - kept.length;
   const toAdd: VPecasSegRow[] = newRows.map(r => ({ ...r, id: crypto.randomUUID(), periodoImport: periodo, isDevolucao: true }));
-  await saveVPecasSegDevolucaoRows([...kept, ...toAdd]);
-  return { added: toAdd.length, removed };
+  const ok = await saveVPecasSegDevolucaoRows([...kept, ...toAdd]);
+  return { added: toAdd.length, removed, ok };
 }
 
 // ─── Transações ignoradas ─────────────────────────────────────────────────────

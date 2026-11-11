@@ -309,7 +309,12 @@ export function VPecasItemDashboard() {
       return;
     }
     const periodo = `${importPeriodYear}-${String(importPeriodMonth).padStart(2, '0')}`;
-    const { added, removed, originalCount } = await importVPecasItemForPeriod(periodo, parsed);
+    const { added, removed, originalCount, ok } = await importVPecasItemForPeriod(periodo, parsed);
+    if (!ok) {
+      toast.error('Falha ao salvar os itens no servidor. Nada foi importado — tente novamente.');
+      if (txtInputRef.current) txtInputRef.current.value = '';
+      return;
+    }
     // Sincroniza produtos monitorados com os dados completos (antes do filtro 100+100)
     await syncProdutosFromImport(periodo, parsed);
     const updated = await loadVPecasItemRows();
@@ -337,7 +342,12 @@ export function VPecasItemDashboard() {
       return;
     }
     const periodo = `${devolPeriodYear}-${String(devolPeriodMonth).padStart(2, '0')}`;
-    const { added, removed, originalCount } = await importVPecasItemDevolucaoForPeriod(periodo, parsed);
+    const { added, removed, originalCount, ok } = await importVPecasItemDevolucaoForPeriod(periodo, parsed);
+    if (!ok) {
+      toast.error('Falha ao salvar as devoluções no servidor. Nada foi importado — tente novamente.');
+      if (devolTxtRef.current) devolTxtRef.current.value = '';
+      return;
+    }
     const updated = await loadVPecasItemDevolucaoRows();
     setDevolucaoRows(updated);
     const filteredOut = originalCount - added;
@@ -359,7 +369,12 @@ export function VPecasItemDashboard() {
       if (xlsxInputRef.current) xlsxInputRef.current.value = '';
       return;
     }
-    const { total, originalCount } = await replaceVPecasItemRows(parsed);
+    const { total, originalCount, ok } = await replaceVPecasItemRows(parsed);
+    if (!ok) {
+      toast.error('Falha ao salvar os itens no servidor. Nada foi importado — tente novamente.');
+      if (xlsxInputRef.current) xlsxInputRef.current.value = '';
+      return;
+    }
     const updated = await loadVPecasItemRows();
     setRows(updated);
     const filteredOut = originalCount - total;

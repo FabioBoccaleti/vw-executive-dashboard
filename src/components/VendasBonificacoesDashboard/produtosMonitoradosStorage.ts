@@ -1,8 +1,22 @@
 import { kvGet, kvSet } from '@/lib/kvClient';
 import { type VPecasItemRow } from './vPecasItemStorage';
+import { saveChunkedByPeriod, loadChunkedByPeriod } from './chunkedKvStorage';
 
 const KEY_CODES = 'produtos_monitorados_codes';
 const KEY_ROWS  = 'registro_produtos_monitorados';
+const PRODUTOS_PREFIX = 'registro_produtos_monitorados_per_';
+
+function normalizeProdutoRow(item: Record<string, unknown>): VPecasItemRow {
+  if (item.data && typeof item.data === 'object') return item as unknown as VPecasItemRow;
+  const { id, periodoImport, highlight, annotation, ...fields } = item;
+  return {
+    id: String(id ?? crypto.randomUUID()),
+    periodoImport: periodoImport as string | undefined,
+    highlight: highlight as boolean | undefined,
+    annotation: annotation as string | undefined,
+    data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
+  } as VPecasItemRow;
+}
 
 export const DEFAULT_MONITORED_CODES = [
   '6EA096301A',
@@ -33,27 +47,11 @@ export async function saveProdutosMonitoradosCodes(codes: string[]): Promise<voi
 // ─── Linhas de produtos monitorados ──────────────────────────────────────────
 
 export async function loadProdutosRows(): Promise<VPecasItemRow[]> {
-  try {
-    const data = await kvGet(KEY_ROWS);
-    if (!Array.isArray(data)) return [];
-    return (data as Record<string, unknown>[]).map(item => {
-      if (item.data && typeof item.data === 'object') return item as unknown as VPecasItemRow;
-      const { id, periodoImport, highlight, annotation, ...fields } = item as Record<string, unknown>;
-      return {
-        id: String(id ?? crypto.randomUUID()),
-        periodoImport: periodoImport as string | undefined,
-        highlight: highlight as boolean | undefined,
-        annotation: annotation as string | undefined,
-        data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
-      } as VPecasItemRow;
-    });
-  } catch {
-    return [];
-  }
+  return loadChunkedByPeriod(PRODUTOS_PREFIX, KEY_ROWS, normalizeProdutoRow);
 }
 
-export async function saveProdutosRows(rows: VPecasItemRow[]): Promise<void> {
-  await kvSet(KEY_ROWS, rows);
+export async function saveProdutosRows(rows: VPecasItemRow[]): Promise<boolean> {
+  return saveChunkedByPeriod(PRODUTOS_PREFIX, rows);
 }
 
 // ─── Sincronização pós-importação ────────────────────────────────────────────

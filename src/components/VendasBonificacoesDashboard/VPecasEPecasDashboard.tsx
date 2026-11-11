@@ -333,7 +333,12 @@ export function VPecasEPecasDashboard() {
       return;
     }
     const periodo = `${devolPeriodYear}-${String(devolPeriodMonth).padStart(2, '0')}`;
-    const { added, removed } = await appendVPecasEPecasDevolucaoRows(periodo, parsed);
+    const { added, removed, ok } = await appendVPecasEPecasDevolucaoRows(periodo, parsed);
+    if (!ok) {
+      toast.error('Falha ao salvar as devoluções no servidor. Nada foi importado — tente novamente.');
+      if (devolTxtRef.current) devolTxtRef.current.value = '';
+      return;
+    }
     const updated = await loadVPecasEPecasDevolucaoRows();
     setDevolucaoRows(updated);
     const msg = removed > 0
