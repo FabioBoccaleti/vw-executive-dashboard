@@ -20,6 +20,7 @@ export interface ContasPagarImport {
 const DUPLICATAS_PREFIX = 'contas_pagar:posicao:';
 const DEPT_MAP_PREFIX = 'contas_pagar:dept_map:';
 const ORIGEM_MAP_PREFIX = 'contas_pagar:origem_map:';
+const BASE_DATE_PREFIX = 'contas_pagar:base_date:';
 
 /** Departamentos de classificação (ordem de exibição). */
 export const DEPARTAMENTOS = [
@@ -99,6 +100,20 @@ export async function getDuplicatas(
 
 export async function deleteDuplicatas(marca: ContasPagarMarcaId, month: string): Promise<boolean> {
   return kvDelete(duplicatasKey(marca, month));
+}
+
+function baseDateKey(marca: ContasPagarMarcaId, month: string): string {
+  return `${BASE_DATE_PREFIX}${marca}:${month}`;
+}
+
+/** Recupera a data-base (ISO 'YYYY-MM-DD') salva para a marca/mês, ou null se não houver. */
+export async function getBaseDate(marca: ContasPagarMarcaId, month: string): Promise<string | null> {
+  return kvGet<string>(baseDateKey(marca, month));
+}
+
+/** Persiste a data-base (ISO 'YYYY-MM-DD') da marca/mês. */
+export async function saveBaseDate(marca: ContasPagarMarcaId, month: string, iso: string): Promise<boolean> {
+  return kvSet(baseDateKey(marca, month), iso);
 }
 
 /** Extrai o mês ('YYYY-MM') do fim de uma chave de storage. */
