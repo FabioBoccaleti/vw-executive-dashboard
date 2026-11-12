@@ -4,6 +4,7 @@ import { Plus, Trash2, Pencil, Check, X, Tag, Package, Users, Car } from 'lucide
 import { toast } from 'sonner';
 import {
   type MarcaRP, type ProdutoRP, type VendedorRP, type ModeloRP,
+  DEPARTAMENTOS_RP,
 } from './remuneracaoProdutosStorage';
 
 type CadastroTab = 'marcas' | 'produtos' | 'vendedores' | 'modelos';
@@ -307,9 +308,11 @@ function VendedoresSection({ marcas, vendedores, onChange }: { marcas: MarcaRP[]
   const [marcaId, setMarcaId] = useState('');
   const [nome, setNome] = useState('');
   const [matricula, setMatricula] = useState('');
+  const [departamento, setDepartamento] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState('');
   const [editMatricula, setEditMatricula] = useState('');
+  const [editDepartamento, setEditDepartamento] = useState('');
 
   const filtered = useMemo(() => vendedores.filter(v => v.marcaId === marcaId), [vendedores, marcaId]);
 
@@ -319,16 +322,18 @@ function VendedoresSection({ marcas, vendedores, onChange }: { marcas: MarcaRP[]
     const mat = matricula.trim();
     if (!n) { toast.error('Informe o nome do vendedor.'); return; }
     if (!mat) { toast.error('Informe a matrícula.'); return; }
+    if (!departamento) { toast.error('Selecione o departamento.'); return; }
     if (filtered.some(v => v.nome.toLowerCase() === n.toLowerCase())) { toast.error('Vendedor já cadastrado para esta marca.'); return; }
-    onChange([...vendedores, { id: crypto.randomUUID(), marcaId, nome: n, matricula: mat }]);
-    setNome(''); setMatricula('');
+    onChange([...vendedores, { id: crypto.randomUUID(), marcaId, nome: n, matricula: mat, departamento }]);
+    setNome(''); setMatricula(''); setDepartamento('');
   };
   const saveEdit = (id: string) => {
     const n = editNome.trim();
     const mat = editMatricula.trim();
     if (!n) { toast.error('Informe o nome do vendedor.'); return; }
     if (!mat) { toast.error('Informe a matrícula.'); return; }
-    onChange(vendedores.map(v => v.id === id ? { ...v, nome: n, matricula: mat } : v));
+    if (!editDepartamento) { toast.error('Selecione o departamento.'); return; }
+    onChange(vendedores.map(v => v.id === id ? { ...v, nome: n, matricula: mat, departamento: editDepartamento } : v));
     setEditId(null);
   };
   const remove = (id: string) => onChange(vendedores.filter(v => v.id !== id));
@@ -342,7 +347,11 @@ function VendedoresSection({ marcas, vendedores, onChange }: { marcas: MarcaRP[]
         <>
           <div className="flex flex-col sm:flex-row gap-2">
             <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do vendedor" className={`${inputCls} flex-1`} />
-            <input value={matricula} onChange={e => setMatricula(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Matrícula" className={`${inputCls} sm:w-44`} />
+            <input value={matricula} onChange={e => setMatricula(e.target.value)} placeholder="Matrícula" className={`${inputCls} sm:w-36`} />
+            <select value={departamento} onChange={e => setDepartamento(e.target.value)} className={`${inputCls} bg-white sm:w-44`}>
+              <option value="">Departamento...</option>
+              {DEPARTAMENTOS_RP.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
             <Button onClick={add} className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"><Plus className="w-4 h-4" /> Adicionar</Button>
           </div>
 
@@ -353,15 +362,20 @@ function VendedoresSection({ marcas, vendedores, onChange }: { marcas: MarcaRP[]
                 {editId === v.id ? (
                   <>
                     <input value={editNome} onChange={e => setEditNome(e.target.value)} className={`${inputCls} flex-1`} />
-                    <input value={editMatricula} onChange={e => setEditMatricula(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEdit(v.id)} placeholder="Matrícula" className={`${inputCls} w-36`} />
+                    <input value={editMatricula} onChange={e => setEditMatricula(e.target.value)} placeholder="Matrícula" className={`${inputCls} w-28`} />
+                    <select value={editDepartamento} onChange={e => setEditDepartamento(e.target.value)} className={`${inputCls} bg-white w-40`}>
+                      <option value="">Departamento...</option>
+                      {DEPARTAMENTOS_RP.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
                     <button onClick={() => saveEdit(v.id)} className="p-1.5 rounded text-teal-600 hover:bg-teal-50"><Check className="w-4 h-4" /></button>
                     <button onClick={() => setEditId(null)} className="p-1.5 rounded text-slate-400 hover:bg-slate-100"><X className="w-4 h-4" /></button>
                   </>
                 ) : (
                   <>
                     <span className="flex-1 text-sm text-slate-700">{v.nome}</span>
-                    <span className="text-sm text-slate-500 w-32 text-right">Mat. {v.matricula}</span>
-                    <button onClick={() => { setEditId(v.id); setEditNome(v.nome); setEditMatricula(v.matricula); }} className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Pencil className="w-4 h-4" /></button>
+                    <span className="text-xs text-slate-500">{v.departamento}</span>
+                    <span className="text-sm text-slate-500 w-28 text-right">Mat. {v.matricula}</span>
+                    <button onClick={() => { setEditId(v.id); setEditNome(v.nome); setEditMatricula(v.matricula); setEditDepartamento(v.departamento); }} className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => remove(v.id)} className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
                   </>
                 )}

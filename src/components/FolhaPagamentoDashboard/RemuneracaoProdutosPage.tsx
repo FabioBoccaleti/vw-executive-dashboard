@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { BookOpen, TableProperties, FilePlus, X, Pencil, Trash2, Plus } from 'lucide-react';
+import { BookOpen, TableProperties, FileText, FilePlus, X, Pencil, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { RemuneracaoProdutosCadastro } from './RemuneracaoProdutosCadastro';
+import { DemonstrativoProdutosView } from './DemonstrativoProdutosView';
 import {
   loadMarcasRP, saveMarcasRP,
   loadProdutosRP, saveProdutosRP,
   loadVendedoresRP, saveVendedoresRP,
   loadModelosRP, saveModelosRP,
   loadRegistrosRP, saveRegistrosRP,
+  loadDemoMetaRP, saveDemoMetaRP,
   type MarcaRP, type ProdutoRP, type VendedorRP, type ModeloRP, type RegistroVendaRP,
+  type DemonstrativoMetaRP, type CampoAssinaturaRP, type AssinaturaDigitalRP,
 } from './remuneracaoProdutosStorage';
 
 interface RemuneracaoProdutosPageProps {
@@ -34,8 +37,16 @@ const emptyDraft = (): Draft => ({ data: todayISO(), marcaId: '', vendedorId: ''
 
 const inputCls = 'border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400';
 
+/** Mapeia o nome da marca (cadastro livre) para VW/Audi. */
+function brandOfMarca(marca: string): 'vw' | 'audi' | null {
+  const n = (marca ?? '').trim().toLowerCase();
+  if (n === 'audi') return 'audi';
+  if (n === 'vw' || n === 'volkswagen') return 'vw';
+  return null;
+}
+
 export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps) {
-  const [view, setView] = useState<'tabela' | 'cadastro'>('tabela');
+  const [view, setView] = useState<'tabela' | 'demonstrativo' | 'cadastro'>('tabela');
   const [loading, setLoading] = useState(true);
 
   const [marcas, setMarcas] = useState<MarcaRP[]>([]);
@@ -43,6 +54,7 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
   const [vendedores, setVendedores] = useState<VendedorRP[]>([]);
   const [modelos, setModelos] = useState<ModeloRP[]>([]);
   const [registros, setRegistros] = useState<RegistroVendaRP[]>([]);
+  const [demoMeta, setDemoMeta] = useState<Record<string, DemonstrativoMetaRP>>({});
 
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -51,10 +63,10 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
 
   useEffect(() => {
     (async () => {
-      const [ma, pr, ve, mo, re] = await Promise.all([
-        loadMarcasRP(), loadProdutosRP(), loadVendedoresRP(), loadModelosRP(), loadRegistrosRP(),
+      const [ma, pr, ve, mo, re, dm] = await Promise.all([
+        loadMarcasRP(), loadProdutosRP(), loadVendedoresRP(), loadModelosRP(), loadRegistrosRP(), loadDemoMetaRP(),
       ]);
-      setMarcas(ma); setProdutos(pr); setVendedores(ve); setModelos(mo); setRegistros(re);
+      setMarcas(ma); setProdutos(pr); setVendedores(ve); setModelos(mo); setRegistros(re); setDemoMeta(dm);
       setLoading(false);
     })();
   }, []);
@@ -139,6 +151,31 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
     toast.success('Venda excluída.');
   };
 
+  // Marca como pago: grava a data de hoje nas vendas pendentes do vendedor (daquela marca).
+  const handleMarkPaid = async (brand: 'vw' | 'audi', vendedorId: string) => {
+    const hoje = todayISO();
+    const next = registros.map(r =>
+      (!r.dataPagamento && brandOfMarca(r.marca) === brand && (r.vendedorId === vendedorId || (!r.vendedorId && r.vendedor === vendedorId)))
+        ? { ...r, dataPagamento: hoje }
+        : r
+    );
+    setRegistros(next);
+    await saveRegistrosRP(next);
+  };
+
+  // Assinatura do demonstrativo (persistida por marca/vendedor/competência).
+  const handleSaveSign = async (key: string, campo: CampoAssinaturaRP, assinatura: AssinaturaDigitalRP | null) => {
+    const next = { ...demoMeta };
+    const meta = { ...(next[key] ?? {}) };
+    const assinaturas = { ...(meta.assinaturas ?? {}) };
+    if (assinatura) assinaturas[campo] = assinatura;
+    else delete assinaturas[campo];
+    meta.assinaturas = assinaturas;
+    next[key] = meta;
+    setDemoMeta(next);
+    await saveDemoMetaRP(next);
+  };
+
   const columns = ['Data', 'Marca', 'Vendedor', 'Cliente', 'Modelo Veículo', 'Produto', 'Valor do Prêmio', 'Data do Pagamento'];
 
   return (
@@ -156,6 +193,12 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${view === 'tabela' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <TableProperties className="w-3.5 h-3.5" /> Registro de Vendas
+            </button>
+            <button
+              onClick={() => setView('demonstrativo')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${view === 'demonstrativo' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <FileText className="w-3.5 h-3.5" /> Demonstrativo de Pagamento
             </button>
             <button
               onClick={() => setView('cadastro')}
@@ -177,6 +220,14 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
           marcas={marcas} produtos={produtos} vendedores={vendedores} modelos={modelos}
           onChangeMarcas={persistMarcas} onChangeProdutos={persistProdutos}
           onChangeVendedores={persistVendedores} onChangeModelos={persistModelos}
+        />
+      ) : view === 'demonstrativo' ? (
+        <DemonstrativoProdutosView
+          registros={registros}
+          vendedores={vendedores}
+          demoMeta={demoMeta}
+          onMarkPaid={handleMarkPaid}
+          onSaveSign={handleSaveSign}
         />
       ) : (
         <>

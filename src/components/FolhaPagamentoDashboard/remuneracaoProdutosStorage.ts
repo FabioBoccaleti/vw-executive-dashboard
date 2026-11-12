@@ -6,6 +6,18 @@ const KEY_PRODUTOS = 'remuneracao_produtos_produtos';
 const KEY_VENDEDORES = 'remuneracao_produtos_vendedores';
 const KEY_MODELOS = 'remuneracao_produtos_modelos';
 const KEY_REGISTROS = 'remuneracao_produtos_registros';
+const KEY_DEMO_META = 'remuneracao_produtos_demonstrativos';
+
+// ── Departamentos (vendedor) ──────────────────────────────────────────────────
+export const DEPARTAMENTOS_RP = [
+  'Novos',
+  'Usados',
+  'Venda Direta',
+  'Oficina',
+  'Funilaria',
+  'Acessorios',
+] as const;
+export type DepartamentoRP = typeof DEPARTAMENTOS_RP[number];
 
 // ── Cadastros ─────────────────────────────────────────────────────────────────
 export interface MarcaRP {
@@ -26,6 +38,7 @@ export interface VendedorRP {
   marcaId: string;
   nome: string;
   matricula: string;
+  departamento: string;
 }
 
 export interface ModeloRP {
@@ -92,4 +105,47 @@ export async function loadRegistrosRP(): Promise<RegistroVendaRP[]> {
 }
 export async function saveRegistrosRP(items: RegistroVendaRP[]): Promise<boolean> {
   return kvSet(KEY_REGISTROS, items);
+}
+
+// ── Demonstrativo de pagamento: assinaturas ───────────────────────────────────
+export interface AssinaturaDigitalRP {
+  username: string;
+  name?: string;
+  dataHora: string;
+}
+
+export type CampoAssinaturaRP =
+  | 'financeiro'
+  | 'gerenciaComercial'
+  | 'diretoriaComercial'
+  | 'diretoria';
+
+export const CAMPO_ASSINATURA_LABELS_RP: Record<CampoAssinaturaRP, string> = {
+  financeiro:         'Financeiro',
+  gerenciaComercial:  'Gerência Comercial',
+  diretoriaComercial: 'Diretoria Comercial',
+  diretoria:          'Diretoria',
+};
+
+export const CAMPO_ASSINATURA_LABELS_RP_CURTO: Record<CampoAssinaturaRP, string> = {
+  financeiro:         'Fin',
+  gerenciaComercial:  'G.Com',
+  diretoriaComercial: 'D.Com',
+  diretoria:          'Dir',
+};
+
+export interface DemonstrativoMetaRP {
+  assinaturas?: Partial<Record<CampoAssinaturaRP, AssinaturaDigitalRP>>;
+}
+
+/** Monta a chave de meta por marca/vendedor/competência. */
+export function demoMetaKey(brand: 'vw' | 'audi', vendedorId: string, year: number, month: number): string {
+  return `${brand}_${vendedorId}_${year}-${String(month).padStart(2, '0')}`;
+}
+
+export async function loadDemoMetaRP(): Promise<Record<string, DemonstrativoMetaRP>> {
+  return (await kvGet<Record<string, DemonstrativoMetaRP>>(KEY_DEMO_META)) ?? {};
+}
+export async function saveDemoMetaRP(meta: Record<string, DemonstrativoMetaRP>): Promise<boolean> {
+  return kvSet(KEY_DEMO_META, meta);
 }
