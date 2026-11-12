@@ -10,7 +10,7 @@ import {
   loadVendedoresRP, saveVendedoresRP,
   loadModelosRP, saveModelosRP,
   loadRegistrosRP, saveRegistrosRP,
-  loadDemoMetaRP, saveDemoMetaRP,
+  loadDemoMetaRP, saveDemoMetaRP, demoMetaKey,
   type MarcaRP, type ProdutoRP, type VendedorRP, type ModeloRP, type RegistroVendaRP,
   type DemonstrativoMetaRP, type CampoAssinaturaRP, type AssinaturaDigitalRP,
 } from './remuneracaoProdutosStorage';
@@ -154,13 +154,30 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
   // Marca como pago: grava a data de hoje nas vendas pendentes do vendedor (daquela marca).
   const handleMarkPaid = async (brand: 'vw' | 'audi', vendedorId: string) => {
     const hoje = todayISO();
-    const next = registros.map(r =>
-      (!r.dataPagamento && brandOfMarca(r.marca) === brand && (r.vendedorId === vendedorId || (!r.vendedorId && r.vendedor === vendedorId)))
-        ? { ...r, dataPagamento: hoje }
-        : r
-    );
-    setRegistros(next);
-    await saveRegistrosRP(next);
+    const matches = (r: RegistroVendaRP) =>
+      !r.dataPagamento && brandOfMarca(r.marca) === brand && (r.vendedorId === vendedorId || (!r.vendedorId && r.vendedor === vendedorId));
+    if (!registros.some(matches)) return;
+    const nextReg = registros.map(r => matches(r) ? { ...r, dataPagamento: hoje } : r);
+    setRegistros(nextReg);
+    await saveRegistrosRP(nextReg);
+  };
+
+  // Reabre o demonstrativo (senha 1985): esvazia a data de pagamento das vendas
+  // pagas na competência e apaga as assinaturas.
+  const handleReopen = async (brand: 'vw' | 'audi', vendedorId: string, year: number, month: number) => {
+    const compPrefix = `${year}-${String(month).padStart(2, '0')}`;
+    const matches = (r: RegistroVendaRP) =>
+      !!r.dataPagamento && r.dataPagamento.startsWith(compPrefix) && brandOfMarca(r.marca) === brand
+      && (r.vendedorId === vendedorId || (!r.vendedorId && r.vendedor === vendedorId));
+    const nextReg = registros.map(r => matches(r) ? { ...r, dataPagamento: '' } : r);
+    setRegistros(nextReg);
+    await saveRegistrosRP(nextReg);
+
+    const key = demoMetaKey(brand, vendedorId, year, month);
+    const nextMeta = { ...demoMeta };
+    nextMeta[key] = { assinaturas: {} };
+    setDemoMeta(nextMeta);
+    await saveDemoMetaRP(nextMeta);
   };
 
   // Assinatura do demonstrativo (persistida por marca/vendedor/competência).
@@ -227,6 +244,7 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
           vendedores={vendedores}
           demoMeta={demoMeta}
           onMarkPaid={handleMarkPaid}
+          onReopen={handleReopen}
           onSaveSign={handleSaveSign}
         />
       ) : (

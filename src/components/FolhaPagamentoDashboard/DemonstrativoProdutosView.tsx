@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, ChevronRight as ChevRight, Printer, Check, Clock, ShieldCheck, PenLine, X, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronRight as ChevRight, Printer, Check, Clock, CheckCircle, ShieldCheck, PenLine, X, Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
@@ -42,12 +42,15 @@ interface VendedorInfo {
   nome: string;
   matricula: string;
   departamento: string;
+  cargo: string;
 }
 
 interface Grupo {
   info: VendedorInfo;
   vendas: RegistroVendaRP[];
   total: number;
+  pago: boolean;
+  dataPagamento: string;
 }
 
 interface DemonstrativoProdutosViewProps {
@@ -55,10 +58,11 @@ interface DemonstrativoProdutosViewProps {
   vendedores: VendedorRP[];
   demoMeta: Record<string, DemonstrativoMetaRP>;
   onMarkPaid: (brand: Brand, vendedorId: string) => Promise<void>;
+  onReopen: (brand: Brand, vendedorId: string, year: number, month: number) => Promise<void>;
   onSaveSign: (key: string, campo: CampoAssinaturaRP, assinatura: AssinaturaDigitalRP | null) => Promise<void>;
 }
 
-export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onMarkPaid, onSaveSign }: DemonstrativoProdutosViewProps) {
+export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onMarkPaid, onReopen, onSaveSign }: DemonstrativoProdutosViewProps) {
   const { session, isAdmin } = useAuth();
   const admin = isAdmin();
 
@@ -69,33 +73,60 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [assinaDialog, setAssinaDialog] = useState<{ campo: CampoAssinaturaRP; senha: string; loading: boolean; erro: string | null } | null>(null);
+  const [reabrirDialog, setReabrirDialog] = useState<{ vendedorId: string; senha: string; erro: string | null } | null>(null);
 
-  // Agrupa as vendas pendentes (sem data de pagamento) por vendedor, dentro da marca.
+  function infoFromVendedor(vendedorId: string, fallbackNome: string): VendedorInfo {
+    const v = vendedores.find(x => x.id === vendedorId);
+    return {
+      id: vendedorId,
+      nome: v?.nome ?? fallbackNome,
+      matricula: v?.matricula ?? '',
+      departamento: v?.departamento ?? '',
+      cargo: v?.cargo ?? '',
+    };
+  }
+
+  // Monta os demonstrativos da competência selecionada, derivando pela própria
+  // data de pagamento das vendas:
+  //  • Pago: vendas da marca cuja data de pagamento cai no mês/ano selecionado.
+  //  • Em aberto: vendas da marca sem data de pagamento (um vendedor já com
+  //    demonstrativo pago no mês não entra também como aberto).
   const grupos = useMemo<Grupo[]>(() => {
-    const pend = registros.filter(r => !r.dataPagamento && brandOfMarca(r.marca) === brand);
+    const compPrefix = `${year}-${String(month).padStart(2, '0')}`;
     const byVend = new Map<string, Grupo>();
-    for (const r of pend) {
-      const key = r.vendedorId || r.vendedor;
-      let g = byVend.get(key);
+
+    // 1) Pagos nesta competência.
+    const pagas = registros.filter(r => brandOfMarca(r.marca) === brand && r.dataPagamento && r.dataPagamento.startsWith(compPrefix));
+    for (const r of pagas) {
+      const vendedorId = r.vendedorId || r.vendedor;
+      let g = byVend.get(vendedorId);
       if (!g) {
-        const v = vendedores.find(x => x.id === r.vendedorId);
-        g = {
-          info: {
-            id: r.vendedorId || key,
-            nome: v?.nome ?? r.vendedor,
-            matricula: v?.matricula ?? '',
-            departamento: v?.departamento ?? '',
-          },
-          vendas: [],
-          total: 0,
-        };
-        byVend.set(key, g);
+        g = { info: infoFromVendedor(vendedorId, r.vendedor), vendas: [], total: 0, pago: true, dataPagamento: '' };
+        byVend.set(vendedorId, g);
       }
       g.vendas.push(r);
       g.total += parseNum(r.valorPremio);
     }
+    for (const g of byVend.values()) {
+      g.dataPagamento = g.vendas.map(v => v.dataPagamento).filter(Boolean).sort().slice(-1)[0] ?? '';
+    }
+
+    // 2) Em aberto (sem data de pagamento), exceto quem já está pago no mês.
+    const pendentes = registros.filter(r => brandOfMarca(r.marca) === brand && !r.dataPagamento);
+    for (const r of pendentes) {
+      const vendedorId = r.vendedorId || r.vendedor;
+      if (byVend.get(vendedorId)?.pago) continue; // pago tem precedência no mês
+      let g = byVend.get(vendedorId);
+      if (!g) {
+        g = { info: infoFromVendedor(vendedorId, r.vendedor), vendas: [], total: 0, pago: false, dataPagamento: '' };
+        byVend.set(vendedorId, g);
+      }
+      g.vendas.push(r);
+      g.total += parseNum(r.valorPremio);
+    }
+
     return Array.from(byVend.values()).sort((a, b) => a.info.nome.localeCompare(b.info.nome));
-  }, [registros, vendedores, brand]);
+  }, [registros, vendedores, demoMeta, brand, year, month]);
 
   const selected = selectedId ? grupos.find(g => g.info.id === selectedId) ?? null : null;
 
@@ -110,10 +141,19 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
   }
 
   async function handleMarkPaid(vendedorId: string) {
-    if (!window.confirm('Marcar como pago preencherá a Data do Pagamento (hoje) das vendas pendentes deste vendedor, que sairão do demonstrativo. Continuar?')) return;
     await onMarkPaid(brand, vendedorId);
-    setSelectedId(null);
-    toast.success('Marcado como pago.');
+    toast.success('Demonstrativo marcado como pago.');
+  }
+
+  function handleConfirmarReabrir() {
+    if (!reabrirDialog) return;
+    if (reabrirDialog.senha !== '1985') {
+      setReabrirDialog(prev => prev ? { ...prev, erro: 'Senha incorreta.' } : prev);
+      return;
+    }
+    const vid = reabrirDialog.vendedorId;
+    setReabrirDialog(null);
+    onReopen(brand, vid, year, month).then(() => toast.success('Demonstrativo reaberto. Data de pagamento e assinaturas removidas.'));
   }
 
   async function handleConfirmarAssinatura() {
@@ -212,9 +252,15 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
                 <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors">
                   <Printer className="w-3.5 h-3.5" /> Imprimir PDF
                 </button>
-                <button onClick={() => handleMarkPaid(selected.info.id)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200">
-                  <Check className="w-3.5 h-3.5" /> Marcar como pago
-                </button>
+                {!selected.pago ? (
+                  <button onClick={() => handleMarkPaid(selected.info.id)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200">
+                    <Check className="w-3.5 h-3.5" /> Marcar como pago
+                  </button>
+                ) : (
+                  <button onClick={() => setReabrirDialog({ vendedorId: selected.info.id, senha: '', erro: null })} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200">
+                    <RotateCcw className="w-3.5 h-3.5" /> Reabrir demonstrativo
+                  </button>
+                )}
               </div>
 
               <div id="demo-produtos-print-area" className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -226,6 +272,7 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
                       <h2 className="text-lg font-bold">{selected.info.nome}</h2>
                       {selected.info.matricula && <p className="text-xs opacity-80 mt-0.5">Matrícula: {selected.info.matricula}</p>}
                       {selected.info.departamento && <p className="text-sm opacity-80">{selected.info.departamento}</p>}
+                      {selected.info.cargo && <p className="text-xs opacity-70 mt-0.5">{selected.info.cargo}</p>}
                       <p className="text-xs opacity-70 mt-0.5">{BRAND_LABEL[brand]}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
@@ -236,9 +283,16 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
                 </div>
 
                 {/* Status */}
-                <div className="px-6 py-2 flex items-center gap-3 text-xs font-semibold border-b bg-amber-50 border-amber-200 text-amber-700">
-                  <div className="w-2 h-2 rounded-full bg-amber-400" /> Pendente
-                </div>
+                {selected.pago ? (
+                  <div className="px-6 py-2 flex items-center gap-3 text-xs font-semibold border-b bg-emerald-50 border-emerald-200 text-emerald-700">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" /> Pago
+                    {selected.dataPagamento && <span className="font-normal text-emerald-600">— {isoToBR(selected.dataPagamento)}</span>}
+                  </div>
+                ) : (
+                  <div className="px-6 py-2 flex items-center gap-3 text-xs font-semibold border-b bg-amber-50 border-amber-200 text-amber-700">
+                    <div className="w-2 h-2 rounded-full bg-amber-400" /> Pendente
+                  </div>
+                )}
 
                 {/* Tabela */}
                 <table className="w-full">
@@ -316,7 +370,7 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
 
               {grupos.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-xl px-5 py-12 text-center text-sm text-slate-400">
-                  Nenhuma venda pendente de pagamento para {BRAND_LABEL[brand]}.
+                  Nenhum demonstrativo para {BRAND_LABEL[brand]} em {periodLabel}.
                 </div>
               ) : (
                 grupos.map(g => {
@@ -327,10 +381,15 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border" style={{ color, borderColor: color, backgroundColor: `${color}11` }}>{BRAND_LABEL[brand]}</span>
                           <span className="text-sm font-semibold text-slate-800 truncate">{g.info.nome}</span>
+                          {g.info.cargo && <span className="text-xs text-slate-500 truncate">{g.info.cargo}</span>}
                           {g.info.departamento && <span className="text-xs text-slate-400 truncate hidden sm:block">· {g.info.departamento}</span>}
                           {g.info.matricula && <span className="text-xs text-slate-500">Mat. {g.info.matricula}</span>}
                         </div>
-                        <p className="text-xs text-slate-400 mt-0.5">{g.vendas.length} {g.vendas.length === 1 ? 'venda' : 'vendas'} pendente(s)</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {g.pago
+                            ? `${g.vendas.length} ${g.vendas.length === 1 ? 'venda' : 'vendas'} · pago${g.dataPagamento ? ' em ' + isoToBR(g.dataPagamento) : ''}`
+                            : `${g.vendas.length} ${g.vendas.length === 1 ? 'venda' : 'vendas'} em aberto`}
+                        </p>
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -345,9 +404,15 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
                         })}
                       </div>
 
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 bg-amber-50 text-amber-700 border border-amber-200">
-                        <Clock className="w-3 h-3" /> Pendente
-                      </div>
+                      {g.pago ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle className="w-3 h-3" /> Pago
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 bg-amber-50 text-amber-700 border border-amber-200">
+                          <Clock className="w-3 h-3" /> Pendente
+                        </div>
+                      )}
 
                       <div className="text-right flex-shrink-0 w-32">
                         <span className="text-sm font-bold text-slate-800 tabular-nums">{fmtBRL(g.total)}</span>
@@ -387,6 +452,35 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
               <button onClick={handleConfirmarAssinatura} disabled={assinaDialog.loading || !assinaDialog.senha} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white disabled:bg-slate-200 disabled:text-slate-400">
                 {assinaDialog.loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5" />}
                 Assinar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dialog de reabertura */}
+      {reabrirDialog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div className="flex items-start justify-between">
+              <h3 className="text-base font-bold text-slate-800">Reabrir demonstrativo</h3>
+              <button onClick={() => setReabrirDialog(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-xs text-slate-500">Isto esvaziará a Data do Pagamento das vendas na planilha e removerá as assinaturas desta competência. Informe a senha para continuar.</p>
+            <input
+              type="password"
+              autoFocus
+              value={reabrirDialog.senha}
+              onChange={e => setReabrirDialog(prev => prev ? { ...prev, senha: e.target.value, erro: null } : prev)}
+              onKeyDown={e => e.key === 'Enter' && handleConfirmarReabrir()}
+              placeholder="Senha"
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            />
+            {reabrirDialog.erro && <p className="text-xs text-red-600">{reabrirDialog.erro}</p>}
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setReabrirDialog(null)} className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-500 text-xs font-semibold hover:bg-slate-50">Cancelar</button>
+              <button onClick={handleConfirmarReabrir} disabled={!reabrirDialog.senha} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-800 text-white disabled:bg-slate-200 disabled:text-slate-400">
+                <RotateCcw className="w-3.5 h-3.5" /> Reabrir
               </button>
             </div>
           </div>

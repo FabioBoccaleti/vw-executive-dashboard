@@ -39,6 +39,7 @@ export interface VendedorRP {
   nome: string;
   matricula: string;
   departamento: string;
+  cargo: string;
 }
 
 export interface ModeloRP {
@@ -136,6 +137,12 @@ export const CAMPO_ASSINATURA_LABELS_RP_CURTO: Record<CampoAssinaturaRP, string>
 
 export interface DemonstrativoMetaRP {
   assinaturas?: Partial<Record<CampoAssinaturaRP, AssinaturaDigitalRP>>;
+  /** Demonstrativo fechado (marcado como pago) para esta competência. */
+  pago?: boolean;
+  /** Data (ISO) em que foi marcado como pago. */
+  dataPagamento?: string;
+  /** IDs das vendas congeladas neste demonstrativo pago. */
+  vendaIds?: string[];
 }
 
 /** Monta a chave de meta por marca/vendedor/competência. */

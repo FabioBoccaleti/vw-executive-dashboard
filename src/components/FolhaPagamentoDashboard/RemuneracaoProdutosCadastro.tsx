@@ -309,10 +309,12 @@ function VendedoresSection({ marcas, vendedores, onChange }: { marcas: MarcaRP[]
   const [nome, setNome] = useState('');
   const [matricula, setMatricula] = useState('');
   const [departamento, setDepartamento] = useState('');
+  const [cargo, setCargo] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState('');
   const [editMatricula, setEditMatricula] = useState('');
   const [editDepartamento, setEditDepartamento] = useState('');
+  const [editCargo, setEditCargo] = useState('');
 
   const filtered = useMemo(() => vendedores.filter(v => v.marcaId === marcaId), [vendedores, marcaId]);
 
@@ -320,20 +322,24 @@ function VendedoresSection({ marcas, vendedores, onChange }: { marcas: MarcaRP[]
     if (!marcaId) { toast.error('Selecione a marca.'); return; }
     const n = nome.trim();
     const mat = matricula.trim();
+    const c = cargo.trim();
     if (!n) { toast.error('Informe o nome do vendedor.'); return; }
     if (!mat) { toast.error('Informe a matrícula.'); return; }
     if (!departamento) { toast.error('Selecione o departamento.'); return; }
+    if (!c) { toast.error('Informe o cargo.'); return; }
     if (filtered.some(v => v.nome.toLowerCase() === n.toLowerCase())) { toast.error('Vendedor já cadastrado para esta marca.'); return; }
-    onChange([...vendedores, { id: crypto.randomUUID(), marcaId, nome: n, matricula: mat, departamento }]);
-    setNome(''); setMatricula(''); setDepartamento('');
+    onChange([...vendedores, { id: crypto.randomUUID(), marcaId, nome: n, matricula: mat, departamento, cargo: c }]);
+    setNome(''); setMatricula(''); setDepartamento(''); setCargo('');
   };
   const saveEdit = (id: string) => {
     const n = editNome.trim();
     const mat = editMatricula.trim();
+    const c = editCargo.trim();
     if (!n) { toast.error('Informe o nome do vendedor.'); return; }
     if (!mat) { toast.error('Informe a matrícula.'); return; }
     if (!editDepartamento) { toast.error('Selecione o departamento.'); return; }
-    onChange(vendedores.map(v => v.id === id ? { ...v, nome: n, matricula: mat, departamento: editDepartamento } : v));
+    if (!c) { toast.error('Informe o cargo.'); return; }
+    onChange(vendedores.map(v => v.id === id ? { ...v, nome: n, matricula: mat, departamento: editDepartamento, cargo: c } : v));
     setEditId(null);
   };
   const remove = (id: string) => onChange(vendedores.filter(v => v.id !== id));
@@ -345,13 +351,14 @@ function VendedoresSection({ marcas, vendedores, onChange }: { marcas: MarcaRP[]
 
       {marcaId && (
         <>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do vendedor" className={`${inputCls} flex-1`} />
-            <input value={matricula} onChange={e => setMatricula(e.target.value)} placeholder="Matrícula" className={`${inputCls} sm:w-36`} />
-            <select value={departamento} onChange={e => setDepartamento(e.target.value)} className={`${inputCls} bg-white sm:w-44`}>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+            <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do vendedor" className={`${inputCls} flex-1 min-w-[160px]`} />
+            <input value={matricula} onChange={e => setMatricula(e.target.value)} placeholder="Matrícula" className={`${inputCls} sm:w-32`} />
+            <select value={departamento} onChange={e => setDepartamento(e.target.value)} className={`${inputCls} bg-white sm:w-40`}>
               <option value="">Departamento...</option>
               {DEPARTAMENTOS_RP.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
+            <input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo" className={`${inputCls} sm:w-44`} />
             <Button onClick={add} className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"><Plus className="w-4 h-4" /> Adicionar</Button>
           </div>
 
@@ -361,21 +368,23 @@ function VendedoresSection({ marcas, vendedores, onChange }: { marcas: MarcaRP[]
               <div key={v.id} className="flex items-center gap-2 px-4 py-2.5">
                 {editId === v.id ? (
                   <>
-                    <input value={editNome} onChange={e => setEditNome(e.target.value)} className={`${inputCls} flex-1`} />
-                    <input value={editMatricula} onChange={e => setEditMatricula(e.target.value)} placeholder="Matrícula" className={`${inputCls} w-28`} />
-                    <select value={editDepartamento} onChange={e => setEditDepartamento(e.target.value)} className={`${inputCls} bg-white w-40`}>
+                    <input value={editNome} onChange={e => setEditNome(e.target.value)} className={`${inputCls} flex-1 min-w-[120px]`} />
+                    <input value={editMatricula} onChange={e => setEditMatricula(e.target.value)} placeholder="Matrícula" className={`${inputCls} w-24`} />
+                    <select value={editDepartamento} onChange={e => setEditDepartamento(e.target.value)} className={`${inputCls} bg-white w-36`}>
                       <option value="">Departamento...</option>
                       {DEPARTAMENTOS_RP.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
+                    <input value={editCargo} onChange={e => setEditCargo(e.target.value)} placeholder="Cargo" className={`${inputCls} w-36`} />
                     <button onClick={() => saveEdit(v.id)} className="p-1.5 rounded text-teal-600 hover:bg-teal-50"><Check className="w-4 h-4" /></button>
                     <button onClick={() => setEditId(null)} className="p-1.5 rounded text-slate-400 hover:bg-slate-100"><X className="w-4 h-4" /></button>
                   </>
                 ) : (
                   <>
                     <span className="flex-1 text-sm text-slate-700">{v.nome}</span>
-                    <span className="text-xs text-slate-500">{v.departamento}</span>
+                    <span className="text-xs text-slate-500">{v.cargo}</span>
+                    <span className="text-xs text-slate-400">{v.departamento}</span>
                     <span className="text-sm text-slate-500 w-28 text-right">Mat. {v.matricula}</span>
-                    <button onClick={() => { setEditId(v.id); setEditNome(v.nome); setEditMatricula(v.matricula); setEditDepartamento(v.departamento); }} className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => { setEditId(v.id); setEditNome(v.nome); setEditMatricula(v.matricula); setEditDepartamento(v.departamento); setEditCargo(v.cargo); }} className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => remove(v.id)} className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
                   </>
                 )}
