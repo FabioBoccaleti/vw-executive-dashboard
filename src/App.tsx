@@ -20,6 +20,7 @@ import { CalculoComissoesVWPage } from '@/components/FolhaPagamentoDashboard/Cal
 import { CalculoComissoesVWPosVendasPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPosVendasPage'
 import { RemuneracoesVariaveisDashboard } from '@/components/FolhaPagamentoDashboard/RemuneracoesVariaveisDashboard'
 import { ComissoesSignDriveProdutosPage } from '@/components/FolhaPagamentoDashboard/ComissoesSignDriveProdutosPage'
+import { RemuneracaoProdutosPage } from '@/components/FolhaPagamentoDashboard/RemuneracaoProdutosPage'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -59,7 +60,7 @@ function AppContent() {
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
   const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi'>('selection')
-  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios' | 'comissoes_signdrive_produtos'>('selection')
+  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios' | 'comissoes_signdrive_produtos' | 'remuneracao_produtos'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive'>('blindagem')
   
   // Inicializa o banco de dados em produção
@@ -263,6 +264,8 @@ function AppContent() {
           <PremiosDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'comissoes_signdrive_produtos' ? (
           <ComissoesSignDriveProdutosPage onBack={() => setFolhaSubPage('selection')} />
+        ) : folhaSubPage === 'remuneracao_produtos' ? (
+          <RemuneracaoProdutosPage onBack={() => setFolhaSubPage('selection')} />
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (
