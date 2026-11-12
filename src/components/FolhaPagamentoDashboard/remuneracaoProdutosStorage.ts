@@ -60,6 +60,7 @@ export interface RegistroVendaRP {
   cliente: string;
   modeloId: string;
   modelo: string;
+  chassi: string;
   produtoId: string;
   produto: string;
   /** Valor do prêmio (snapshot do cadastro no momento do registro). */

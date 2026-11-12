@@ -31,9 +31,10 @@ type Draft = {
   vendedorId: string;
   cliente: string;
   modeloId: string;
+  chassi: string;
   produtoId: string;
 };
-const emptyDraft = (): Draft => ({ data: todayISO(), marcaId: '', vendedorId: '', cliente: '', modeloId: '', produtoId: '' });
+const emptyDraft = (): Draft => ({ data: todayISO(), marcaId: '', vendedorId: '', cliente: '', modeloId: '', chassi: '', produtoId: '' });
 
 const inputCls = 'border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400';
 
@@ -87,7 +88,7 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
   const openNew = () => { setEditId(null); setDraft(emptyDraft()); setShowModal(true); };
   const openEdit = (row: RegistroVendaRP) => {
     setEditId(row.id);
-    setDraft({ data: row.data, marcaId: row.marcaId, vendedorId: row.vendedorId, cliente: row.cliente, modeloId: row.modeloId, produtoId: row.produtoId });
+    setDraft({ data: row.data, marcaId: row.marcaId, vendedorId: row.vendedorId, cliente: row.cliente, modeloId: row.modeloId, chassi: row.chassi ?? '', produtoId: row.produtoId });
     setShowModal(true);
   };
   const closeModal = () => { setShowModal(false); setEditId(null); setDraft(emptyDraft()); };
@@ -101,6 +102,7 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
     if (!draft.vendedorId) { toast.error('Selecione o vendedor.'); return; }
     if (!draft.cliente.trim()) { toast.error('Informe o cliente.'); return; }
     if (!draft.modeloId) { toast.error('Selecione o modelo do veículo.'); return; }
+    if (!draft.chassi.trim()) { toast.error('Informe o chassi.'); return; }
     if (!draft.produtoId) { toast.error('Selecione o produto.'); return; }
 
     const marca = marcas.find(m => m.id === draft.marcaId);
@@ -108,6 +110,14 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
     const modelo = modelos.find(m => m.id === draft.modeloId);
     const produto = produtos.find(p => p.id === draft.produtoId);
     if (!marca || !vendedor || !modelo || !produto) { toast.error('Dados do cadastro não encontrados.'); return; }
+
+    // Aviso de chassi já registrado em outra venda (considera todas as vendas).
+    const chassiNorm = draft.chassi.trim().toLowerCase();
+    const existente = registros.find(r => r.id !== editId && (r.chassi ?? '').trim().toLowerCase() === chassiNorm);
+    if (existente) {
+      const ok = window.confirm(`Já existe uma venda registrada com o chassi "${draft.chassi.trim()}" (cliente: ${existente.cliente || '—'}). Deseja incluir a venda mesmo assim?`);
+      if (!ok) return;
+    }
 
     setSaving(true);
     let next: RegistroVendaRP[];
@@ -119,6 +129,7 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
         vendedorId: vendedor.id, vendedor: vendedor.nome,
         cliente: draft.cliente.trim(),
         modeloId: modelo.id, modelo: modelo.nome,
+        chassi: draft.chassi.trim(),
         produtoId: produto.id, produto: produto.nome,
         valorPremio: produto.premio,
       } : r);
@@ -130,6 +141,7 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
         vendedorId: vendedor.id, vendedor: vendedor.nome,
         cliente: draft.cliente.trim(),
         modeloId: modelo.id, modelo: modelo.nome,
+        chassi: draft.chassi.trim(),
         produtoId: produto.id, produto: produto.nome,
         valorPremio: produto.premio,
         dataPagamento: '',
@@ -193,7 +205,7 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
     await saveDemoMetaRP(next);
   };
 
-  const columns = ['Data', 'Marca', 'Vendedor', 'Cliente', 'Modelo Veículo', 'Produto', 'Valor do Prêmio', 'Data do Pagamento'];
+  const columns = ['Data', 'Marca', 'Vendedor', 'Cliente', 'Modelo Veículo', 'Chassi', 'Produto', 'Valor do Prêmio', 'Data do Pagamento'];
 
   return (
     <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
@@ -276,6 +288,7 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
                       <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{r.vendedor || '—'}</td>
                       <td className="px-3 py-2.5 text-slate-700">{r.cliente || '—'}</td>
                       <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{r.modelo || '—'}</td>
+                      <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{r.chassi || '—'}</td>
                       <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{r.produto || '—'}</td>
                       <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{fmtCurrency(r.valorPremio)}</td>
                       <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{isoToBR(r.dataPagamento) || '—'}</td>
@@ -350,6 +363,10 @@ export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps
                   <option value="">{draft.marcaId ? 'Selecione...' : 'Selecione a marca primeiro'}</option>
                   {modelosFiltrados.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                 </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Chassi <span className="text-red-500">*</span></label>
+                <input type="text" value={draft.chassi} onChange={e => setDraft(p => ({ ...p, chassi: e.target.value }))} placeholder="Ex: 9BWZZZ377VT004251" className={inputCls} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Produto <span className="text-red-500">*</span></label>
