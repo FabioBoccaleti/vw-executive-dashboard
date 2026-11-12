@@ -46,7 +46,7 @@ function brandOfMarca(marca: string): 'vw' | 'audi' | null {
 }
 
 export function RemuneracaoProdutosPage({ onBack }: RemuneracaoProdutosPageProps) {
-  const [view, setView] = useState<'tabela' | 'demonstrativo' | 'cadastro'>('tabela');
+  const [view, setView] = useState<'tabela' | 'demonstrativo' | 'cadastro'>('demonstrativo');
   const [loading, setLoading] = useState(true);
 
   const [marcas, setMarcas] = useState<MarcaRP[]>([]);

@@ -36,6 +36,7 @@ function brandOfMarca(marca: string): Brand | null {
 const parseNum = (s: string): number => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 const fmtBRL = (v: number): string => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const isoToBR = (iso: string): string => { if (!iso) return ''; const [y, m, d] = iso.split('-'); return y && m && d ? `${d}/${m}/${y}` : ''; };
+const escapeHtml = (s: string): string => (s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
 interface VendedorInfo {
   id: string;
@@ -205,6 +206,103 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
     setTimeout(() => { root.innerHTML = ''; document.head.removeChild(style); }, 300);
   }
 
+  function buildGroupHtml(g: Grupo): string {
+    const meta = metaFor(g.info.id);
+    const rows = g.vendas.map(v => `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:10px 24px;font-size:12px;color:#334155;white-space:nowrap;">${escapeHtml(isoToBR(v.data)) || '—'}</td>
+        <td style="padding:10px 16px;font-size:12px;color:#334155;">${escapeHtml(v.cliente) || '—'}</td>
+        <td style="padding:10px 16px;font-size:12px;color:#334155;white-space:nowrap;">${escapeHtml(v.modelo) || '—'}</td>
+        <td style="padding:10px 16px;font-size:12px;color:#334155;">${escapeHtml(v.produto) || '—'}</td>
+        <td style="padding:10px 24px;font-size:12px;font-weight:600;color:#0f172a;text-align:right;white-space:nowrap;">${fmtBRL(parseNum(v.valorPremio))}</td>
+      </tr>`).join('');
+
+    const assinaturas = (Object.keys(CAMPO_ASSINATURA_LABELS_RP) as CampoAssinaturaRP[]).map(campo => {
+      const ass = meta?.assinaturas?.[campo];
+      const label = CAMPO_ASSINATURA_LABELS_RP[campo];
+      return ass ? `
+        <div style="border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;background:#f0fdf4;">
+          <div style="font-size:11px;color:#15803d;font-weight:700;margin-bottom:2px;">${label}</div>
+          ${ass.name && ass.name !== ass.username ? `<div style="font-size:12px;font-weight:700;color:#166534;">${escapeHtml(ass.name)}</div>` : ''}
+          <div style="font-size:11px;color:#16a34a;">${escapeHtml(ass.username)}</div>
+          <div style="font-size:10px;color:#15803d;">${new Date(ass.dataHora).toLocaleString('pt-BR')}</div>
+          <div style="font-size:10px;font-weight:700;color:#15803d;margin-top:4px;">✓ ASSINATURA ELETRÔNICA</div>
+        </div>` : `
+        <div style="border:1px dashed #cbd5e1;border-radius:8px;padding:10px 12px;background:#f8fafc;">
+          <div style="font-size:11px;color:#94a3b8;font-weight:700;">${label}</div>
+          <div style="font-size:10px;color:#cbd5e1;margin-top:16px;border-top:1px solid #e2e8f0;padding-top:4px;">Aguardando assinatura</div>
+        </div>`;
+    }).join('');
+
+    const statusHtml = g.pago
+      ? `<div style="padding:8px 24px;font-size:12px;font-weight:600;background:#ecfdf5;border-bottom:1px solid #a7f3d0;color:#047857;">● Pago${g.dataPagamento ? ' — ' + escapeHtml(isoToBR(g.dataPagamento)) : ''}</div>`
+      : `<div style="padding:8px 24px;font-size:12px;font-weight:600;background:#fffbeb;border-bottom:1px solid #fde68a;color:#b45309;">● Pendente</div>`;
+
+    return `
+      <div style="page-break-after:always;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;">
+        <div style="background:${color};color:#fff;padding:16px 24px;display:flex;justify-content:space-between;gap:16px;">
+          <div>
+            <div style="font-size:11px;font-weight:600;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">${DEMO_TITULO}</div>
+            <div style="font-size:18px;font-weight:700;">${escapeHtml(g.info.nome)}</div>
+            ${g.info.matricula ? `<div style="font-size:12px;opacity:.8;margin-top:2px;">Matrícula: ${escapeHtml(g.info.matricula)}</div>` : ''}
+            ${g.info.departamento ? `<div style="font-size:13px;opacity:.8;">${escapeHtml(g.info.departamento)}</div>` : ''}
+            ${g.info.cargo ? `<div style="font-size:12px;opacity:.7;margin-top:2px;">${escapeHtml(g.info.cargo)}</div>` : ''}
+            <div style="font-size:12px;opacity:.7;margin-top:2px;">${BRAND_LABEL[brand]}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;">Competência</div>
+            <div style="font-size:16px;font-weight:700;margin-top:2px;">${periodLabel}</div>
+          </div>
+        </div>
+        ${statusHtml}
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+              <th style="text-align:left;padding:10px 24px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;">Data</th>
+              <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;">Cliente</th>
+              <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;">Modelo</th>
+              <th style="text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;">Produto</th>
+              <th style="text-align:right;padding:10px 24px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;">Valor do Prêmio</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr style="background:${color};">
+              <td colspan="4" style="padding:10px 24px;font-size:13px;font-weight:700;color:#fff;">Total</td>
+              <td style="padding:10px 24px;font-size:13px;font-weight:700;color:#fff;text-align:right;white-space:nowrap;">${fmtBRL(g.total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div style="border-top:1px solid #f1f5f9;padding:16px 24px;">
+          <div style="font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Assinaturas</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">${assinaturas}</div>
+        </div>
+      </div>`;
+  }
+
+  function handlePrintAll() {
+    if (grupos.length === 0) { toast.info('Nenhum demonstrativo para imprimir.'); return; }
+    const root = document.getElementById('print-root');
+    if (!root) { window.print(); return; }
+    root.innerHTML = grupos.map(buildGroupHtml).join('');
+    const style = document.createElement('style');
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      @media print { body > *:not(#print-root) { display: none !important; } }
+      #print-root { font-family: Inter, sans-serif; }
+      #print-root div[style*="page-break-after:always"]:last-child { page-break-after: auto !important; }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => { root.innerHTML = ''; document.head.removeChild(style); }, 300);
+  }
+
   const periodLabel = `${MONTHS[month - 1]} de ${year}`;
   const color = BRAND_COLOR[brand];
 
@@ -233,15 +331,22 @@ export function DemonstrativoProdutosView({ registros, vendedores, demoMeta, onM
                 <ChevronLeft className="w-3.5 h-3.5" /> Vendedores
               </button>
             ) : <div />}
-            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1">
-              <button onClick={() => changeMonth(-1)} className="p-1 text-slate-400 hover:text-slate-600"><ChevronLeft className="w-4 h-4" /></button>
-              <select value={month} onChange={e => setMonth(Number(e.target.value))} className="text-sm font-semibold text-slate-700 bg-transparent focus:outline-none">
-                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              </select>
-              <select value={year} onChange={e => setYear(Number(e.target.value))} className="text-sm font-semibold text-slate-700 bg-transparent focus:outline-none">
-                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <button onClick={() => changeMonth(1)} className="p-1 text-slate-400 hover:text-slate-600"><ChevronRight className="w-4 h-4" /></button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1">
+                <button onClick={() => changeMonth(-1)} className="p-1 text-slate-400 hover:text-slate-600"><ChevronLeft className="w-4 h-4" /></button>
+                <select value={month} onChange={e => setMonth(Number(e.target.value))} className="text-sm font-semibold text-slate-700 bg-transparent focus:outline-none">
+                  {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                </select>
+                <select value={year} onChange={e => setYear(Number(e.target.value))} className="text-sm font-semibold text-slate-700 bg-transparent focus:outline-none">
+                  {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <button onClick={() => changeMonth(1)} className="p-1 text-slate-400 hover:text-slate-600"><ChevronRight className="w-4 h-4" /></button>
+              </div>
+              {!selected && (
+                <button onClick={handlePrintAll} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors">
+                  <Printer className="w-3.5 h-3.5" /> Imprimir Todos
+                </button>
+              )}
             </div>
           </div>
 
