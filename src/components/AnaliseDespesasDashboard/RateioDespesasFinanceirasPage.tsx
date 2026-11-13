@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { loadBaseGerencialDreSnapshot } from '../BaseGerencialDashboard/baseGerencialDataProcessor';
 import type { Department } from '@/lib/dataStorage';
 import {
   type AnaliseBrand,
@@ -1285,6 +1286,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           loadedAudiKvRows,
           loadedVwDreByDept,
           loadedAudiDreByDept,
+          loadedVwBgByDept,
+          loadedAudiBgByDept,
         ] = await Promise.all([
           loadRateioCirculanteConfig(),
           loadMultipleMonthsAnaliseDespesas('vw', selectedYear, MONTHS),
@@ -1312,6 +1315,16 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           Promise.all(
             AUDI_DRE_DEPT_KEYS.map((deptKey) =>
               loadDREDataAsync(selectedYear as 2024 | 2025 | 2026 | 2027, AUDI_DRE_DEPT_TO_DEPARTMENT[deptKey], 'audi').then((dre) => ({ deptKey, dre })),
+            ),
+          ),
+          Promise.all(
+            VW_DRE_DEPT_KEYS.map((deptKey) =>
+              loadBaseGerencialDreSnapshot('vw', selectedYear, VW_DRE_DEPT_TO_DEPARTMENT[deptKey]).then((snap) => ({ deptKey, snap })),
+            ),
+          ),
+          Promise.all(
+            AUDI_DRE_DEPT_KEYS.map((deptKey) =>
+              loadBaseGerencialDreSnapshot('audi', selectedYear, AUDI_DRE_DEPT_TO_DEPARTMENT[deptKey]).then((snap) => ({ deptKey, snap })),
             ),
           ),
         ]);
@@ -1375,6 +1388,22 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           return acc;
         }, {} as Record<AudiDreDeptKey, any[] | null>);
 
+        // Base Gerencial (fonte viva, valor cheio) por departamento/mês. Tem
+        // prioridade sobre o snapshot resumo_dre, que a partir de setembro pode
+        // conter valores truncados em milhares. Só contém meses importados.
+        const vwBgLookup = loadedVwBgByDept.reduce((acc, { deptKey, snap }) => {
+          const byMonth: Record<number, number> = {};
+          for (const m of snap.months) byMonth[m.month] = Math.round(Number(m.values?.lucroLiquidoExercicio ?? 0));
+          acc[deptKey] = byMonth;
+          return acc;
+        }, {} as Record<VwDreDeptKey, Record<number, number>>);
+        const audiBgLookup = loadedAudiBgByDept.reduce((acc, { deptKey, snap }) => {
+          const byMonth: Record<number, number> = {};
+          for (const m of snap.months) byMonth[m.month] = Math.round(Number(m.values?.lucroLiquidoExercicio ?? 0));
+          acc[deptKey] = byMonth;
+          return acc;
+        }, {} as Record<AudiDreDeptKey, Record<number, number>>);
+
         const nextVwMensal: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
         const nextAudiMensal: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
 
@@ -1384,6 +1413,10 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           const audiKv = loadedAudiKvRows[monthIndex] ?? null;
 
           nextVwMensal[month] = VW_DRE_DEPT_KEYS.reduce((sum, deptKey) => {
+            const bgByMonth = vwBgLookup[deptKey] ?? {};
+            if (month in bgByMonth) {
+              return sum + bgByMonth[month];
+            }
             if (hasVwDeptData(vwKv, deptKey)) {
               return sum + parseDreNumber(vwKv?.[deptKey]?.lucroLiquidoExercicio);
             }
@@ -1391,6 +1424,10 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           }, 0);
 
           nextAudiMensal[month] = AUDI_DRE_DEPT_KEYS.reduce((sum, deptKey) => {
+            const bgByMonth = audiBgLookup[deptKey] ?? {};
+            if (month in bgByMonth) {
+              return sum + bgByMonth[month];
+            }
             if (hasAudiDeptData(audiKv, deptKey)) {
               return sum + parseDreNumber(audiKv?.[deptKey]?.lucroLiquidoExercicio);
             }
