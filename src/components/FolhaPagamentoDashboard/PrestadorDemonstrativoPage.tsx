@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Printer, Check, Save, Loader2, Plus, Trash2,
 import { toast } from 'sonner';
 import { kvGet } from '@/lib/kvClient';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { loadBaseGerencialDreSnapshot } from '@/components/BaseGerencialDashboard/baseGerencialDataProcessor';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
 import {
@@ -845,12 +846,34 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
         existing = migrated;
       }
 
-      // Prioriza DRE do dashboard executivo (mais atual) e usa resumo_dre como fallback.
+      // Base de cálculo: prioriza a fonte viva (Base Gerencial, em valor cheio —
+      // a mesma usada pelo Resumo DRE), depois o Dashboard Executivo e, por fim,
+      // o snapshot resumo_dre como fallback. O snapshot resumo_dre pode conter
+      // valores truncados em milhares; por isso não é a fonte preferencial aqui.
       let dreRow = kvDreRow;
       const monthIndex = drePrev.month - 1;
       const yr = drePrev.year as 2024 | 2025 | 2026 | 2027;
       const brand = prestador.brand as 'vw' | 'audi';
       const deptEntries = Object.entries(DEPT_TO_EXEC_DEPT);
+
+      // Meses do trimestre-calendário anterior (para a base trimestral).
+      const quarterMonths = previousQuarterMonths(year, month);
+
+      // Carrega os snapshots da Base Gerencial (valor cheio) uma vez por ano/departamento.
+      const bgYears = [...new Set([drePrev.year, ...quarterMonths.map(q => q.year)])];
+      const bgByYearDept = new Map<string, Awaited<ReturnType<typeof loadBaseGerencialDreSnapshot>>>();
+      await Promise.all(
+        bgYears.flatMap(by =>
+          deptEntries.map(async ([dk, dept]) => {
+            bgByYearDept.set(`${by}:${dk}`, await loadBaseGerencialDreSnapshot(brand, by, dept));
+          })
+        )
+      );
+      const bgLucro = (y: number, m: number, dk: string): number => {
+        const snap = bgByYearDept.get(`${y}:${dk}`);
+        return Number(snap?.months.find(x => x.month === m)?.values.lucroLiquidoExercicio ?? 0);
+      };
+
       const dreResults = await Promise.all(
         deptEntries.map(([dk, dept]) =>
           loadDREDataAsync(yr, dept as any, brand).then(d => ({ dk, d }))
@@ -862,18 +885,23 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
         synthetic[dk] = { lucroLiquidoExercicio: extractLucroLiquido(d, monthIndex) };
       }
 
-      // Se o DRE executivo retornou dados válidos, usa ele para evitar defasagem do resumo_dre.
-      if (Object.values(synthetic).some(v => v.lucroLiquidoExercicio !== 0)) {
+      const bgRow: Record<string, { lucroLiquidoExercicio: number }> = {};
+      for (const [dk] of deptEntries) {
+        bgRow[dk] = { lucroLiquidoExercicio: bgLucro(drePrev.year, drePrev.month, dk) };
+      }
+
+      // Prioridade: Base Gerencial (valor cheio) → Dashboard Executivo → resumo_dre.
+      if (Object.values(bgRow).some(v => v.lucroLiquidoExercicio !== 0)) {
+        dreRow = bgRow;
+      } else if (Object.values(synthetic).some(v => v.lucroLiquidoExercicio !== 0)) {
         dreRow = synthetic;
       }
 
       // Base trimestral: soma o Lucro Líquido do trimestre-calendário anterior
       // (3 meses), apenas quando o demonstrativo é o primeiro mês após o
       // fechamento do trimestre. Fora disso, trimestralByDept fica null → base 0.
-      // Cada mês é resolvido como no item de mês único: prioriza o Dashboard
-      // Executivo e usa resumo_dre como fallback. Isso evita perder o mês mais
-      // recente do trimestre, que às vezes só existe no resumo_dre.
-      const quarterMonths = previousQuarterMonths(year, month);
+      // Cada mês segue a mesma prioridade: Base Gerencial → Dashboard Executivo
+      // → resumo_dre (fallback).
       let trimestralByDept: Record<string, number> | null = null;
       if (quarterMonths.length === 3) {
         const acc = Object.fromEntries(deptEntries.map(([dk]) => [dk, 0])) as Record<string, number>;
@@ -889,14 +917,18 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
                 )
               ),
             ]);
+            const qBg = Object.fromEntries(
+              deptEntries.map(([dk]) => [dk, bgLucro(qm.year, qm.month, dk)])
+            ) as Record<string, number>;
             const qSynthetic = Object.fromEntries(
               qDreResults.map(({ dk, d }) => [dk, extractLucroLiquido(d, qm.month - 1)])
             ) as Record<string, number>;
-            const useSynthetic = Object.values(qSynthetic).some(v => v !== 0);
+            const useBg = Object.values(qBg).some(v => v !== 0);
+            const useSynthetic = !useBg && Object.values(qSynthetic).some(v => v !== 0);
             return Object.fromEntries(
               deptEntries.map(([dk]) => [
                 dk,
-                useSynthetic ? qSynthetic[dk] : parseValDre(qKvRow?.[dk]?.lucroLiquidoExercicio),
+                useBg ? qBg[dk] : useSynthetic ? qSynthetic[dk] : parseValDre(qKvRow?.[dk]?.lucroLiquidoExercicio),
               ])
             ) as Record<string, number>;
           })
