@@ -8,6 +8,25 @@ interface RegistroAnaliseVendasConsorcioDashboardProps {
   onOpenCadastros: () => void;
 }
 
+interface ColDef { key: string; label: string; width: number; align?: 'right' }
+
+// Colunas-folha da tabela (as duas de parcelas ficam sob o grupo "Quantidade de Parcelas")
+const COLUMNS: ColDef[] = [
+  { key: 'dataBordero',             label: 'Data do Borderô',             width: 140 },
+  { key: 'tipoVenda',               label: 'Tipo da Venda',               width: 160 },
+  { key: 'parcelasTotal',           label: 'Total de Parcelas',           width: 120 },
+  { key: 'parcelaRecebida',         label: 'Parcela Recebida',            width: 120 },
+  { key: 'grupoCota',               label: 'Grupo / Cota',                width: 130 },
+  { key: 'cliente',                 label: 'Cliente',                     width: 190 },
+  { key: 'valorCota',               label: 'Valor da Cota de Consorcio',  width: 180, align: 'right' },
+  { key: 'pctComissaoVenda',        label: '% Comissão s/ Venda',         width: 150, align: 'right' },
+  { key: 'valorComissaoVenda',      label: 'Valor da Comissão de Venda',  width: 185, align: 'right' },
+  { key: 'pctRentabilidadeBruta',   label: '% Rentabilidade Bruta',       width: 150, align: 'right' },
+  { key: 'impostosComissao',        label: 'Impostos s/ Comissão',        width: 150, align: 'right' },
+  { key: 'totalComissaoLiquida',    label: 'Total das Comissão Líquida',  width: 180, align: 'right' },
+  { key: 'pctRentabilidadeLiquida', label: '% Rentabilidade Líquida',     width: 150, align: 'right' },
+];
+
 export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenCadastros }: RegistroAnaliseVendasConsorcioDashboardProps) {
   const { canAccessVendasSub, isAdmin } = useAuth();
   const canTabela   = isAdmin() || canAccessVendasSub('consorcio.tabela');
@@ -92,12 +111,75 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
 
       {/* ── Content ── */}
       {activeTab === 'tabela' && canTabela && (
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="p-5 rounded-full bg-cyan-50">
-              <TableProperties className="w-12 h-12 text-cyan-500" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-800">Em desenvolvimento</h2>
+        <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
+          <div
+            className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-auto flex-1"
+            style={{ maxHeight: 'calc(100vh - 180px)' }}
+          >
+            <table className="border-collapse text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
+              <colgroup>
+                <col style={{ width: 56, minWidth: 56 }} />
+                {COLUMNS.map(c => (
+                  <col key={c.key} style={{ width: c.width, minWidth: c.width }} />
+                ))}
+              </colgroup>
+
+              <thead>
+                <tr>
+                  <th
+                    rowSpan={2}
+                    className="sticky left-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-r border-cyan-900 align-middle"
+                    style={{ background: '#0e7490' }}
+                  >
+                    #
+                  </th>
+                  {COLUMNS.map(col => {
+                    if (col.key === 'parcelasTotal') {
+                      return (
+                        <th
+                          key="grp-parcelas"
+                          colSpan={2}
+                          className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-2 border-r border-b border-cyan-500 text-center"
+                          style={{ background: '#0891b2' }}
+                        >
+                          Quantidade de Parcelas
+                        </th>
+                      );
+                    }
+                    if (col.key === 'parcelaRecebida') return null;
+                    return (
+                      <th
+                        key={`h-${col.key}`}
+                        rowSpan={2}
+                        className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-cyan-500 align-middle leading-snug text-center"
+                        style={{ background: '#0891b2' }}
+                      >
+                        {col.label}
+                      </th>
+                    );
+                  })}
+                </tr>
+                <tr>
+                  {COLUMNS.filter(c => c.key === 'parcelasTotal' || c.key === 'parcelaRecebida').map(col => (
+                    <th
+                      key={`sub-${col.key}`}
+                      className="sticky z-30 text-white text-xs font-semibold px-3 py-2 border-r border-cyan-500 text-center leading-snug"
+                      style={{ background: '#0891b2', top: 'var(--parcelas-group-height, 37px)' }}
+                    >
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr>
+                  <td colSpan={COLUMNS.length + 1} className="text-center text-sm text-slate-400 py-10">
+                    Nenhum registro cadastrado
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
