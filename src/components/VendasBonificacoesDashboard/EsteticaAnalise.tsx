@@ -421,23 +421,31 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
     return calcMetrics(filterRows(baseRows, prevY, prevM), dsrList, custoPreparacaoList, [{ ano: prevY, mes: prevM }], salariosFixosList);
   }, [baseRows, selectedYear, monthChip, dsrList, custoPreparacaoList, salariosFixosList]);
 
-  // Dados mensais
+  // Dados mensais: usa o mesmo cálculo dos cards (calcMetrics) para cada mês,
+  // para que o gráfico reflita exatamente os números do filtro mensal.
   const monthlyData = useMemo(() => {
     const maxMonth = monthChip !== null ? monthChip : 12;
+    const now = new Date();
+    const nowComparable = toComparable(now.getFullYear(), now.getMonth() + 1);
     return MONTHS.slice(0, maxMonth).map((label, mi) => {
       const m = mi + 1;
-      const mRows = baseRows.filter(r =>
-        (selectedYear === 'Todos' || getRowYear(r) === selectedYear) && getRowMonth(r) === m
-      );
-      const rl        = mRows.reduce((a, r) => a + n(r.receitaLiquida), 0);
-      const lucro     = mRows.reduce((a, r) => a + n(r.lucroBruto), 0);
-      const comissoes = mRows.reduce((a, r) => a + n(r.comissaoVendedor) + n(r.comissaoVendedorAcessorios), 0);
-      const resultado = lucro - comissoes;
-      const pctLucro     = rl > 0 ? (lucro / rl) * 100 : 0;
-      const pctResultado = rl > 0 ? (resultado / rl) * 100 : 0;
-      return { label, rl, lucro, comissoes, resultado, pctLucro, pctResultado, qtd: mRows.length };
+      const mRows = filterRows(baseRows, selectedYear, m);
+      // Meses futuros não entram (evita contar Folha Fixa antes do mês acontecer)
+      const months = monthsForFilter(selectedYear, m, availableYears)
+        .filter(({ ano, mes }) => toComparable(ano, mes) <= nowComparable);
+      const mm = calcMetrics(mRows, dsrList, custoPreparacaoList, months, salariosFixosList);
+      return {
+        label,
+        rl: mm.totalRL,
+        lucro: mm.totalLucro,
+        comissoes: mm.totalComissoes,
+        resultado: mm.resultado,
+        pctLucro: mm.pctLucroMedio,
+        pctResultado: mm.pctResultado,
+        qtd: mm.qtd,
+      };
     });
-  }, [baseRows, selectedYear, monthChip]);
+  }, [baseRows, selectedYear, monthChip, availableYears, dsrList, custoPreparacaoList, salariosFixosList]);
 
   // Por produto
   const produtoData = useMemo(() => {
