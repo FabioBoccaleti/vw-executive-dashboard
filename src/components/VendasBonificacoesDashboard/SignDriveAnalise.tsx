@@ -197,6 +197,7 @@ export function SignDriveAnalise({ rows }: { rows: AssinaturaRow[] }) {
   const custoColaborador = remTotals.salary + remTotals.benefits + remTotals.encCadastrados;
   const custoComissoes = remTotals.comissoesDSR + remTotals.encComissao;
   const resultadoLiquido = kpis.comissaoLiquida - custoColaborador - custoComissoes;
+  const pctResultadoLiquido = kpis.comissaoLiquida !== 0 ? (resultadoLiquido / kpis.comissaoLiquida) * 100 : 0;
 
   return (
     <div className="flex-1 overflow-auto p-4 flex flex-col gap-4 bg-slate-100">
@@ -247,7 +248,7 @@ export function SignDriveAnalise({ rows }: { rows: AssinaturaRow[] }) {
         <SummaryCard icon={<Tag className="w-5 h-5" />} color="amber"
           label="Custo Comissões Colaborador" value={fmtCurrency(custoComissoes)} sub="Comissões + DSR + Encargos s/ comissões" />
         <SummaryCard icon={<TrendingUp className="w-5 h-5" />} color={resultadoLiquido >= 0 ? 'emerald' : 'rose'}
-          label="Resultado Líquido da Operação" value={fmtCurrency(resultadoLiquido)} sub="Com. Líquida − Custo Colaborador − Custo Comissões" />
+          label="Resultado Líquido da Operação" value={fmtCurrency(resultadoLiquido)} sub={`${pctResultadoLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% da Com. Líquida · Com. Líquida − Custo Colaborador − Custo Comissões`} />
       </div>
 
       {/* ── Gráficos ── */}
