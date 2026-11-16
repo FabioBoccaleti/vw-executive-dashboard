@@ -24,7 +24,8 @@ interface VendasSelectionPageProps {
 }
 
 export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelectionPageProps) {
-  const { canAccessVendasSub, isAdmin } = useAuth();
+  const { canAccessVendasSub, canAccessModule, isAdmin } = useAuth();
+  const canCentralVW = isAdmin() || canAccessModule('central_vendas_vw');
   const canBlindagem = isAdmin() || BLINDAGEM_SUBS.some(s => canAccessVendasSub(s));
   const canPeliculas = isAdmin() || PELICULAS_SUBS.some(s => canAccessVendasSub(s));
   const canEstetica  = isAdmin() || ESTETICA_SUBS.some(s => canAccessVendasSub(s));
@@ -110,6 +111,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           )}
 
           {/* Card — Central de Vendas VW */}
+          {canCentralVW && (
           <button
             onClick={() => onSelect('importar-pdf')}
             className="w-56 bg-white rounded-2xl border-2 border-emerald-400 shadow-md hover:shadow-xl hover:border-emerald-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -124,6 +126,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
               <BaseDateBadge dateKey="base_date:central_vendas_vw" />
             </div>
           </button>
+          )}
 
           {/* Card — Vendas de Carro por Assinatura (Sign&Drive) */}
           {canAssinatura && (
