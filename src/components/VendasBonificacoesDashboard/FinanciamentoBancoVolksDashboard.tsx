@@ -662,8 +662,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         setAnaliseDeducaoUsadosInput(deducao.usados ? String(deducao.usados).replace('.', ',') : '');
         setAnaliseRemGerNovosTotal(remGer.novos);
         setAnaliseRemGerUsadosTotal(remGer.usados);
-        setAnaliseRemGerNovosInput(remGer.novos ? String(remGer.novos).replace('.', ',') : '');
-        setAnaliseRemGerUsadosInput(remGer.usados ? String(remGer.usados).replace('.', ',') : '');
+        setAnaliseRemGerNovosInput(remGer.novos ? '-' + fmtBRL(remGer.novos) : '');
+        setAnaliseRemGerUsadosInput(remGer.usados ? '-' + fmtBRL(remGer.usados) : '');
       }
       setAnaliseLoading(false);
     })();
@@ -702,8 +702,10 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   };
 
   const handleSaveAnaliseRemGerencia = async () => {
-    const novos = parseNum(analiseRemGerNovosInput);
-    const usados = parseNum(analiseRemGerUsadosInput);
+    const novos = Math.abs(parseNum(analiseRemGerNovosInput));
+    const usados = Math.abs(parseNum(analiseRemGerUsadosInput));
+    setAnaliseRemGerNovosInput(novos ? '-' + fmtBRL(novos) : '');
+    setAnaliseRemGerUsadosInput(usados ? '-' + fmtBRL(usados) : '');
     if (novos === analiseRemGerNovosTotal && usados === analiseRemGerUsadosTotal) return;
     setAnaliseSaving(true);
     try {
@@ -2784,6 +2786,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                                   <input
                                     value={analiseRemGerNovosInput}
                                     onChange={e => setAnaliseRemGerNovosInput(e.target.value)}
+                                    onFocus={() => setAnaliseRemGerNovosInput(analiseRemGerNovosTotal ? '-' + String(analiseRemGerNovosTotal).replace('.', ',') : '')}
                                     onBlur={handleSaveAnaliseRemGerencia}
                                     placeholder="0,00"
                                     className="w-28 text-right text-red-600 text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -2793,6 +2796,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                                   <input
                                     value={analiseRemGerUsadosInput}
                                     onChange={e => setAnaliseRemGerUsadosInput(e.target.value)}
+                                    onFocus={() => setAnaliseRemGerUsadosInput(analiseRemGerUsadosTotal ? '-' + String(analiseRemGerUsadosTotal).replace('.', ',') : '')}
                                     onBlur={handleSaveAnaliseRemGerencia}
                                     placeholder="0,00"
                                     className="w-28 text-right text-red-600 text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
