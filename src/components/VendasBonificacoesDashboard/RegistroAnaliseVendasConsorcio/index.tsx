@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
-import { Handshake, TableProperties, BarChart2, BookOpen, LogOut } from 'lucide-react';
+import { Handshake, TableProperties, BarChart2, BookOpen, LogOut, ShoppingCart, Clock, CheckCircle2 } from 'lucide-react';
 
 interface RegistroAnaliseVendasConsorcioDashboardProps {
   onChangeBrand: () => void;
@@ -30,10 +30,14 @@ const COLUMNS: ColDef[] = [
 export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenCadastros }: RegistroAnaliseVendasConsorcioDashboardProps) {
   const { canAccessVendasSub, isAdmin } = useAuth();
   const canTabela   = isAdmin() || canAccessVendasSub('consorcio.tabela');
+  const canVendas   = isAdmin() || canAccessVendasSub('consorcio.vendas');
   const canAnalise  = isAdmin() || canAccessVendasSub('consorcio.analise');
   const canCadastro = isAdmin() || canAccessVendasSub('consorcio.cadastro');
 
-  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>(canTabela ? 'tabela' : 'analise');
+  const [activeTab, setActiveTab] = useState<'tabela' | 'vendas' | 'analise'>(
+    canTabela ? 'tabela' : canVendas ? 'vendas' : 'analise',
+  );
+  const [vendasSubTab, setVendasSubTab] = useState<'a_receber' | 'recebida'>('a_receber');
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -58,6 +62,19 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
           <div className="flex items-center gap-3">
             {/* Abas */}
             <div className="flex items-center bg-white/10 rounded-lg p-0.5 gap-0.5">
+              {canVendas && (
+              <button
+                onClick={() => setActiveTab('vendas')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  activeTab === 'vendas'
+                    ? 'bg-cyan-500 text-white shadow-sm'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <ShoppingCart className="w-3.5 h-3.5" />
+                Vendas
+              </button>
+              )}
               {canTabela && (
               <button
                 onClick={() => setActiveTab('tabela')}
@@ -180,6 +197,38 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'vendas' && canVendas && (
+        <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
+          <div className="inline-flex self-start bg-slate-200 rounded-lg p-0.5 gap-0.5">
+            {([
+              { v: 'a_receber' as const, label: 'A Receber', icon: <Clock className="w-3.5 h-3.5" /> },
+              { v: 'recebida' as const, label: 'Recebida', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+            ]).map(opt => (
+              <button
+                key={opt.v}
+                onClick={() => setVendasSubTab(opt.v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  vendasSubTab === opt.v ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-300'
+                }`}
+              >
+                {opt.icon}
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex-1 flex items-center justify-center p-8">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="p-5 rounded-full bg-cyan-50">
+                {vendasSubTab === 'a_receber'
+                  ? <Clock className="w-12 h-12 text-cyan-500" />
+                  : <CheckCircle2 className="w-12 h-12 text-cyan-500" />}
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">Em desenvolvimento</h2>
+            </div>
           </div>
         </div>
       )}

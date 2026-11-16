@@ -16,7 +16,7 @@ const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas
 const DESPACHANTE_SUBS: VendasSubModuleId[] = ['despachante.vw', 'despachante.audi'];
 const PASSAGEM_VW_SUBS: VendasSubModuleId[] = ['passagem_vw.cadastro', 'passagem_vw.passagens', 'passagem_vw.situacoes', 'passagem_vw.analise'];
 const PASSAGEM_AUDI_SUBS: VendasSubModuleId[] = ['passagem_audi.cadastro', 'passagem_audi.passagens', 'passagem_audi.situacoes', 'passagem_audi.analise'];
-const CONSORCIO_SUBS: VendasSubModuleId[] = ['consorcio.tabela', 'consorcio.analise', 'consorcio.cadastro'];
+const CONSORCIO_SUBS: VendasSubModuleId[] = ['consorcio.tabela', 'consorcio.vendas', 'consorcio.analise', 'consorcio.cadastro'];
 
 interface VendasSelectionPageProps {
   onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi' | 'consorcio') => void;

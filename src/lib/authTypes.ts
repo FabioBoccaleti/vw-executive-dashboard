@@ -87,6 +87,7 @@ export type VendasSubModuleId =
   | 'passagem_audi.situacoes'
   | 'passagem_audi.analise'
   | 'consorcio.tabela'
+  | 'consorcio.vendas'
   | 'consorcio.analise'
   | 'consorcio.cadastro';
 
@@ -192,6 +193,7 @@ export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'passagem_audi.situacoes': 'Situações',
   'passagem_audi.analise': 'Análise',
   'consorcio.tabela': 'Tabela',
+  'consorcio.vendas': 'Vendas',
   'consorcio.analise': 'Análise',
   'consorcio.cadastro': 'Cadastro',
 };
