@@ -82,7 +82,7 @@ const MENU_SIGNDRIVE: MenuItem[] = [
 
 interface CadastrosPageProps {
   onBack: () => void;
-  variant?: 'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive';
+  variant?: 'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive' | 'consorcio';
 }
 
 export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPageProps) {
@@ -90,6 +90,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
   const isPeliculas = variant === 'peliculas';
   const isEstetica  = variant === 'estetica';
   const isAssinatura = variant === 'assinatura-signdrive';
+  const isConsorcio = variant === 'consorcio';
   const MENU_ITEMS = isAssinatura ? MENU_SIGNDRIVE : isEstetica ? MENU_ESTETICA : isPeliculas ? MENU_PELICULAS : MENU_BLINDAGEM;
 
   const current = MENU_ITEMS.find(m => m.id === activeSection);
@@ -105,6 +106,8 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
           ? { background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' }
           : isAssinatura
           ? { background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)' }
+          : isConsorcio
+          ? { background: 'linear-gradient(135deg, #0e7490 0%, #06b6d4 100%)' }
           : { background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' }}
       >
         <div className="px-6 py-4 flex items-center gap-4">
@@ -121,11 +124,22 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {isPeliculas && <p className="text-xs text-white/60 mt-0.5">Películas na Audi</p>}
             {isEstetica  && <p className="text-xs text-white/60 mt-0.5">Estética Audi</p>}
             {isAssinatura && <p className="text-xs text-white/60 mt-0.5">Vendas de Carro por Assinatura (Sign&amp;Drive)</p>}
+            {isConsorcio && <p className="text-xs text-white/60 mt-0.5">Registro e Análise de Vendas de Consorcio</p>}
           </div>
         </div>
       </header>
 
       {/* ── Body ── */}
+      {isConsorcio ? (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="p-5 rounded-full bg-cyan-50">
+              <WalletCards className="w-12 h-12 text-cyan-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-800">Em desenvolvimento</h2>
+          </div>
+        </div>
+      ) : (
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Sidebar ── */}
@@ -199,6 +213,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
           </div>
         </main>
       </div>
+      )}
     </div>
   );
 }

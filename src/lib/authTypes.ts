@@ -85,7 +85,10 @@ export type VendasSubModuleId =
   | 'passagem_audi.cadastro'
   | 'passagem_audi.passagens'
   | 'passagem_audi.situacoes'
-  | 'passagem_audi.analise';
+  | 'passagem_audi.analise'
+  | 'consorcio.tabela'
+  | 'consorcio.analise'
+  | 'consorcio.cadastro';
 
 // Subpermissões do módulo folha_pagamento
 export type FolhaSubModuleId =
@@ -188,6 +191,9 @@ export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'passagem_audi.passagens': 'Passagens',
   'passagem_audi.situacoes': 'Situações',
   'passagem_audi.analise': 'Análise',
+  'consorcio.tabela': 'Tabela',
+  'consorcio.analise': 'Análise',
+  'consorcio.cadastro': 'Cadastro',
 };
 
 export interface UserRecord {

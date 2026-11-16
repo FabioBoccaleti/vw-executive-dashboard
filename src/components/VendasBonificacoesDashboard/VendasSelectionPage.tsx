@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList, Key, Hammer } from 'lucide-react';
+import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList, Key, Hammer, Handshake } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
@@ -16,9 +16,10 @@ const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas
 const DESPACHANTE_SUBS: VendasSubModuleId[] = ['despachante.vw', 'despachante.audi'];
 const PASSAGEM_VW_SUBS: VendasSubModuleId[] = ['passagem_vw.cadastro', 'passagem_vw.passagens', 'passagem_vw.situacoes', 'passagem_vw.analise'];
 const PASSAGEM_AUDI_SUBS: VendasSubModuleId[] = ['passagem_audi.cadastro', 'passagem_audi.passagens', 'passagem_audi.situacoes', 'passagem_audi.analise'];
+const CONSORCIO_SUBS: VendasSubModuleId[] = ['consorcio.tabela', 'consorcio.analise', 'consorcio.cadastro'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi' | 'consorcio') => void;
   onChangeBrand: () => void;
 }
 
@@ -33,6 +34,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
   const canDespachante    = isAdmin() || DESPACHANTE_SUBS.some(s => canAccessVendasSub(s));
   const canPassagemVW     = isAdmin() || PASSAGEM_VW_SUBS.some(s => canAccessVendasSub(s));
   const canPassagemAudi   = isAdmin() || PASSAGEM_AUDI_SUBS.some(s => canAccessVendasSub(s));
+  const canConsorcio      = isAdmin() || CONSORCIO_SUBS.some(s => canAccessVendasSub(s));
 
 
 
@@ -225,10 +227,25 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           </button>
           )}
 
+          {/* Card — Registro e Análise de Vendas de Consorcio */}
+          {canConsorcio && (
+          <button
+            onClick={() => onSelect('consorcio')}
+            className="w-56 bg-white rounded-2xl border-2 border-cyan-400 shadow-md hover:shadow-xl hover:border-cyan-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-cyan-50 group-hover:bg-cyan-100 transition-colors">
+              <Handshake className="w-10 h-10 text-cyan-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Registro e Análise de<br />Vendas de Consorcio
+              </h2>
+            </div>
+          </button>
+          )}
+
         </div>
       </div>
-
-
     </div>
   );
 }

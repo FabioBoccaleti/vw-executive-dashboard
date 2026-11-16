@@ -48,6 +48,7 @@ import { ComparativoRedeAudiDashboard } from '@/components/ComparativoRedeAudiDa
 import { EbitdaDashboard } from '@/components/EbitdaDashboard'
 import { PassagemOficinaFunilariaVWDashboard } from '@/components/VendasBonificacoesDashboard/PassagemOficinaFunilariaVW'
 import { PassagemOficinaFunilariaAudiDashboard } from '@/components/VendasBonificacoesDashboard/PassagemOficinaFunilariaAudi'
+import { RegistroAnaliseVendasConsorcioDashboard } from '@/components/VendasBonificacoesDashboard/RegistroAnaliseVendasConsorcio'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -59,9 +60,9 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi'>('selection')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi' | 'consorcio'>('selection')
   const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios' | 'comissoes_signdrive_produtos' | 'remuneracao_produtos'>('selection')
-  const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive'>('blindagem')
+  const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive' | 'consorcio'>('blindagem')
   
   // Inicializa o banco de dados em produção
   useEffect(() => {
@@ -306,6 +307,11 @@ function AppContent() {
           <PassagemOficinaFunilariaVWDashboard onBack={() => setVendasSubPage('selection')} />
         ) : vendasSubPage === 'passagem-oficina-funilaria-audi' ? (
           <PassagemOficinaFunilariaAudiDashboard onBack={() => setVendasSubPage('selection')} />
+        ) : vendasSubPage === 'consorcio' ? (
+          <RegistroAnaliseVendasConsorcioDashboard
+            onChangeBrand={() => setVendasSubPage('selection')}
+            onOpenCadastros={() => { setCadastrosVariant('consorcio'); setCurrentPage('cadastros'); }}
+          />
         ) : (
           <VendasBonificacoesDashboard
             onChangeBrand={() => setVendasSubPage('selection')}
