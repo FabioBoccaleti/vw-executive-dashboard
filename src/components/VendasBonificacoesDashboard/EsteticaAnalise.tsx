@@ -128,15 +128,25 @@ function calcSalariosFixoTotals(months: { ano: number; mes: number }[], list: Sa
 }
 
 /** Monta a lista de meses/anos cobertos pelo filtro selecionado (Ano/Mês),
- * usada para acumular os valores de Salários Fixos no período correto. */
+ * usada para acumular os valores de Salários Fixos no período correto.
+ * Em "Ano todo", meses futuros não entram. */
 function monthsForFilter(year: number | 'Todos', monthChip: number | null, availableYears: number[]): { ano: number; mes: number }[] {
   if (monthChip !== null) {
     if (year === 'Todos') return availableYears.map(y => ({ ano: y, mes: monthChip }));
     return [{ ano: year, mes: monthChip }];
   }
+  // "Ano todo": não conta meses futuros (ano corrente vai só até o mês atual),
+  // senão a Folha Fixa de colaboradores sem data de fim é somada antecipadamente.
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
   const years = year === 'Todos' ? availableYears : [year];
   const out: { ano: number; mes: number }[] = [];
-  years.forEach(y => { for (let m = 1; m <= 12; m++) out.push({ ano: y, mes: m }); });
+  years.forEach(y => {
+    if (y > currentYear) return;
+    const lastMonth = y === currentYear ? currentMonth : 12;
+    for (let m = 1; m <= lastMonth; m++) out.push({ ano: y, mes: m });
+  });
   return out;
 }
 
