@@ -124,11 +124,15 @@ export function agruparModelosBase(itens: VeiculoAnaliseItem[]) {
   const grupos = new Map<string, ModeloResumo & { itens: VeiculoAnaliseItem[] }>();
   for (const item of itens) {
     const descricao = item.modelo.toUpperCase().trim()
-      .replace(/^(?:(?:NOVO|NOVA|VW|VOLKSWAGEN)\s+)+/, '')
+      .replace(/^(?:(?:NOVO|NOVA|VW|VOLKSWAGEN|AUDI)\s+)+/, '')
       .replace(/\bT[\s-]*CROSS\b/g, 'T-CROSS');
     // ID.4 e ID. Buzz contêm espaços/pontuação que fazem parte do nome do carro.
     const eletrico = descricao.match(/^ID[.\s-]*(\d+|BUZZ)\b/);
-    const modelo = eletrico ? `ID.${eletrico[1]}` : normalizarModelo(descricao);
+    // Os identificadores Audi não são códigos de concessionária (ex.: A3, Q3).
+    const audi = descricao.match(/^(?:RS\s*Q?\s*\d{1,2}|(?:SQ|[ASQR])\s*\d{1,2}|TT(?:S|RS)?|E[\s-]?TRON)\b/);
+    const modelo = eletrico ? `ID.${eletrico[1]}`
+      : audi ? audi[0].replace(/\s+/g, '').replace(/^ETRON$/, 'E-TRON')
+      : normalizarModelo(descricao);
     const grupo = grupos.get(modelo) ?? { modelo, n: 0, valor: 0, itens: [] };
     grupo.n += 1;
     grupo.valor += item.valor;

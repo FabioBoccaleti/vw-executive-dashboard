@@ -24,7 +24,10 @@ beforeEach(() => {
 });
 
 describe('inventário de veículos por tipo', () => {
-  it('mantém o inventário de veículos novos VW separado dos estoques existentes', async () => {
+  it.each([
+    ['vw_novos', 'estoque_novos_vw'],
+    ['audi_novos', 'estoque_novos_audi'],
+  ] as const)('mantém o inventário %s separado dos estoques existentes', async (inventory, prefix) => {
     const data = {
       month: '2026-11',
       fileName: 'estoque.xlsx',
@@ -34,16 +37,16 @@ describe('inventário de veículos por tipo', () => {
       veiculos: [],
     };
 
-    await saveInventarioVeiculos('vw_novos', data);
-    await getInventarioVeiculos('vw_novos', data.month);
-    await deleteInventarioVeiculos('vw_novos', data.month);
-    await getAvailableMonthsVeiculos('vw_novos');
-    await getLatestMonthVeiculos('vw_novos');
+    await saveInventarioVeiculos(inventory, data);
+    await getInventarioVeiculos(inventory, data.month);
+    await deleteInventarioVeiculos(inventory, data.month);
+    await getAvailableMonthsVeiculos(inventory);
+    await getLatestMonthVeiculos(inventory);
 
-    expect(kvSet).toHaveBeenCalledWith('estoque_novos_vw:inventario:2026-11', data);
-    expect(kvGet).toHaveBeenCalledWith('estoque_novos_vw:inventario:2026-11');
-    expect(kvDelete).toHaveBeenCalledWith('estoque_novos_vw:inventario:2026-11');
-    expect(kvKeys).toHaveBeenCalledWith('estoque_novos_vw:inventario:*');
+    expect(kvSet).toHaveBeenCalledWith(`${prefix}:inventario:2026-11`, data);
+    expect(kvGet).toHaveBeenCalledWith(`${prefix}:inventario:2026-11`);
+    expect(kvDelete).toHaveBeenCalledWith(`${prefix}:inventario:2026-11`);
+    expect(kvKeys).toHaveBeenCalledWith(`${prefix}:inventario:*`);
     expect(kvKeys).toHaveBeenCalledTimes(2);
   });
 

@@ -37,9 +37,10 @@ export interface VeiculoImport {
 }
 
 /** Identificador de cada inventário de veículos, armazenado separadamente. */
-export type VeiculoInventoryId = 'vw' | 'audi' | 'vw_novos';
+export type VeiculoInventoryId = 'vw' | 'audi' | 'vw_novos' | 'audi_novos';
 
 function inventarioPrefix(inventory: VeiculoInventoryId): string {
+  if (inventory === 'audi_novos') return 'estoque_novos_audi';
   return inventory === 'vw_novos' ? 'estoque_novos_vw' : `estoque_usados_${inventory}`;
 }
 

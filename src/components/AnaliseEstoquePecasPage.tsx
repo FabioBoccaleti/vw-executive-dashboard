@@ -11,10 +11,10 @@ interface Props {
   onChangeBrand: () => void;
 }
 
-type SubPage = 'selection' | 'audi' | 'vw' | 'usados_vw' | 'usados_audi' | 'novos_vw' | 'grade_test_drive' | 'monitoramento_bv';
+type SubPage = 'selection' | 'audi' | 'vw' | 'usados_vw' | 'usados_audi' | 'novos_vw' | 'novos_audi' | 'grade_test_drive' | 'monitoramento_bv';
 
 interface SubCard {
-  id: 'audi' | 'vw' | 'usados_vw' | 'usados_audi' | 'novos_vw';
+  id: 'audi' | 'vw' | 'usados_vw' | 'usados_audi' | 'novos_vw' | 'novos_audi';
   name: string;
   primary: string;
   primaryLight: string;
@@ -27,6 +27,7 @@ const SUB_CARDS: SubCard[] = [
   { id: 'vw', name: 'Estoque de Peças VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'pecas' },
   { id: 'usados_audi', name: 'Estoque de Veículos Usados Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'usados', veiculoInventoryId: 'audi' },
   { id: 'usados_vw', name: 'Estoque de Veículos Usados VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados', veiculoInventoryId: 'vw' },
+  { id: 'novos_audi', name: 'Estoque de Veículos Novos Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'usados', veiculoInventoryId: 'audi_novos' },
   { id: 'novos_vw', name: 'Estoque de Veículos Novos VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados', veiculoInventoryId: 'vw_novos' },
 ];
 

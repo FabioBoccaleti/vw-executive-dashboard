@@ -78,6 +78,7 @@ interface Props {
 }
 
 export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props) {
+  const resumoPorModelo = brand === 'vw_novos' || brand === 'audi_novos';
   const [month, setMonth] = useState<string>(currentMonth());
   const [monthResolved, setMonthResolved] = useState(false);
   const [baseDate, setBaseDate] = useState<string>(lastDayOfMonthISO(currentMonth()));
@@ -138,16 +139,16 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
   }, [data, baseDate, threshold]);
 
   const modelosBase = useMemo(() =>
-    brand === 'vw_novos' && analise ? agruparModelosBase(analise.itens) : [],
-  [brand, analise]);
+    resumoPorModelo && analise ? agruparModelosBase(analise.itens) : [],
+  [resumoPorModelo, analise]);
 
   const veiculosPagos = useMemo(() => {
-    const itens = brand === 'vw_novos' && analise
+    const itens = resumoPorModelo && analise
       ? analise.itens.filter((it): it is VeiculoAnaliseItem & { dias: number } => it.dias !== null && it.dias >= 180)
         .sort((a, b) => b.dias - a.dias)
       : [];
     return { itens, valor: itens.reduce((total, it) => total + it.valor, 0) };
-  }, [brand, analise]);
+  }, [resumoPorModelo, analise]);
 
   const variacao = useMemo(() => {
     if (!analise) return null;
@@ -234,7 +235,6 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
     );
   }
 
-  const resumoPorModelo = brand === 'vw_novos';
   const dadosAgrupamento = resumoPorModelo ? modelosBase : analise.marcas;
 
   return (

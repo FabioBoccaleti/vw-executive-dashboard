@@ -69,8 +69,31 @@ describe('apresentação do gráfico de estoque', () => {
     expect(within(summary).queryByText('NOVO POLO HIGHLINE TSI')).not.toBeInTheDocument();
   });
 
-  it('mantém todas as marcas no gráfico de usados', async () => {
-    render(<AnaliseVeiculosTab brand="vw" name="Usados VW" primary="#001e50" primaryLight="#e8f4fc" />);
+  it('apresenta novos Audi por carro e expande as versões completas', async () => {
+    const audiVeiculos = [
+      { ...veiculos[0], modelo: 'AUDI Q3 PERFORMANCE', valor: 200_000 },
+      { ...veiculos[1], modelo: 'Q3 SPORTBACK S LINE', valor: 300_000 },
+      { ...veiculos[2], modelo: 'AUDI A3 SEDAN', valor: 150_000 },
+    ];
+    vi.mocked(getInventarioVeiculos).mockImplementation(async (_, month) =>
+      month === '2026-11'
+        ? { month, fileName: 'audi.xlsx', importedAt: 0, headers: [], rows: [], veiculos: audiVeiculos }
+        : null);
+    render(<AnaliseVeiculosTab brand="audi_novos" name="Novos Audi" primary="#bb0a30" primaryLight="#fce8ec" />);
+    const heading = await screen.findByText('Veículos em estoque por modelo');
+    const chart = heading.parentElement!;
+    const labels = Array.from(chart.querySelectorAll('.recharts-yAxis .recharts-cartesian-axis-tick-value'));
+    expect(labels.map(label => label.textContent)).toEqual(['Q3', 'A3']);
+    const summary = screen.getByText('Resumo por modelo').parentElement!;
+    fireEvent.click(within(summary).getByText('Q3'));
+    expect(within(summary).getByText('AUDI Q3 PERFORMANCE')).toBeInTheDocument();
+    expect(within(summary).getByText('Q3 SPORTBACK S LINE')).toBeInTheDocument();
+    expect(getLatestMonthVeiculos).toHaveBeenLastCalledWith('audi_novos');
+    expect(getInventarioVeiculos).toHaveBeenCalledWith('audi_novos', '2026-11');
+  });
+
+  it.each(['vw', 'audi'] as const)('mantém todas as marcas no gráfico de usados %s', async brand => {
+    render(<AnaliseVeiculosTab brand={brand} name="Usados" primary="#001e50" primaryLight="#e8f4fc" />);
     const heading = await screen.findByText('Veículos em estoque por marca');
     const chart = heading.parentElement!;
 
@@ -81,7 +104,7 @@ describe('apresentação do gráfico de estoque', () => {
   });
 });
 
-describe('veículos pagos em estoque de novos VW', () => {
+describe.each(['vw_novos', 'audi_novos'] as const)('veículos pagos em estoque de %s', brand => {
   function mockInventarioPago() {
     const itens = [
       { modelo: 'POLO TRACK 179', entrada: '2026-06-04', valor: 100 },
@@ -99,7 +122,7 @@ describe('veículos pagos em estoque de novos VW', () => {
   it('inclui exatamente 180 dias e mantém card e tabela consistentes ao mudar os dias da análise', async () => {
     mockInventarioPago();
     const { container } = render(
-      <AnaliseVeiculosTab brand="vw_novos" name="Novos VW" primary="#001e50" primaryLight="#e8f4fc" />);
+      <AnaliseVeiculosTab brand={brand} name="Novos" primary="#001e50" primaryLight="#e8f4fc" />);
     const section = await screen.findByRole('region', { name: 'Veículos pagos em Estoque' });
     const table = within(section).getByRole('table');
     expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual([
@@ -130,7 +153,7 @@ describe('veículos pagos em estoque de novos VW', () => {
   });
 
   it('mostra card zerado e mensagem explícita quando não há veículos elegíveis', async () => {
-    render(<AnaliseVeiculosTab brand="vw_novos" name="Novos VW" primary="#001e50" primaryLight="#e8f4fc" />);
+    render(<AnaliseVeiculosTab brand={brand} name="Novos" primary="#001e50" primaryLight="#e8f4fc" />);
     const section = await screen.findByRole('region', { name: 'Veículos pagos em Estoque' });
     expect(within(section).getByText('Nenhum veículo com 180 dias ou mais em estoque.')).toBeInTheDocument();
     expect(section.textContent?.replace(/\s/g, '')).toContain('0veículos·Total:R$0,00');
