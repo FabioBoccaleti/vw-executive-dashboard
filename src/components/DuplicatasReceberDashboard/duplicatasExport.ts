@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import { HEADER_FILL, styleTitle, styleHeader, styleTotal, borderDataRow, downloadExcel as download } from '@/lib/excelReportStyles';
 import type { DuplicatasMarca } from './DuplicatasReceberDashboard';
 import {
   analyze, resumoPorDepartamento, resumoPorOrigem,
@@ -9,10 +9,6 @@ import {
 const CURRENCY_FMT = 'R$ #,##0.00';
 const INT_FMT = '#,##0';
 const PERC_FMT = '0.0"%"';
-const TITLE_FILL = 'FF3730A3'; // indigo-800
-const HEADER_FILL = 'FF4F46E5'; // indigo-600
-const TOTAL_FILL = 'FFEEF2FF'; // indigo-50
-const THIN = 'FFE2E8F0'; // slate-200
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 function monthLabel(month: string): string {
@@ -30,42 +26,6 @@ function situacao(d: Duplicata): string {
 function diasValor(d: Duplicata): number | '' {
   if (!d.vencimento) return '';
   return d.vencido ? d.diasAtraso : d.diasAteVencer;
-}
-
-function thinBorder(): Partial<ExcelJS.Borders> {
-  const side = { style: 'thin' as const, color: { argb: THIN } };
-  return { top: side, bottom: side, left: side, right: side };
-}
-function styleTitle(ws: ExcelJS.Worksheet, row: ExcelJS.Row, colspan: number) {
-  ws.mergeCells(row.number, 1, row.number, colspan);
-  row.height = 24;
-  const cell = row.getCell(1);
-  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TITLE_FILL } };
-  cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 };
-  cell.alignment = { vertical: 'middle', horizontal: 'left' };
-}
-function styleHeader(row: ExcelJS.Row) {
-  row.height = 20;
-  row.eachCell((cell) => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } };
-    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
-    cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    cell.border = thinBorder();
-  });
-}
-function styleTotal(row: ExcelJS.Row) {
-  row.font = { bold: true };
-  row.eachCell((cell) => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TOTAL_FILL } };
-    cell.border = thinBorder();
-  });
-}
-function borderDataRow(row: ExcelJS.Row) {
-  row.eachCell((cell) => { cell.border = thinBorder(); });
-}
-async function download(wb: ExcelJS.Workbook, filename: string) {
-  const buffer = await wb.xlsx.writeBuffer();
-  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
 }
 
 interface ExportParams {

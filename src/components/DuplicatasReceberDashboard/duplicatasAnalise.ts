@@ -111,7 +111,7 @@ function detectColumns(headers: string[]): ColumnMap {
 
 /** Converte as linhas importadas em duplicatas, classificando o departamento e calculando o aging. */
 export function parseDuplicatas(
-  data: DuplicatasImport,
+  data: Pick<DuplicatasImport, 'headers' | 'rows'>,
   map: DepartamentoMap,
   referenceDate: Date,
 ): Duplicata[] {

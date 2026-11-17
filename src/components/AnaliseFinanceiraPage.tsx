@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Receipt, Banknote } from 'lucide-react';
+import { Receipt, Banknote, FileWarning } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { DuplicatasReceberDashboard } from '@/components/DuplicatasReceberDashboard/DuplicatasReceberDashboard';
 import { ContasPagarDashboard } from '@/components/ContasPagarDashboard/ContasPagarDashboard';
+import { MultasReceberDashboard } from '@/components/MultasReceberDashboard/MultasReceberDashboard';
 
 interface Props {
   onChangeBrand: () => void;
 }
 
-type SubPage = 'selection' | 'duplicatas' | 'contas_pagar';
+type SubPage = 'selection' | 'duplicatas' | 'contas_pagar' | 'multas';
 
 interface SubCard {
   id: Exclude<SubPage, 'selection'>;
@@ -22,6 +23,7 @@ interface SubCard {
 const SUB_CARDS: SubCard[] = [
   { id: 'duplicatas', name: 'Duplicatas a Receber', primary: '#4f46e5', primaryLight: '#eef2ff', icon: Receipt },
   { id: 'contas_pagar', name: 'Contas a Pagar', primary: '#4f46e5', primaryLight: '#eef2ff', icon: Banknote },
+  { id: 'multas', name: 'Multas a Receber', primary: '#4f46e5', primaryLight: '#eef2ff', icon: FileWarning },
 ];
 
 export function AnaliseFinanceiraPage({ onChangeBrand }: Props) {
@@ -33,6 +35,10 @@ export function AnaliseFinanceiraPage({ onChangeBrand }: Props) {
 
   if (subPage === 'contas_pagar') {
     return <ContasPagarDashboard onBack={() => setSubPage('selection')} />;
+  }
+
+  if (subPage === 'multas') {
+    return <MultasReceberDashboard onBack={() => setSubPage('selection')} />;
   }
 
   return (
