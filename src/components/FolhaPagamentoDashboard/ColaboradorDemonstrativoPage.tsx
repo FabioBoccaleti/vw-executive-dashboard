@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Printer, Check, Save, Loader2, X, FileText, 
 import { toast } from 'sonner';
 import { kvGet } from '@/lib/kvClient';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { loadBaseGerencialDreSnapshot } from '@/components/BaseGerencialDashboard/baseGerencialDataProcessor';
 import { loadSnapshotStore } from '../VendasBonificacoesDashboard/provisaoPivSnapshotStorage';
 import { periodoKey } from '../VendasBonificacoesDashboard/provisaoPivStorage';
 import { useAuth } from '@/contexts/useAuth';
@@ -537,6 +538,8 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
 
   const [lanc,    setLanc]    = useState<LancamentoRV | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reload, setReload] = useState(0);
   const [saving,  setSaving]  = useState(false);
   const [editing, setEditing] = useState(false);
   const [dirty,   setDirty]   = useState(false);
@@ -564,7 +567,9 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
 
   // Carrega lançamento do mês selecionado + base do DRE (mês anterior, igual PJ)
   useEffect(() => {
+    let active = true;
     setLoading(true);
+    setLoadError(false);
     setEditing(false);
     setDirty(false);
 
@@ -577,6 +582,7 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
         kvGet<any>(dreKey),
         colaborador.brand === 'vw' ? loadSnapshotStore() : Promise.resolve({}),
       ]);
+      if (!active) return;
 
       if (existing && existing.status === 'pago') {
         setLanc(existing);
@@ -589,14 +595,18 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
         ? Math.max(0, (snapshotStore as any)[periodoKey(drePrev.year, drePrev.month)]?.totalSiq ?? 0)
         : 0;
 
-      // Monta a linha de DRE por departamento (prioriza o Dashboard Executivo)
+      // Fallback legado: Dashboard Executivo → resumo_dre.
       let dreRow = kvDreRow;
       const monthIndex = drePrev.month - 1;
       const deptEntries = Object.entries(DEPT_TO_EXEC_DEPT);
       const dreResults = await Promise.all(
-        deptEntries.map(([dk, dept]) =>
-          loadDREDataAsync(drePrev.year as any, dept as any, colaborador.brand).then(d => ({ dk, d }))
-        )
+        deptEntries.map(async ([dk, dept]) => {
+          const [d, gerencial] = await Promise.all([
+            loadDREDataAsync(drePrev.year as any, dept as any, colaborador.brand),
+            loadBaseGerencialDreSnapshot(colaborador.brand, drePrev.year, dept),
+          ]);
+          return { dk, d, gerencial };
+        })
       );
       const synthetic: Record<string, { lucroLiquidoExercicio: number }> = {};
       for (const { dk, d } of dreResults) {
@@ -604,6 +614,18 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
       }
       if (Object.values(synthetic).some(v => v.lucroLiquidoExercicio !== 0)) {
         dreRow = synthetic;
+      }
+
+      // Prioriza reais completos da Base Gerencial, inclusive zero/prejuízo.
+      // Não multiplica o resumo_dre, que pode estar truncado em milhares.
+      for (const { dk, gerencial } of dreResults) {
+        const gerencialMonth = gerencial.months.find(entry => entry.month === drePrev.month);
+        if (gerencialMonth) {
+          dreRow = {
+            ...dreRow,
+            [dk]: { lucroLiquidoExercicio: gerencialMonth.values.lucroLiquidoExercicio ?? 0 },
+          };
+        }
       }
 
       const raw = existing ?? buildLancamentoVazio(colaborador, year, month);
@@ -637,11 +659,22 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
         };
       }
 
-      setLanc(base);
-      setLoading(false);
+      if (active) {
+        setLanc(base);
+        setLoading(false);
+      }
     }
-    load();
-  }, [colaborador, year, month]);
+    load().catch(err => {
+      console.error('Erro ao carregar demonstrativo de remunerações variáveis:', err);
+      if (active) {
+        setLanc(null);
+        setLoadError(true);
+        setLoading(false);
+        toast.error('Não foi possível carregar a base de cálculo do demonstrativo.');
+      }
+    });
+    return () => { active = false; };
+  }, [colaborador, year, month, reload]);
 
   function handlePrev() {
     const p = prevMonth(year, month);
@@ -790,6 +823,7 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
     };
     await saveLancamento(updated);
     setLanc(buildLancamentoPreview(colaborador, updated));
+    setReload(value => value + 1);
     setReopenDialog(null);
     toast.success('Demonstrativo reaberto. Assinaturas removidas.');
   }
@@ -857,13 +891,14 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
 
             <button
               onClick={handlePrint}
+              disabled={loading || loadError}
               className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-colors"
             >
               <Printer className="w-3.5 h-3.5" />
               Imprimir PDF
             </button>
 
-            {!editing && lanc?.status !== 'pago' && (
+            {!loading && !loadError && !editing && lanc?.status !== 'pago' && (
               <button
                 onClick={handleToggleStatus}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200"
@@ -873,15 +908,13 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
               </button>
             )}
 
-            {isAdmin && (
+            {isAdmin && !loading && !loadError && (
               editing ? (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
                       setEditing(false); setDirty(false);
-                      loadLancamento(colaborador.id, year, month).then(l =>
-                        setLanc(buildLancamentoPreview(colaborador, l ?? buildLancamentoVazio(colaborador, year, month)))
-                      );
+                      setReload(value => value + 1);
                     }}
                     className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-500 text-xs font-semibold hover:bg-slate-50"
                   >
@@ -923,6 +956,11 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
         {loading ? (
           <div className="flex items-center justify-center py-24 text-slate-400">
             <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <p>Não foi possível carregar a base de cálculo.</p>
+            <button onClick={() => setReload(value => value + 1)} className="mt-2 underline">Tentar novamente</button>
           </div>
         ) : lanc ? (
           <DemonstrativoTable
