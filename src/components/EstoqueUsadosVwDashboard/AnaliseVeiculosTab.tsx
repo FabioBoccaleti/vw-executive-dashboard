@@ -141,6 +141,14 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
     brand === 'vw_novos' && analise ? agruparModelosBase(analise.itens) : [],
   [brand, analise]);
 
+  const veiculosPagos = useMemo(() => {
+    const itens = brand === 'vw_novos' && analise
+      ? analise.itens.filter((it): it is VeiculoAnaliseItem & { dias: number } => it.dias !== null && it.dias >= 180)
+        .sort((a, b) => b.dias - a.dias)
+      : [];
+    return { itens, valor: itens.reduce((total, it) => total + it.valor, 0) };
+  }, [brand, analise]);
+
   const variacao = useMemo(() => {
     if (!analise) return null;
     if (!prevData) return { disponivel: false as const };
@@ -283,7 +291,7 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${resumoPorModelo ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-5'} gap-4`}>
         <KpiCard
           icon={<Boxes className="w-5 h-5" />}
           color={primary}
@@ -319,6 +327,15 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
           value={fmtInt(analise.parados)}
           sub={`${fmtPct(analise.pctParados)} · ${fmtCurrency(analise.valorParado)}`}
         />
+        {resumoPorModelo && (
+          <KpiCard
+            icon={<Car className="w-5 h-5" />}
+            color="#0f766e"
+            label="Veículos pagos em Estoque"
+            value={fmtCurrency(veiculosPagos.valor)}
+            sub={`${fmtInt(veiculosPagos.itens.length)} ${veiculosPagos.itens.length === 1 ? 'veículo' : 'veículos'} · 180 dias ou mais`}
+          />
+        )}
       </div>
 
       {/* Variação vs mês anterior */}
@@ -569,6 +586,53 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
           </table>
         </div>
       </div>
+
+      {resumoPorModelo && (
+        <section
+          aria-labelledby="veiculos-pagos-titulo"
+          className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+        >
+          <div className="px-4 py-3 border-b border-slate-100">
+            <h4 id="veiculos-pagos-titulo" className="text-sm font-bold text-slate-700">
+              Veículos pagos em Estoque
+            </h4>
+            <p className="text-xs text-slate-400 mt-1">
+              Veículos com 180 dias ou mais em estoque, conforme os dias calculados na análise.
+            </p>
+          </div>
+          <div className="overflow-auto max-h-[50vh]">
+            <table className="w-full text-sm border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr style={{ backgroundColor: primary }} className="text-white">
+                  <th className="text-left px-3 py-2">Modelo</th>
+                  <th className="text-left px-3 py-2">Chassi</th>
+                  <th className="text-right px-3 py-2">Dias</th>
+                  <th className="text-right px-3 py-2">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {veiculosPagos.itens.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-6 text-center text-slate-400">
+                      Nenhum veículo com 180 dias ou mais em estoque.
+                    </td>
+                  </tr>
+                ) : veiculosPagos.itens.map((it, i) => (
+                  <tr key={`${it.veiculo}-${i}`} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <td className="px-3 py-1.5 text-slate-700">{it.modelo || '—'}</td>
+                    <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{it.chassi || '—'}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-slate-700">{fmtInt(it.dias)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-slate-800">{fmtCurrency(it.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2 text-xs text-slate-500 border-t border-slate-100">
+            {fmtInt(veiculosPagos.itens.length)} veículos · Total: {fmtCurrency(veiculosPagos.valor)}
+          </div>
+        </section>
+      )}
 
       {/* Tabela detalhada */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">

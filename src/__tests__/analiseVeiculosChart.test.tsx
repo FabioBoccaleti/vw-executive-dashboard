@@ -77,5 +77,62 @@ describe('apresentação do gráfico de estoque', () => {
     expect(chart.querySelectorAll('.recharts-bar-rectangle')).toHaveLength(12);
     expect(within(chart).getByText('MARCA 12')).toBeInTheDocument();
     expect(screen.getByText('Resumo por marca')).toBeInTheDocument();
+    expect(screen.queryByText('Veículos pagos em Estoque')).not.toBeInTheDocument();
+  });
+});
+
+describe('veículos pagos em estoque de novos VW', () => {
+  function mockInventarioPago() {
+    const itens = [
+      { modelo: 'POLO TRACK 179', entrada: '2026-06-04', valor: 100 },
+      { modelo: 'T-CROSS HIGHLINE 180', entrada: '2026-06-03', valor: 200 },
+      { modelo: 'NIVUS COMFORTLINE 181', entrada: '2026-06-02', valor: 300 },
+      { modelo: 'TERA SEM DATA', entrada: null, valor: 400 },
+      { modelo: 'JETTA SEM VALOR', entrada: '2026-01-01', valor: 0 },
+    ].map((item, i) => ({ ...veiculos[0], ...item, veiculo: String(i), chassi: `VIN-${i}` }));
+    vi.mocked(getInventarioVeiculos).mockImplementation(async (_, month) =>
+      month === '2026-11'
+        ? { month, fileName: 'estoque.xlsx', importedAt: 0, headers: [], rows: [], veiculos: itens }
+        : null);
+  }
+
+  it('inclui exatamente 180 dias e mantém card e tabela consistentes ao mudar os dias da análise', async () => {
+    mockInventarioPago();
+    const { container } = render(
+      <AnaliseVeiculosTab brand="vw_novos" name="Novos VW" primary="#001e50" primaryLight="#e8f4fc" />);
+    const section = await screen.findByRole('region', { name: 'Veículos pagos em Estoque' });
+    const table = within(section).getByRole('table');
+    expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual([
+      'Modelo', 'Chassi', 'Dias', 'Valor',
+    ]);
+    expect(within(table).getAllByRole('row').slice(1).map(row =>
+      within(row).getAllByRole('cell').map(cell => cell.textContent?.replace(/\s/g, '')))).toEqual([
+      ['NIVUSCOMFORTLINE181', 'VIN-2', '181', 'R$300,00'],
+      ['T-CROSSHIGHLINE180', 'VIN-1', '180', 'R$200,00'],
+    ]);
+    const kpi = screen.getAllByText('Veículos pagos em Estoque').find(el => !section.contains(el))!.parentElement!.parentElement!;
+    const [valorPrincipal, quantidadeSecundaria] = kpi.querySelectorAll('p');
+    expect(valorPrincipal.textContent?.replace(/\s/g, '')).toBe('R$500,00');
+    expect(quantidadeSecundaria).toHaveTextContent('2 veículos · 180 dias ou mais');
+    expect(section.previousElementSibling).toHaveTextContent('Top modelos em estoque');
+
+    const threshold = container.querySelector<HTMLInputElement>('input[type="number"]')!;
+    fireEvent.change(threshold, { target: { value: '365' } });
+    fireEvent.blur(threshold);
+    expect(within(table).getAllByRole('row')).toHaveLength(3);
+
+    const baseDate = container.querySelector<HTMLInputElement>('input[type="date"]')!;
+    fireEvent.change(baseDate, { target: { value: '2026-11-29' } });
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
+    expect(within(table).queryByText('T-CROSS HIGHLINE 180')).not.toBeInTheDocument();
+    expect(valorPrincipal.textContent?.replace(/\s/g, '')).toBe('R$300,00');
+    expect(quantidadeSecundaria).toHaveTextContent('1 veículo · 180 dias ou mais');
+  });
+
+  it('mostra card zerado e mensagem explícita quando não há veículos elegíveis', async () => {
+    render(<AnaliseVeiculosTab brand="vw_novos" name="Novos VW" primary="#001e50" primaryLight="#e8f4fc" />);
+    const section = await screen.findByRole('region', { name: 'Veículos pagos em Estoque' });
+    expect(within(section).getByText('Nenhum veículo com 180 dias ou mais em estoque.')).toBeInTheDocument();
+    expect(section.textContent?.replace(/\s/g, '')).toContain('0veículos·Total:R$0,00');
   });
 });
