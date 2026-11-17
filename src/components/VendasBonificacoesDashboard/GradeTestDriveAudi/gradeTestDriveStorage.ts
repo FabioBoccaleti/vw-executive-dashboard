@@ -101,8 +101,8 @@ export async function saveGrades(grades: GradeTrimestre[]): Promise<boolean> {
 
 // ─── Veículos ───────────────────────────────────────────────────────────────
 
-export async function getVeiculos(): Promise<VeiculoGrade[]> {
-  return (await kvGet<VeiculoGrade[]>(VEICULOS_KEY)) ?? [];
+export async function getVeiculos(options?: { throwOnError?: boolean }): Promise<VeiculoGrade[]> {
+  return (await kvGet<VeiculoGrade[]>(VEICULOS_KEY, options)) ?? [];
 }
 
 export async function saveVeiculos(veiculos: VeiculoGrade[]): Promise<boolean> {

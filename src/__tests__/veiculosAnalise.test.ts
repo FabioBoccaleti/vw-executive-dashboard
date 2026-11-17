@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agruparModelosBase, buildAnaliseVeiculos } from '@/components/EstoqueUsadosVwDashboard/veiculosAnalise';
+import { agruparModelosBase, buildAnaliseVeiculos, separarEstoqueTestDrive } from '@/components/EstoqueUsadosVwDashboard/veiculosAnalise';
 import type { VeiculoRow } from '@/components/EstoqueUsadosVwDashboard/veiculosStorage';
 
 function veiculo(modelo: string, valor: number): VeiculoRow {
@@ -23,6 +23,42 @@ describe('agrupamento de novos por carro', () => {
       { modelo: 'Q8', n: 1, valor: 600 },
       { modelo: 'RSQ8', n: 1, valor: 500 },
     ]);
+  });
+
+  describe('separação de Test Drive / Courtesy Car', () => {
+    it('cruza o chassi completo normalizado sem duplicar veículos e conserva quantidade e valor', () => {
+      const analise = buildAnaliseVeiculos([
+        { ...veiculo('NOVO', 100), chassi: 'VIN-NOVO' },
+        { ...veiculo('TEST DRIVE', 200), chassi: ' vin-td ' },
+        { ...veiculo('COURTESY', 300), chassi: 'VIN-CC' },
+        { ...veiculo('SEM VALOR', 0), chassi: 'VIN-TD' },
+      ], '2026-11-30', 90);
+      const resultado = separarEstoqueTestDrive(analise.itens, [
+        { chassi: 'VIN-TD', classificacao: 'test_drive' },
+        { chassi: 'VIN-TD', classificacao: 'test_drive' },
+        { chassi: ' vin-cc ', classificacao: 'courtesy_car' },
+        { chassi: 'FORA-DO-INVENTARIO', classificacao: 'test_drive' },
+      ]);
+      expect(resultado.novos.map(item => item.modelo)).toEqual(['NOVO']);
+      expect(resultado.testDrive.map(item => [item.modelo, item.classificacao, item.valor])).toEqual([
+        ['TEST DRIVE', 'test_drive', 200], ['COURTESY', 'courtesy_car', 300],
+      ]);
+      const juntos = [...resultado.novos, ...resultado.testDrive];
+      expect(juntos).toHaveLength(analise.totalVeiculos);
+      expect(juntos.reduce((sum, item) => sum + item.valor, 0)).toBe(analise.totalValor);
+    });
+
+    it('não cruza chassis vazios nem sufixos e preserva todos os novos se a Grade está vazia', () => {
+      const analise = buildAnaliseVeiculos([
+        { ...veiculo('SEM CHASSI', 100), chassi: '' },
+        { ...veiculo('CHASSI COMPLETO', 200), chassi: 'PREFIXO1234567' },
+      ], '2026-11-30', 90);
+      expect(separarEstoqueTestDrive(analise.itens, [
+        { chassi: ' ', classificacao: 'test_drive' },
+        { chassi: '1234567', classificacao: 'test_drive' },
+      ]).novos).toEqual(analise.itens);
+      expect(separarEstoqueTestDrive(analise.itens, [])).toEqual({ novos: analise.itens, testDrive: [] });
+    });
   });
 
   it('soma versões do mesmo carro e preserva os itens originais sem incluir valores zerados', () => {

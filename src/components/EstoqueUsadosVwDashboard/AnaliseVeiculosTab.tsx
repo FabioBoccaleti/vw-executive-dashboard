@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
@@ -9,9 +9,10 @@ import {
 import { toast } from 'sonner';
 import { getInventarioVeiculos, getLatestMonthVeiculos, type VeiculoImport, type VeiculoInventoryId } from './veiculosStorage';
 import {
-  buildAnaliseVeiculos, agruparModelosBase, AGING_BUCKETS, type VeiculoAnaliseItem,
+  buildAnaliseVeiculos, agruparModelosBase, separarEstoqueTestDrive, AGING_BUCKETS, type VeiculoAnaliseItem,
 } from './veiculosAnalise';
 import { exportVeiculosExcel } from './veiculosExport';
+import { CLASSIFICACAO_LABELS, getVeiculos, type VeiculoGrade } from '@/components/VendasBonificacoesDashboard/GradeTestDriveAudi/gradeTestDriveStorage';
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -79,6 +80,7 @@ interface Props {
 
 export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props) {
   const resumoPorModelo = brand === 'vw_novos' || brand === 'audi_novos';
+  const separarAudi = brand === 'audi_novos';
   const [month, setMonth] = useState<string>(currentMonth());
   const [monthResolved, setMonthResolved] = useState(false);
   const [baseDate, setBaseDate] = useState<string>(lastDayOfMonthISO(currentMonth()));
@@ -87,6 +89,9 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<VeiculoImport | null>(null);
   const [prevData, setPrevData] = useState<VeiculoImport | null>(null);
+  const [grade, setGrade] = useState<VeiculoGrade[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [retry, setRetry] = useState(0);
 
   const [search, setSearch] = useState('');
   const [filtroMarca, setFiltroMarca] = useState<string>('todas');
@@ -99,15 +104,23 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
 
   // Resolve o mês mais recente disponível ao abrir.
   useEffect(() => {
-    let active = true;
     setMonthResolved(false);
+  }, [brand]);
+
+  useEffect(() => {
+    if (monthResolved) return;
+    let active = true;
+    setLoadError('');
     getLatestMonthVeiculos(brand).then((latest) => {
       if (!active) return;
       if (latest) setMonth(latest);
       setMonthResolved(true);
+    }).catch(err => {
+      console.error('Erro ao carregar mês do inventário:', err);
+      if (active) setLoadError('Não foi possível carregar o mês do inventário.');
     });
     return () => { active = false; };
-  }, [brand]);
+  }, [brand, retry, monthResolved]);
 
   // Ao selecionar um mês, define a data-base para o último dia desse mês
   // (o usuário ainda pode alterá-la manualmente depois).
@@ -115,28 +128,43 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
     setBaseDate(lastDayOfMonthISO(month));
   }, [month]);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    if (!monthResolved) return;
+    let active = true;
     setLoading(true);
-    try {
-      const [inv, prevInv] = await Promise.all([
-        getInventarioVeiculos(brand, month),
-        getInventarioVeiculos(brand, prevMonthStr(month)),
-      ]);
+    setLoadError('');
+    Promise.all([
+      getInventarioVeiculos(brand, month),
+      getInventarioVeiculos(brand, prevMonthStr(month)),
+      separarAudi ? getVeiculos({ throwOnError: true }) : Promise.resolve([]),
+    ]).then(([inv, prevInv, veiculosGrade]) => {
+      if (!active) return;
       setData(inv);
       setPrevData(prevInv);
-    } finally {
-      setLoading(false);
-    }
-  }, [brand, month]);
+      setGrade(veiculosGrade);
+    }).catch(err => {
+      console.error('Erro ao carregar análise de veículos:', err);
+      if (active) setLoadError(separarAudi
+        ? 'Não foi possível carregar o inventário ou a Grade de Test Drive Audi. A separação do estoque não pode ser calculada.'
+        : 'Não foi possível carregar o inventário de veículos.');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [monthResolved, brand, month, separarAudi, retry]);
 
-  useEffect(() => {
-    if (monthResolved) load();
-  }, [monthResolved, load]);
-
-  const analise = useMemo(() => {
+  const analiseTotal = useMemo(() => {
     if (!data) return null;
     return buildAnaliseVeiculos(data.veiculos, baseDate, threshold);
   }, [data, baseDate, threshold]);
+
+  const separacao = useMemo(() => separarAudi && analiseTotal
+    ? separarEstoqueTestDrive(analiseTotal.itens, grade) : null,
+  [separarAudi, analiseTotal, grade]);
+  const analise = useMemo(() => separacao
+    ? buildAnaliseVeiculos(separacao.novos, baseDate, threshold) : analiseTotal,
+  [separacao, baseDate, threshold, analiseTotal]);
+  const valorTestDrive = useMemo(() =>
+    separacao?.testDrive.reduce((total, item) => total + item.valor, 0) ?? 0,
+  [separacao]);
 
   const modelosBase = useMemo(() =>
     resumoPorModelo && analise ? agruparModelosBase(analise.itens) : [],
@@ -153,7 +181,8 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
   const variacao = useMemo(() => {
     if (!analise) return null;
     if (!prevData) return { disponivel: false as const };
-    const prevVeics = prevData.veiculos.filter((v) => v.valor > 0);
+    const prevAnalise = buildAnaliseVeiculos(prevData.veiculos, baseDate, threshold);
+    const prevVeics = separarAudi ? separarEstoqueTestDrive(prevAnalise.itens, grade).novos : prevAnalise.itens;
     const prevQtd = prevVeics.length;
     const prevValor = prevVeics.reduce((s, v) => s + v.valor, 0);
     const dQtd = analise.totalVeiculos - prevQtd;
@@ -167,7 +196,7 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
       pQtd: prevQtd > 0 ? (dQtd / prevQtd) * 100 : null,
       pValor: prevValor > 0 ? (dValor / prevValor) * 100 : null,
     };
-  }, [analise, prevData]);
+  }, [analise, prevData, baseDate, threshold, separarAudi, grade]);
 
   const itensFiltrados = useMemo(() => {
     if (!analise) return [] as VeiculoAnaliseItem[];
@@ -196,7 +225,7 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
     if (!analise) return;
     setExporting(true);
     try {
-      await exportVeiculosExcel({ name, primary, month, baseDate, analise });
+      await exportVeiculosExcel({ name, primary, month, baseDate, analise, testDrive: separacao?.testDrive });
     } catch (err) {
       console.error('Erro ao exportar Excel:', err);
       toast.error('Erro ao gerar o Excel.');
@@ -204,6 +233,15 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
       setExporting(false);
     }
   };
+
+  if (loadError) {
+    return (
+      <div role="alert" className="mt-4 bg-white border border-red-200 rounded-xl p-6 text-red-700">
+        <p>{loadError}</p>
+        <button onClick={() => setRetry(value => value + 1)} className="mt-3 text-sm underline">Tentar novamente</button>
+      </div>
+    );
+  }
 
   if (!monthResolved || loading) {
     return (
@@ -214,7 +252,7 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
     );
   }
 
-  if (!data || !analise || analise.totalVeiculos === 0) {
+  if (!data || !analise || !analiseTotal || analiseTotal.totalVeiculos === 0) {
     return (
       <div className="mt-4 bg-white border border-slate-200 rounded-xl shadow-sm py-16">
         <div className="flex flex-col items-center text-center gap-3">
@@ -290,22 +328,47 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
         </div>
       </div>
 
+      {separacao && (
+        <section aria-label="Composição do estoque" className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KpiCard icon={<Boxes className="w-5 h-5" />} color={primary}
+              label="Estoque total" value={fmtCurrency(analiseTotal.totalValor)}
+              sub={`${fmtInt(analiseTotal.totalVeiculos)} ${analiseTotal.totalVeiculos === 1 ? 'veículo' : 'veículos'} · Novos + Test Drive / Courtesy Car`} />
+            <KpiCard icon={<Car className="w-5 h-5" />} color="#0f766e"
+              label="Estoque de Novos" value={fmtCurrency(analise.totalValor)}
+              sub={`${fmtInt(analise.totalVeiculos)} ${analise.totalVeiculos === 1 ? 'veículo novo' : 'veículos novos'}`} />
+            <KpiCard icon={<Car className="w-5 h-5" />} color="#0284c7"
+              label="Estoque de Test Drive / Courtesy Car" value={fmtCurrency(valorTestDrive)}
+              sub={`${fmtInt(separacao.testDrive.length)} ${separacao.testDrive.length === 1 ? 'veículo' : 'veículos'}`} />
+          </div>
+          <p className="text-xs text-slate-500">
+            Indicadores, comparação mensal, gráficos e tabelas de novos excluem Test Drive / Courtesy Car.
+            Identificação pelo chassi no cadastro atual da Grade de Test Drive Audi, inclusive veículos marcados como vendidos.
+            Valores conforme o inventário do mês selecionado.
+          </p>
+        </section>
+      )}
+
       {/* KPIs */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${resumoPorModelo ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-5'} gap-4`}>
-        <KpiCard
-          icon={<Boxes className="w-5 h-5" />}
-          color={primary}
-          label="Veículos em estoque"
-          value={fmtInt(analise.totalVeiculos)}
-          sub={`${analise.marcas.length} marcas`}
-        />
-        <KpiCard
-          icon={<DollarSign className="w-5 h-5" />}
-          color="#0f766e"
-          label="Valor total em estoque"
-          value={fmtCurrency(analise.totalValor)}
-          sub="Soma do valor unitário"
-        />
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${separarAudi ? 'lg:grid-cols-4' : resumoPorModelo ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-5'} gap-4`}>
+        {!separarAudi && (
+          <>
+            <KpiCard
+              icon={<Boxes className="w-5 h-5" />}
+              color={primary}
+              label="Veículos em estoque"
+              value={fmtInt(analise.totalVeiculos)}
+              sub={`${analise.marcas.length} marcas`}
+            />
+            <KpiCard
+              icon={<DollarSign className="w-5 h-5" />}
+              color="#0f766e"
+              label="Valor total em estoque"
+              value={fmtCurrency(analise.totalValor)}
+              sub="Soma do valor unitário"
+            />
+          </>
+        )}
         <KpiCard
           icon={<Tag className="w-5 h-5" />}
           color="#475569"
@@ -631,6 +694,47 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
           <div className="px-4 py-2 text-xs text-slate-500 border-t border-slate-100">
             {fmtInt(veiculosPagos.itens.length)} veículos · Total: {fmtCurrency(veiculosPagos.valor)}
           </div>
+        </section>
+      )}
+
+      {separacao && (
+        <section aria-label="Veículos Test Drive / Courtesy Car"
+          className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <h4 className="text-sm font-bold text-slate-700">Veículos Test Drive / Courtesy Car</h4>
+            <p className="text-xs text-slate-400 mt-1">Veículos do inventário identificados por chassi na Grade de Test Drive Audi.</p>
+          </div>
+          <div className="overflow-auto max-h-[50vh]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-sky-600 text-white">
+                <tr>
+                  <th className="text-left px-3 py-2">Modelo</th>
+                  <th className="text-left px-3 py-2">Chassi</th>
+                  <th className="text-left px-3 py-2">Classificação</th>
+                  <th className="text-right px-3 py-2">Dias</th>
+                  <th className="text-right px-3 py-2">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {separacao.testDrive.length === 0 ? (
+                  <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">
+                    Nenhum Test Drive / Courtesy Car identificado neste inventário.
+                  </td></tr>
+                ) : separacao.testDrive.map((item, i) => (
+                  <tr key={`${item.veiculo}-${i}`} className={i % 2 ? 'bg-slate-50' : 'bg-white'}>
+                    <td className="px-3 py-1.5 text-slate-700">{item.modelo || '—'}</td>
+                    <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{item.chassi}</td>
+                    <td className="px-3 py-1.5 text-slate-600">{CLASSIFICACAO_LABELS[item.classificacao]}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{item.dias === null ? '—' : fmtInt(item.dias)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums font-medium">{fmtCurrency(item.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-4 py-2 text-xs text-slate-500 border-t border-slate-100">
+            {fmtInt(separacao.testDrive.length)} veículos · Total: {fmtCurrency(valorTestDrive)}
+          </p>
         </section>
       )}
 

@@ -40,3 +40,23 @@ ranking de clientes filtram somente a tabela detalhada.
 **Exportar Excel** baixa o mês completo com a data-base selecionada, sem aplicar
 os filtros da tela. O arquivo inclui resumo, departamentos, faixas de vencidos e
 a vencer, todos os clientes e títulos detalhados, com valores e datas formatados.
+
+## Estoque de Veículos Novos Audi
+
+O inventário é separado em **Novos** e **Test Drive / Courtesy Car** pelo chassi
+completo, ignorando diferenças entre maiúsculas/minúsculas e espaços nas pontas.
+A referência é o cadastro atual da aba **Veículos** de **Grade de Test Drive Audi
+e Rentabilidade**, inclusive veículos marcados como vendidos. Só são considerados
+os veículos presentes no inventário do mês selecionado, com valor positivo.
+Valores e dias de estoque vêm do inventário, não do cadastro da Grade.
+
+Os três cards de composição mostram valor e quantidade do estoque total e de
+cada grupo. Os demais indicadores, a comparação mensal, gráficos, resumos,
+veículos pagos (180 dias ou mais) e a tabela geral incluem somente os Novos.
+Test Drive / Courtesy Car tem tabela própria, com modelo, chassi, classificação,
+dias e valor. O Excel segue a mesma separação, com totais conciliados e aba própria.
+Meses anteriores também são classificados usando o cadastro **atual** da Grade;
+não é um histórico de emplacamento. Se a Grade não carregar, a análise informa
+o erro e permite tentar novamente, sem assumir que todos são novos.
+
+Os estoques de Novos VW e de Usados não são afetados por essa separação.

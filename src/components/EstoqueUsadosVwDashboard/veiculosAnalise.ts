@@ -1,5 +1,6 @@
 import type { VeiculoRow } from './veiculosStorage';
 import { normalizarModelo } from '@/lib/modeloVeiculo';
+import type { Classificacao, VeiculoGrade } from '@/components/VendasBonificacoesDashboard/GradeTestDriveAudi/gradeTestDriveStorage';
 
 // ─── Faixas de aging (dias em estoque) ──────────────────────────────────────────
 export interface AgingBucketDef {
@@ -113,6 +114,27 @@ export interface VeiculoAnaliseItem extends VeiculoRow {
   dias: number | null;
   faixa: string | null;
   parado: boolean;
+}
+
+export interface VeiculoTestDriveItem extends VeiculoAnaliseItem {
+  classificacao: Classificacao;
+}
+
+export function separarEstoqueTestDrive(
+  itens: VeiculoAnaliseItem[],
+  grade: ReadonlyArray<Pick<VeiculoGrade, 'chassi' | 'classificacao'>>,
+) {
+  const porChassi = new Map(grade
+    .filter(veiculo => veiculo.chassi.trim())
+    .map(veiculo => [veiculo.chassi.trim().toUpperCase(), veiculo.classificacao]));
+  const novos: VeiculoAnaliseItem[] = [];
+  const testDrive: VeiculoTestDriveItem[] = [];
+  for (const item of itens) {
+    const classificacao = porChassi.get(item.chassi.trim().toUpperCase());
+    if (classificacao) testDrive.push({ ...item, classificacao });
+    else novos.push(item);
+  }
+  return { novos, testDrive };
 }
 
 export interface BucketResumo { label: string; n: number; valor: number; }

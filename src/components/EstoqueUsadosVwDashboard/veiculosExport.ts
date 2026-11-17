@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import type { AnaliseVeiculosResult, VeiculoAnaliseItem } from './veiculosAnalise';
+import type { AnaliseVeiculosResult, VeiculoAnaliseItem, VeiculoTestDriveItem } from './veiculosAnalise';
+import { CLASSIFICACAO_LABELS } from '@/components/VendasBonificacoesDashboard/GradeTestDriveAudi/gradeTestDriveStorage';
 
 const CURRENCY_FMT = 'R$ #,##0.00';
 const INT_FMT = '#,##0';
@@ -74,26 +75,28 @@ interface ExportParams {
   month: string;
   baseDate: string;
   analise: AnaliseVeiculosResult;
+  testDrive?: VeiculoTestDriveItem[];
 }
 
 /** Gera e baixa a análise de estoque de veículos em Excel, com uma aba por seção. */
-export async function exportVeiculosExcel({ name, primary, month, baseDate, analise }: ExportParams) {
+export async function exportVeiculosExcel({ name, primary, month, baseDate, analise, testDrive }: ExportParams) {
   const theme: Theme = { title: hexToArgb(primary), header: hexToArgb(primary) };
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Sorana Executive Dashboard';
   wb.created = new Date();
 
-  buildResumoSheet(wb, theme, name, month, baseDate, analise);
+  buildResumoSheet(wb, theme, name, month, baseDate, analise, testDrive);
   buildFaixaSheet(wb, theme, analise);
   buildMarcaSheet(wb, theme, analise);
   buildModeloSheet(wb, theme, analise);
   buildVeiculosSheet(wb, theme, analise);
+  if (testDrive) buildTestDriveSheet(wb, theme, testDrive);
 
   await download(wb, `${name.replace(/\s+/g, '_')}_${month}.xlsx`);
 }
 
-function buildResumoSheet(wb: ExcelJS.Workbook, theme: Theme, name: string, month: string, baseDate: string, a: AnaliseVeiculosResult) {
+function buildResumoSheet(wb: ExcelJS.Workbook, theme: Theme, name: string, month: string, baseDate: string, a: AnaliseVeiculosResult, testDrive?: VeiculoTestDriveItem[]) {
   const ws = wb.addWorksheet('Resumo', { properties: { tabColor: { argb: theme.header } } });
   ws.columns = [{ width: 40 }, { width: 22 }, { width: 12 }];
 
@@ -111,8 +114,18 @@ function buildResumoSheet(wb: ExcelJS.Workbook, theme: Theme, name: string, mont
     row.getCell(2).alignment = { horizontal: 'right' };
     borderDataRow(row);
   };
-  kpi('Veículos em estoque', a.totalVeiculos, INT_FMT);
-  kpi('Valor total em estoque', a.totalValor, CURRENCY_FMT);
+  if (testDrive) {
+    const valorTestDrive = testDrive.reduce((total, item) => total + item.valor, 0);
+    kpi('Estoque total - veículos', a.totalVeiculos + testDrive.length, INT_FMT);
+    kpi('Estoque total - valor', a.totalValor + valorTestDrive, CURRENCY_FMT);
+    kpi('Estoque de Novos - veículos', a.totalVeiculos, INT_FMT);
+    kpi('Estoque de Novos - valor', a.totalValor, CURRENCY_FMT);
+    kpi('Test Drive / Courtesy Car - veículos', testDrive.length, INT_FMT);
+    kpi('Test Drive / Courtesy Car - valor', valorTestDrive, CURRENCY_FMT);
+  } else {
+    kpi('Veículos em estoque', a.totalVeiculos, INT_FMT);
+    kpi('Valor total em estoque', a.totalValor, CURRENCY_FMT);
+  }
   kpi('Ticket médio', a.ticketMedio, CURRENCY_FMT);
   kpi('Idade média (dias)', a.idadeMedia != null ? Math.round(a.idadeMedia) : '', INT_FMT);
   kpi(`Veículos parados (> ${a.threshold} dias)`, a.parados, INT_FMT);
@@ -120,6 +133,29 @@ function buildResumoSheet(wb: ExcelJS.Workbook, theme: Theme, name: string, mont
   kpi('Valor parado', a.valorParado, CURRENCY_FMT);
   kpi('Marcas distintas', a.marcas.length, INT_FMT);
   kpi('Modelos distintos', a.modelos.length, INT_FMT);
+  if (testDrive) {
+    ws.addRow([]);
+    ws.addRow(['Demais indicadores e abas de análise: somente veículos novos.']);
+    ws.addRow(['Test Drive / Courtesy Car: chassi no cadastro atual da Grade, inclusive vendidos.']);
+    ws.addRow(['Valores conforme o inventário do mês selecionado.']);
+  }
+}
+
+function buildTestDriveSheet(wb: ExcelJS.Workbook, theme: Theme, itens: VeiculoTestDriveItem[]) {
+  const ws = wb.addWorksheet('Test Drive - Courtesy Car', { properties: { tabColor: { argb: theme.header } } });
+  ws.columns = [{ width: 44 }, { width: 24 }, { width: 20 }, { width: 12 }, { width: 22 }];
+  styleTitle(ws, ws.addRow(['Veículos Test Drive / Courtesy Car']), 5, theme);
+  ws.addRow([]);
+  styleHeader(ws.addRow(['Modelo', 'Chassi', 'Classificação', 'Dias', 'Valor']), theme);
+  for (const item of itens) {
+    const row = ws.addRow([item.modelo, item.chassi, CLASSIFICACAO_LABELS[item.classificacao], item.dias ?? '', item.valor]);
+    row.getCell(4).numFmt = INT_FMT;
+    row.getCell(5).numFmt = CURRENCY_FMT;
+    borderDataRow(row);
+  }
+  const total = ws.addRow(['Total', '', '', '', itens.reduce((sum, item) => sum + item.valor, 0)]);
+  total.getCell(5).numFmt = CURRENCY_FMT;
+  styleTotal(total);
 }
 
 function buildFaixaSheet(wb: ExcelJS.Workbook, theme: Theme, a: AnaliseVeiculosResult) {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { kvDelete, kvGet, kvKeys, kvSet } from '@/lib/kvClient';
+import { getVeiculos } from '@/components/VendasBonificacoesDashboard/GradeTestDriveAudi/gradeTestDriveStorage';
 import {
   deleteInventarioVeiculos,
   getAvailableMonthsVeiculos,
@@ -24,6 +25,13 @@ beforeEach(() => {
 });
 
 describe('inventário de veículos por tipo', () => {
+  it('propaga a leitura estrita da Grade para não classificar falha como cadastro vazio', async () => {
+    const falha = new Error('Grade indisponível');
+    vi.mocked(kvGet).mockRejectedValueOnce(falha);
+    await expect(getVeiculos({ throwOnError: true })).rejects.toBe(falha);
+    expect(kvGet).toHaveBeenCalledWith('grade-test-drive-audi:veiculos', { throwOnError: true });
+  });
+
   it.each([
     ['vw_novos', 'estoque_novos_vw'],
     ['audi_novos', 'estoque_novos_audi'],
