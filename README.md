@@ -60,3 +60,12 @@ não é um histórico de emplacamento. Se a Grade não carregar, a análise info
 o erro e permite tentar novamente, sem assumir que todos são novos.
 
 Os estoques de Novos VW e de Usados não são afetados por essa separação.
+
+## Financiamento Banco Volks — custos de seguros
+
+Em **Análise de Resultado**, **Deduções Custos Seguros** permite ao administrador
+salvar valores mensais separados para Novos e Usados. A linha **Deduções Custo
+Seguros**, após **Total Remuneração + Encargos**, reduz o resultado da operação
+e sua margem, sem alterar impostos, receita líquida, remunerações ou o resultado
+por vendedor. **Ano todo** soma os valores dos meses com dados de financiamento;
+os lançamentos são editados mês a mês e não alteram as Deduções já existentes.

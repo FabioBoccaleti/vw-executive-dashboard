@@ -22,6 +22,8 @@ import {
   setAnaliseAliquota as persistAnaliseAliquota,
   getAnaliseDeducao as fetchAnaliseDeducao,
   setAnaliseDeducao as persistAnaliseDeducao,
+  getAnaliseDeducaoSeguros as fetchAnaliseDeducaoSeguros,
+  setAnaliseDeducaoSeguros as persistAnaliseDeducaoSeguros,
   getAnaliseRemGerencia as fetchAnaliseRemGerencia,
   setAnaliseRemGerencia as persistAnaliseRemGerencia,
 } from './financiamentoAnaliseStorage';
@@ -320,6 +322,8 @@ interface AnaliseMes {
   dsrPct: number;
   deducaoNovos: number;
   deducaoUsados: number;
+  deducaoSegurosNovos: number;
+  deducaoSegurosUsados: number;
   remGerenciaNovos: number;
   remGerenciaUsados: number;
 }
@@ -327,6 +331,7 @@ interface AnaliseMes {
 interface SegmentoResultado {
   comissaoBruta: number;
   deducoes: number;
+  deducoesSeguros: number;
   impostos: number;
   receitaLiquida: number;
   comissaoPaga: number;
@@ -340,7 +345,7 @@ interface SegmentoResultado {
 
 /** Finaliza um acumulador de segmento calculando impostos, receita líquida, encargos e resultado. */
 function finalizeSegmento(
-  acc: { comissaoBruta: number; deducoes: number; comissaoPaga: number; premios: number; dsr: number; remGerencia: number },
+  acc: { comissaoBruta: number; deducoes: number; deducoesSeguros: number; comissaoPaga: number; premios: number; dsr: number; remGerencia: number },
   aliquotaPct: number,
 ): SegmentoResultado {
   const impostos = (acc.comissaoBruta - acc.deducoes) * aliquotaPct / 100;
@@ -354,6 +359,7 @@ function finalizeSegmento(
   return {
     comissaoBruta: acc.comissaoBruta,
     deducoes: acc.deducoes,
+    deducoesSeguros: acc.deducoesSeguros,
     impostos,
     receitaLiquida,
     comissaoPaga: acc.comissaoPaga,
@@ -362,7 +368,7 @@ function finalizeSegmento(
     provEnc,
     remGerencia: acc.remGerencia,
     totalRemuneracao,
-    resultado: receitaLiquida - totalRemuneracao,
+    resultado: receitaLiquida - totalRemuneracao - acc.deducoesSeguros,
   };
 }
 
@@ -370,8 +376,8 @@ function finalizeSegmento(
 function calcAnaliseSegmentos(meses: AnaliseMes[], regras: RemuneracaoProdutoRegra[], aliquotaPct: number): {
   novos: SegmentoResultado; usados: SegmentoResultado; total: SegmentoResultado;
 } {
-  const novos = { comissaoBruta: 0, deducoes: 0, comissaoPaga: 0, premios: 0, dsr: 0, remGerencia: 0 };
-  const usados = { comissaoBruta: 0, deducoes: 0, comissaoPaga: 0, premios: 0, dsr: 0, remGerencia: 0 };
+  const novos = { comissaoBruta: 0, deducoes: 0, deducoesSeguros: 0, comissaoPaga: 0, premios: 0, dsr: 0, remGerencia: 0 };
+  const usados = { comissaoBruta: 0, deducoes: 0, deducoesSeguros: 0, comissaoPaga: 0, premios: 0, dsr: 0, remGerencia: 0 };
   for (const mm of meses) {
     novos.comissaoBruta += mm.rows.filter(r => !isSemi(r)).reduce((a, r) => a + calcTotalComissoes(r), 0);
     usados.comissaoBruta += mm.rows.filter(r => isSemi(r)).reduce((a, r) => a + calcTotalComissoes(r), 0);
@@ -384,12 +390,15 @@ function calcAnaliseSegmentos(meses: AnaliseMes[], regras: RemuneracaoProdutoReg
     usados.dsr += resumo.comissaoVendedorUsados * mm.dsrPct / 100;
     novos.deducoes += mm.deducaoNovos;
     usados.deducoes += mm.deducaoUsados;
+    novos.deducoesSeguros += mm.deducaoSegurosNovos;
+    usados.deducoesSeguros += mm.deducaoSegurosUsados;
     novos.remGerencia += mm.remGerenciaNovos;
     usados.remGerencia += mm.remGerenciaUsados;
   }
   const totalAcc = {
     comissaoBruta: novos.comissaoBruta + usados.comissaoBruta,
     deducoes: novos.deducoes + usados.deducoes,
+    deducoesSeguros: novos.deducoesSeguros + usados.deducoesSeguros,
     comissaoPaga: novos.comissaoPaga + usados.comissaoPaga,
     premios: novos.premios + usados.premios,
     dsr: novos.dsr + usados.dsr,
@@ -512,6 +521,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   // ── Aba Análise de Resultado ──
   const [analiseAnoTodo, setAnaliseAnoTodo] = useState(false);
   const [analiseLoading, setAnaliseLoading] = useState(false);
+  const [analiseError, setAnaliseError] = useState(false);
+  const [analiseRetry, setAnaliseRetry] = useState(0);
   const [analiseMonths, setAnaliseMonths] = useState<AnaliseMes[]>([]);
   const [analiseAliquota, setAnaliseAliquota] = useState(0);          // percentual global persistido
   const [analiseAliquotaInput, setAnaliseAliquotaInput] = useState(''); // rascunho do campo
@@ -519,6 +530,10 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   const [analiseDeducaoUsadosTotal, setAnaliseDeducaoUsadosTotal] = useState(0); // soma do escopo (Usados)
   const [analiseDeducaoNovosInput, setAnaliseDeducaoNovosInput] = useState('');  // rascunho do mês (Novos)
   const [analiseDeducaoUsadosInput, setAnaliseDeducaoUsadosInput] = useState(''); // rascunho do mês (Usados)
+  const [analiseSegurosNovosTotal, setAnaliseSegurosNovosTotal] = useState(0);
+  const [analiseSegurosUsadosTotal, setAnaliseSegurosUsadosTotal] = useState(0);
+  const [analiseSegurosNovosInput, setAnaliseSegurosNovosInput] = useState('');
+  const [analiseSegurosUsadosInput, setAnaliseSegurosUsadosInput] = useState('');
   const [analiseRemGerNovosTotal, setAnaliseRemGerNovosTotal] = useState(0);     // soma do escopo (Novos)
   const [analiseRemGerUsadosTotal, setAnaliseRemGerUsadosTotal] = useState(0);   // soma do escopo (Usados)
   const [analiseRemGerNovosInput, setAnaliseRemGerNovosInput] = useState('');    // rascunho do mês (Novos)
@@ -617,12 +632,14 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     if (activeSection !== 'vendas' || vendasSubTab !== 'analise') return;
     let cancelled = false;
     setAnaliseLoading(true);
+    setAnaliseError(false);
     (async () => {
       const dsrCfg = await loadVendasDsr();
       if (analiseAnoTodo) {
         const meses = [...vendasMonthsWithData].sort((a, b) => a - b);
         const datas = await Promise.all(meses.map(m => getFinanciamentoMes(vendasYear, m)));
         const deducoes = await Promise.all(meses.map(m => fetchAnaliseDeducao(vendasYear, m)));
+        const seguros = await Promise.all(meses.map(m => fetchAnaliseDeducaoSeguros(vendasYear, m)));
         const remGers = await Promise.all(meses.map(m => fetchAnaliseRemGerencia(vendasYear, m)));
         if (cancelled) return;
         setAnaliseMonths(meses.map((m, i) => ({
@@ -630,6 +647,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
           dsrPct: dsrPctFor(dsrCfg, vendasYear, m),
           deducaoNovos: deducoes[i].novos,
           deducaoUsados: deducoes[i].usados,
+          deducaoSegurosNovos: seguros[i].novos,
+          deducaoSegurosUsados: seguros[i].usados,
           remGerenciaNovos: remGers[i].novos,
           remGerenciaUsados: remGers[i].usados,
         })));
@@ -637,15 +656,20 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         setAnaliseDeducaoUsadosTotal(deducoes.reduce((a, b) => a + b.usados, 0));
         setAnaliseDeducaoNovosInput('');
         setAnaliseDeducaoUsadosInput('');
+        setAnaliseSegurosNovosTotal(seguros.reduce((a, b) => a + b.novos, 0));
+        setAnaliseSegurosUsadosTotal(seguros.reduce((a, b) => a + b.usados, 0));
+        setAnaliseSegurosNovosInput('');
+        setAnaliseSegurosUsadosInput('');
         setAnaliseRemGerNovosTotal(remGers.reduce((a, b) => a + b.novos, 0));
         setAnaliseRemGerUsadosTotal(remGers.reduce((a, b) => a + b.usados, 0));
         setAnaliseRemGerNovosInput('');
         setAnaliseRemGerUsadosInput('');
       } else {
-        const [data, deducao, remGer] = await Promise.all([
+        const [data, deducao, remGer, seguros] = await Promise.all([
           getFinanciamentoMes(vendasYear, vendasMonth),
           fetchAnaliseDeducao(vendasYear, vendasMonth),
           fetchAnaliseRemGerencia(vendasYear, vendasMonth),
+          fetchAnaliseDeducaoSeguros(vendasYear, vendasMonth),
         ]);
         if (cancelled) return;
         setAnaliseMonths([{
@@ -653,6 +677,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
           dsrPct: dsrPctFor(dsrCfg, vendasYear, vendasMonth),
           deducaoNovos: deducao.novos,
           deducaoUsados: deducao.usados,
+          deducaoSegurosNovos: seguros.novos,
+          deducaoSegurosUsados: seguros.usados,
           remGerenciaNovos: remGer.novos,
           remGerenciaUsados: remGer.usados,
         }]);
@@ -660,15 +686,21 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         setAnaliseDeducaoUsadosTotal(deducao.usados);
         setAnaliseDeducaoNovosInput(deducao.novos ? String(deducao.novos).replace('.', ',') : '');
         setAnaliseDeducaoUsadosInput(deducao.usados ? String(deducao.usados).replace('.', ',') : '');
+        setAnaliseSegurosNovosTotal(seguros.novos);
+        setAnaliseSegurosUsadosTotal(seguros.usados);
+        setAnaliseSegurosNovosInput(seguros.novos ? String(seguros.novos).replace('.', ',') : '');
+        setAnaliseSegurosUsadosInput(seguros.usados ? String(seguros.usados).replace('.', ',') : '');
         setAnaliseRemGerNovosTotal(remGer.novos);
         setAnaliseRemGerUsadosTotal(remGer.usados);
         setAnaliseRemGerNovosInput(remGer.novos ? '-' + fmtBRL(remGer.novos) : '');
         setAnaliseRemGerUsadosInput(remGer.usados ? '-' + fmtBRL(remGer.usados) : '');
       }
-      setAnaliseLoading(false);
-    })();
+    })().catch(err => {
+      console.error('Erro ao carregar análise de resultado do financiamento:', err);
+      if (!cancelled) setAnaliseError(true);
+    }).finally(() => { if (!cancelled) setAnaliseLoading(false); });
     return () => { cancelled = true; };
-  }, [activeSection, vendasSubTab, vendasYear, vendasMonth, analiseAnoTodo, vendasMonthsWithData]);
+  }, [activeSection, vendasSubTab, vendasYear, vendasMonth, analiseAnoTodo, vendasMonthsWithData, analiseRetry]);
 
   const handleSaveAnaliseAliquota = async () => {
     const pct = parseNum(analiseAliquotaInput);
@@ -696,6 +728,26 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       toast.success('Deduções do mês salvas.');
     } catch {
       toast.error('Erro ao salvar as deduções.');
+    } finally {
+      setAnaliseSaving(false);
+    }
+  };
+
+  const handleSaveAnaliseDeducaoSeguros = async () => {
+    const novos = Math.abs(parseNum(analiseSegurosNovosInput));
+    const usados = Math.abs(parseNum(analiseSegurosUsadosInput));
+    setAnaliseSaving(true);
+    try {
+      await persistAnaliseDeducaoSeguros(vendasYear, vendasMonth, { novos, usados });
+      setAnaliseSegurosNovosTotal(novos);
+      setAnaliseSegurosUsadosTotal(usados);
+      setAnaliseSegurosNovosInput(novos ? String(novos).replace('.', ',') : '');
+      setAnaliseSegurosUsadosInput(usados ? String(usados).replace('.', ',') : '');
+      setAnaliseMonths(prev => prev.map(m => ({ ...m, deducaoSegurosNovos: novos, deducaoSegurosUsados: usados })));
+      toast.success('Deduções de custos de seguros do mês salvas.');
+    } catch (err) {
+      console.error('Erro ao salvar deduções de custos de seguros:', err);
+      toast.error('Erro ao salvar as deduções de custos de seguros.');
     } finally {
       setAnaliseSaving(false);
     }
@@ -1505,6 +1557,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ANO</span>
             <select
               value={vendasYear}
+              disabled={analiseSaving}
               onChange={e => setVendasYear(Number(e.target.value))}
               className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-6 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
             >
@@ -1520,6 +1573,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 {vendasSubTab === 'analise' && (
                   <button
                     onClick={() => setAnaliseAnoTodo(true)}
+                    disabled={analiseSaving}
                     className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
                       analiseAnoTodo ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
                     }`}
@@ -1534,7 +1588,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                   return (
                     <button
                       key={monthNum}
-                      disabled={!hasData}
+                      disabled={!hasData || analiseSaving}
                       onClick={() => { setVendasMonth(monthNum); setAnaliseAnoTodo(false); }}
                       className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
                         isActive
@@ -2605,6 +2659,11 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 <div className="flex items-center justify-center h-64">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                 </div>
+              ) : analiseError ? (
+                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  <p>Não foi possível carregar a análise de resultado.</p>
+                  <button onClick={() => setAnaliseRetry(value => value + 1)} className="mt-2 underline">Tentar novamente</button>
+                </div>
               ) : (() => {
                 const scopeLabel = analiseAnoTodo ? `Ano de ${vendasYear}` : `${MONTHS[vendasMonth - 1]}/${vendasYear}`;
                 if (!analiseMonths.some(m => m.rows.length > 0)) {
@@ -2690,6 +2749,44 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         )}
                         <p className="text-[10px] text-slate-400 mt-0.5">
                           {analiseAnoTodo ? 'Soma das deduções dos meses; edite mês a mês.' : 'Deduções referentes ao mês selecionado, separadas por Novos e Usados.'}
+                        </p>
+                      </div>
+
+                      <div className="w-px h-12 bg-slate-200 self-center" />
+
+                      <div role="group" aria-label="Deduções Custos Seguros">
+                        <p className="block text-[11px] font-semibold text-slate-500 mb-1">
+                          Deduções Custos Seguros {analiseAnoTodo ? '(ano todo)' : `(${MONTHS[vendasMonth - 1]})`}
+                        </p>
+                        {analiseAnoTodo || !isAdmin() ? (
+                          <div className="flex items-center gap-4 text-sm font-bold text-slate-700">
+                            <span>Novos: R$ {fmtBRL(analiseSegurosNovosTotal)}</span>
+                            <span>Usados: R$ {fmtBRL(analiseSegurosUsadosTotal)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-end gap-3">
+                            <div>
+                              <label htmlFor="analise-seguros-novos" className="block text-[10px] text-slate-400 mb-0.5">Novos</label>
+                              <input id="analise-seguros-novos" aria-label="Deduções Custos Seguros - Novos"
+                                value={analiseSegurosNovosInput}
+                                onChange={e => setAnaliseSegurosNovosInput(e.target.value)}
+                                placeholder="0,00" inputMode="decimal"
+                                className="w-32 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                            </div>
+                            <div>
+                              <label htmlFor="analise-seguros-usados" className="block text-[10px] text-slate-400 mb-0.5">Usados</label>
+                              <input id="analise-seguros-usados" aria-label="Deduções Custos Seguros - Usados"
+                                value={analiseSegurosUsadosInput}
+                                onChange={e => setAnaliseSegurosUsadosInput(e.target.value)}
+                                placeholder="0,00" inputMode="decimal"
+                                className="w-32 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                            </div>
+                            <button onClick={handleSaveAnaliseDeducaoSeguros} disabled={analiseSaving}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">Salvar</button>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {analiseAnoTodo ? 'Soma dos custos de seguros dos meses; edite mês a mês.' : 'Deduzidos somente do resultado da operação, após remuneração e encargos.'}
                         </p>
                       </div>
                     </div>
@@ -2816,6 +2913,13 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                             <td className="px-4 py-2.5 text-right">{money(seg.novos.totalRemuneracao)}</td>
                             <td className="px-4 py-2.5 text-right">{money(seg.usados.totalRemuneracao)}</td>
                             <td className="px-4 py-2.5 text-right">{money(T.totalRemuneracao)}</td>
+                          </tr>
+
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) Deduções Custo Seguros</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.deducoesSeguros)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.deducoesSeguros)}</td>
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.deducoesSeguros)}</td>
                           </tr>
 
                           <tr><td colSpan={4} className="py-1" /></tr>

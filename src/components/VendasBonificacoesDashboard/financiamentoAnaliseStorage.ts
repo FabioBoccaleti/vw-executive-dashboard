@@ -57,6 +57,19 @@ export async function setAnaliseDeducao(year: number, month: number, valor: Anal
   await kvSet(deducaoKey(year, month), valor);
 }
 
+function deducaoSegurosKey(year: number, month: number): string {
+  return `financiamento_analise:deducao_custo_seguros:${year}:${String(month).padStart(2, '0')}`;
+}
+
+export async function getAnaliseDeducaoSeguros(year: number, month: number): Promise<AnaliseDeducao> {
+  return readNovosUsados(await kvGet<unknown>(deducaoSegurosKey(year, month), { throwOnError: true }));
+}
+
+export async function setAnaliseDeducaoSeguros(year: number, month: number, valor: AnaliseDeducao): Promise<void> {
+  const saved = await kvSet(deducaoSegurosKey(year, month), valor);
+  if (!saved) throw new Error('Erro ao salvar as deduções de custos de seguros.');
+}
+
 export async function getAnaliseRemGerencia(year: number, month: number): Promise<AnaliseDeducao> {
   try {
     return readNovosUsados(await kvGet<unknown>(remGerenciaKey(year, month)));
