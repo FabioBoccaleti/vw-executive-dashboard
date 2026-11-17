@@ -3,10 +3,10 @@ import { FolderInput, BarChart3 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ImportacaoVeiculosTab } from './ImportacaoVeiculosTab';
 import { AnaliseVeiculosTab } from './AnaliseVeiculosTab';
-import type { VeiculoBrandId } from './veiculosStorage';
+import type { VeiculoInventoryId } from './veiculosStorage';
 
 export interface VeiculoBrandConfig {
-  id: VeiculoBrandId;
+  id: VeiculoInventoryId;
   name: string;
   primary: string;
   primaryLight: string;

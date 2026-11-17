@@ -8,7 +8,7 @@ import {
   getInventarioVeiculos,
   deleteInventarioVeiculos,
   type VeiculoImport,
-  type VeiculoBrandId,
+  type VeiculoInventoryId,
 } from './veiculosStorage';
 
 const MONTH_NAMES = [
@@ -29,7 +29,7 @@ function currentMonth(): string {
 }
 
 interface Props {
-  brand: VeiculoBrandId;
+  brand: VeiculoInventoryId;
   primary: string;
   primaryLight: string;
 }

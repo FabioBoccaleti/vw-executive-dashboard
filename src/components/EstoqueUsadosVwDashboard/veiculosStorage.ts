@@ -1,6 +1,6 @@
 import { kvGet, kvSet, kvKeys, kvDelete } from '@/lib/kvClient';
 
-/** Veículo estruturado a partir da planilha de inventário de usados. */
+/** Veículo estruturado a partir de uma planilha de inventário. */
 export interface VeiculoRow {
   /** Código interno do veículo (coluna VEICULO). */
   veiculo: string;
@@ -20,7 +20,7 @@ export interface VeiculoRow {
   valor: number;
 }
 
-/** Dados de uma importação de inventário de veículos usados, por mês. */
+/** Dados de uma importação de inventário de veículos, por mês. */
 export interface VeiculoImport {
   /** Mês de referência no formato 'YYYY-MM'. */
   month: string;
@@ -36,23 +36,27 @@ export interface VeiculoImport {
   veiculos: VeiculoRow[];
 }
 
-/** Marca de veículos usados (cada uma com seu próprio arquivo/armazenamento). */
-export type VeiculoBrandId = 'vw' | 'audi';
+/** Identificador de cada inventário de veículos, armazenado separadamente. */
+export type VeiculoInventoryId = 'vw' | 'audi' | 'vw_novos';
 
-function inventarioKey(brand: VeiculoBrandId, month: string): string {
-  return `estoque_usados_${brand}:inventario:${month}`;
+function inventarioPrefix(inventory: VeiculoInventoryId): string {
+  return inventory === 'vw_novos' ? 'estoque_novos_vw' : `estoque_usados_${inventory}`;
 }
 
-export async function saveInventarioVeiculos(brand: VeiculoBrandId, data: VeiculoImport): Promise<boolean> {
-  return kvSet(inventarioKey(brand, data.month), data);
+function inventarioKey(inventory: VeiculoInventoryId, month: string): string {
+  return `${inventarioPrefix(inventory)}:inventario:${month}`;
 }
 
-export async function getInventarioVeiculos(brand: VeiculoBrandId, month: string): Promise<VeiculoImport | null> {
-  return kvGet<VeiculoImport>(inventarioKey(brand, month));
+export async function saveInventarioVeiculos(inventory: VeiculoInventoryId, data: VeiculoImport): Promise<boolean> {
+  return kvSet(inventarioKey(inventory, data.month), data);
 }
 
-export async function deleteInventarioVeiculos(brand: VeiculoBrandId, month: string): Promise<boolean> {
-  return kvDelete(inventarioKey(brand, month));
+export async function getInventarioVeiculos(inventory: VeiculoInventoryId, month: string): Promise<VeiculoImport | null> {
+  return kvGet<VeiculoImport>(inventarioKey(inventory, month));
+}
+
+export async function deleteInventarioVeiculos(inventory: VeiculoInventoryId, month: string): Promise<boolean> {
+  return kvDelete(inventarioKey(inventory, month));
 }
 
 /** Extrai o mês ('YYYY-MM') do fim de uma chave de storage. */
@@ -62,8 +66,8 @@ function monthFromKey(key: string): string | null {
 }
 
 /** Lista os meses ('YYYY-MM') que possuem inventário importado para a marca. */
-export async function getAvailableMonthsVeiculos(brand: VeiculoBrandId): Promise<string[]> {
-  const keys = await kvKeys(`estoque_usados_${brand}:inventario:*`);
+export async function getAvailableMonthsVeiculos(inventory: VeiculoInventoryId): Promise<string[]> {
+  const keys = await kvKeys(`${inventarioPrefix(inventory)}:inventario:*`);
   return keys
     .map(monthFromKey)
     .filter((m): m is string => !!m)
@@ -71,7 +75,7 @@ export async function getAvailableMonthsVeiculos(brand: VeiculoBrandId): Promise
 }
 
 /** Mês mais recente com inventário importado para a marca (ou null). */
-export async function getLatestMonthVeiculos(brand: VeiculoBrandId): Promise<string | null> {
-  const months = await getAvailableMonthsVeiculos(brand);
+export async function getLatestMonthVeiculos(inventory: VeiculoInventoryId): Promise<string | null> {
+  const months = await getAvailableMonthsVeiculos(inventory);
   return months.length > 0 ? months[months.length - 1] : null;
 }

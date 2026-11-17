@@ -109,7 +109,7 @@ function displayCell(value: unknown): string {
 }
 
 /**
- * Faz o parse do arquivo Excel de inventário de veículos usados.
+ * Faz o parse do arquivo Excel de inventário de veículos.
  * Lê a primeira planilha, mapeia as colunas por nome (sem acento/maiúsculas) e
  * monta a lista estruturada de veículos, além dos dados brutos para preview.
  */

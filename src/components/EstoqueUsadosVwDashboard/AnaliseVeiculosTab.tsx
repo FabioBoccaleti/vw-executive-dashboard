@@ -7,9 +7,9 @@ import {
   TrendingUp, TrendingDown, Minus,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getInventarioVeiculos, getLatestMonthVeiculos, type VeiculoImport, type VeiculoBrandId } from './veiculosStorage';
+import { getInventarioVeiculos, getLatestMonthVeiculos, type VeiculoImport, type VeiculoInventoryId } from './veiculosStorage';
 import {
-  buildAnaliseVeiculos, AGING_BUCKETS, type VeiculoAnaliseItem,
+  buildAnaliseVeiculos, agruparModelosBase, AGING_BUCKETS, type VeiculoAnaliseItem,
 } from './veiculosAnalise';
 import { exportVeiculosExcel } from './veiculosExport';
 
@@ -71,7 +71,7 @@ function signedCurrency(n: number): string { return `${n > 0 ? '+' : ''}${fmtCur
 function signedPct(p: number | null): string { return p == null ? '—' : `${p > 0 ? '+' : ''}${fmtPct(p)}`; }
 
 interface Props {
-  brand: VeiculoBrandId;
+  brand: VeiculoInventoryId;
   name: string;
   primary: string;
   primaryLight: string;
@@ -91,7 +91,7 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
   const [filtroMarca, setFiltroMarca] = useState<string>('todas');
   const [filtroFaixa, setFiltroFaixa] = useState<string>('todas');
   const [expandedFaixa, setExpandedFaixa] = useState<string | null>(null);
-  const [expandedMarca, setExpandedMarca] = useState<string | null>(null);
+  const [expandedResumo, setExpandedResumo] = useState<string | null>(null);
   const [expandedModelo, setExpandedModelo] = useState<string | null>(null);
   const [showAllModelos, setShowAllModelos] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -136,6 +136,10 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
     if (!data) return null;
     return buildAnaliseVeiculos(data.veiculos, baseDate, threshold);
   }, [data, baseDate, threshold]);
+
+  const modelosBase = useMemo(() =>
+    brand === 'vw_novos' && analise ? agruparModelosBase(analise.itens) : [],
+  [brand, analise]);
 
   const variacao = useMemo(() => {
     if (!analise) return null;
@@ -221,6 +225,9 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
       </div>
     );
   }
+
+  const resumoPorModelo = brand === 'vw_novos';
+  const dadosAgrupamento = resumoPorModelo ? modelosBase : analise.marcas;
 
   return (
     <div className="mt-4 space-y-4">
@@ -414,20 +421,32 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
         </div>
       </div>
 
-      {/* Estoque por marca + por modelo */}
+      {/* Estoque por marca ou modelo */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl shadow-sm p-4">
-          <h4 className="text-sm font-bold text-slate-700 mb-3">Veículos em estoque por marca</h4>
-          <ResponsiveContainer width="100%" height={Math.max(220, analise.marcas.length * 30)}>
+          <h4 className="text-sm font-bold text-slate-700 mb-3">
+            {resumoPorModelo ? 'Veículos em estoque por modelo' : 'Veículos em estoque por marca'}
+          </h4>
+          <ResponsiveContainer width="100%" height={Math.max(220, dadosAgrupamento.length * (resumoPorModelo ? 40 : 30))}>
             <BarChart
-              data={analise.marcas}
+              data={dadosAgrupamento}
               layout="vertical"
               margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-              <YAxis type="category" dataKey="marca" tick={{ fontSize: 12 }} width={90} />
+              <YAxis
+                type="category"
+                dataKey={resumoPorModelo ? 'modelo' : 'marca'}
+                tick={{ fontSize: 12 }}
+                width={resumoPorModelo ? 180 : 90}
+                interval={resumoPorModelo ? 0 : undefined}
+                tickFormatter={resumoPorModelo
+                  ? (value: string) => value.length > 24 ? `${value.slice(0, 21)}...` : value
+                  : undefined}
+              />
               <Tooltip
+                contentStyle={resumoPorModelo ? { maxWidth: 320, whiteSpace: 'normal', overflowWrap: 'anywhere' } : undefined}
                 formatter={(v: number, _n, p) => [
                   `${fmtInt(v)} veículos · ${fmtCurrency((p?.payload as { valor: number }).valor)}`,
                   'Quantidade',
@@ -436,38 +455,67 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
               <Bar dataKey="n" radius={[0, 4, 4, 0]} fill={primary} />
             </BarChart>
           </ResponsiveContainer>
+          {resumoPorModelo && (
+            <p className="text-xs text-slate-400 mt-2">
+              Versões agrupadas por carro. Passe o mouse para ver a quantidade e o valor total.
+            </p>
+          )}
         </div>
 
-        {/* Tabela por marca (expansível) */}
+        {/* Tabela por marca ou modelo (expansível) */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
-          <h4 className="text-sm font-bold text-slate-700 mb-1">Resumo por marca</h4>
-          <p className="text-xs text-slate-400 mb-3">Clique em uma marca para ver os veículos.</p>
+          <h4 className="text-sm font-bold text-slate-700 mb-1">
+            Resumo por {resumoPorModelo ? 'modelo' : 'marca'}
+          </h4>
+          <p className="text-xs text-slate-400 mb-3">
+            {resumoPorModelo
+              ? 'Clique em um modelo para ver os veículos com suas versões completas.'
+              : 'Clique em uma marca para ver os veículos.'}
+          </p>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-500 border-b border-slate-100">
-                <th className="text-left py-1.5 font-medium">Marca</th>
+                <th className="text-left py-1.5 font-medium">{resumoPorModelo ? 'Modelo' : 'Marca'}</th>
                 <th className="text-right py-1.5 font-medium">Veículos</th>
                 <th className="text-right py-1.5 font-medium">Valor</th>
               </tr>
             </thead>
             <tbody>
-              {analise.marcas.map((m) => {
-                const isOpen = expandedMarca === m.marca;
-                const itensMarca = isOpen
-                  ? analise.itens.filter((it) => it.marca === m.marca).sort((a, c) => c.valor - a.valor)
-                  : [];
-                return (
-                  <ExpandRow
-                    key={m.marca}
-                    label={m.marca}
-                    n={m.n}
-                    valor={m.valor}
-                    isOpen={isOpen}
-                    onToggle={() => setExpandedMarca(isOpen ? null : m.marca)}
-                    itens={itensMarca}
-                  />
-                );
-              })}
+              {resumoPorModelo
+                ? modelosBase.map((m) => {
+                    const isOpen = expandedResumo === m.modelo;
+                    const itensModelo = isOpen
+                      ? [...m.itens].sort((a, c) => c.valor - a.valor)
+                      : [];
+                    return (
+                      <ExpandRow
+                        key={m.modelo}
+                        label={m.modelo}
+                        n={m.n}
+                        valor={m.valor}
+                        isOpen={isOpen}
+                        onToggle={() => setExpandedResumo(isOpen ? null : m.modelo)}
+                        itens={itensModelo}
+                      />
+                    );
+                  })
+                : analise.marcas.map((m) => {
+                    const isOpen = expandedResumo === m.marca;
+                    const itensMarca = isOpen
+                      ? analise.itens.filter((it) => it.marca === m.marca).sort((a, c) => c.valor - a.valor)
+                      : [];
+                    return (
+                      <ExpandRow
+                        key={m.marca}
+                        label={m.marca}
+                        n={m.n}
+                        valor={m.valor}
+                        isOpen={isOpen}
+                        onToggle={() => setExpandedResumo(isOpen ? null : m.marca)}
+                        itens={itensMarca}
+                      />
+                    );
+                  })}
             </tbody>
           </table>
         </div>

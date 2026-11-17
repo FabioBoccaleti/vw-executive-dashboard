@@ -1,4 +1,5 @@
 import type { VeiculoRow } from './veiculosStorage';
+import { normalizarModelo } from '@/lib/modeloVeiculo';
 
 // ─── Faixas de aging (dias em estoque) ──────────────────────────────────────────
 export interface AgingBucketDef {
@@ -117,6 +118,25 @@ export interface VeiculoAnaliseItem extends VeiculoRow {
 export interface BucketResumo { label: string; n: number; valor: number; }
 export interface MarcaResumo { marca: string; n: number; valor: number; }
 export interface ModeloResumo { modelo: string; n: number; valor: number; }
+
+/** Agrupa versões para exibição, preservando a descrição original nos detalhes. */
+export function agruparModelosBase(itens: VeiculoAnaliseItem[]) {
+  const grupos = new Map<string, ModeloResumo & { itens: VeiculoAnaliseItem[] }>();
+  for (const item of itens) {
+    const descricao = item.modelo.toUpperCase().trim()
+      .replace(/^(?:(?:NOVO|NOVA|VW|VOLKSWAGEN)\s+)+/, '')
+      .replace(/\bT[\s-]*CROSS\b/g, 'T-CROSS');
+    // ID.4 e ID. Buzz contêm espaços/pontuação que fazem parte do nome do carro.
+    const eletrico = descricao.match(/^ID[.\s-]*(\d+|BUZZ)\b/);
+    const modelo = eletrico ? `ID.${eletrico[1]}` : normalizarModelo(descricao);
+    const grupo = grupos.get(modelo) ?? { modelo, n: 0, valor: 0, itens: [] };
+    grupo.n += 1;
+    grupo.valor += item.valor;
+    grupo.itens.push(item);
+    grupos.set(modelo, grupo);
+  }
+  return [...grupos.values()].sort((a, b) => b.n - a.n || b.valor - a.valor);
+}
 
 export interface AnaliseVeiculosResult {
   totalVeiculos: number;

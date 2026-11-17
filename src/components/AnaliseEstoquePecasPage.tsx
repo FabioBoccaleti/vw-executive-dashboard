@@ -5,28 +5,29 @@ import { EstoquePecasDashboard } from '@/components/EstoquePecasDashboard/Estoqu
 import { EstoqueUsadosVwDashboard } from '@/components/EstoqueUsadosVwDashboard/EstoqueUsadosVwDashboard';
 import { GradeTestDriveAudiDashboard } from '@/components/VendasBonificacoesDashboard/GradeTestDriveAudi';
 import { MonitoramentoCustoFinanceiroBVDashboard } from '@/components/VendasBonificacoesDashboard/MonitoramentoCustoFinanceiroBVDashboard';
-import type { VeiculoBrandId } from '@/components/EstoqueUsadosVwDashboard/veiculosStorage';
+import type { VeiculoInventoryId } from '@/components/EstoqueUsadosVwDashboard/veiculosStorage';
 
 interface Props {
   onChangeBrand: () => void;
 }
 
-type SubPage = 'selection' | 'audi' | 'vw' | 'usados_vw' | 'usados_audi' | 'grade_test_drive' | 'monitoramento_bv';
+type SubPage = 'selection' | 'audi' | 'vw' | 'usados_vw' | 'usados_audi' | 'novos_vw' | 'grade_test_drive' | 'monitoramento_bv';
 
 interface SubCard {
-  id: 'audi' | 'vw' | 'usados_vw' | 'usados_audi';
+  id: 'audi' | 'vw' | 'usados_vw' | 'usados_audi' | 'novos_vw';
   name: string;
   primary: string;
   primaryLight: string;
   kind: 'pecas' | 'usados';
-  veiculoBrand?: VeiculoBrandId;
+  veiculoInventoryId?: VeiculoInventoryId;
 }
 
 const SUB_CARDS: SubCard[] = [
   { id: 'audi', name: 'Estoque de Peças Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'pecas' },
   { id: 'vw', name: 'Estoque de Peças VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'pecas' },
-  { id: 'usados_audi', name: 'Estoque de Veículos Usados Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'usados', veiculoBrand: 'audi' },
-  { id: 'usados_vw', name: 'Estoque de Veículos Usados VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados', veiculoBrand: 'vw' },
+  { id: 'usados_audi', name: 'Estoque de Veículos Usados Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'usados', veiculoInventoryId: 'audi' },
+  { id: 'usados_vw', name: 'Estoque de Veículos Usados VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados', veiculoInventoryId: 'vw' },
+  { id: 'novos_vw', name: 'Estoque de Veículos Novos VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados', veiculoInventoryId: 'vw_novos' },
 ];
 
 export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
@@ -45,7 +46,7 @@ export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
     if (card.kind === 'usados') {
       return (
         <EstoqueUsadosVwDashboard
-          config={{ id: card.veiculoBrand!, name: card.name, primary: card.primary, primaryLight: card.primaryLight }}
+          config={{ id: card.veiculoInventoryId!, name: card.name, primary: card.primary, primaryLight: card.primaryLight }}
           onBack={() => setSubPage('selection')}
         />
       );

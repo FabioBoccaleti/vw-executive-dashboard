@@ -76,7 +76,7 @@ interface ExportParams {
   analise: AnaliseVeiculosResult;
 }
 
-/** Gera e baixa a análise de estoque de veículos usados em Excel, com uma aba por seção. */
+/** Gera e baixa a análise de estoque de veículos em Excel, com uma aba por seção. */
 export async function exportVeiculosExcel({ name, primary, month, baseDate, analise }: ExportParams) {
   const theme: Theme = { title: hexToArgb(primary), header: hexToArgb(primary) };
 
