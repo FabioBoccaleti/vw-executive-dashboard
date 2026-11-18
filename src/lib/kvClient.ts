@@ -120,14 +120,54 @@ export async function kvDelete(key: string): Promise<boolean> {
   } catch (error) { console.error('KV DELETE error:', error); return false; }
 }
 
-export async function kvKeys(pattern: string = '*'): Promise<string[]> {
+export async function kvKeys(pattern: string = '*', options?: { throwOnError?: boolean }): Promise<string[]> {
   if (IS_DEV) return idbKeys(pattern);
   try {
     const response = await fetch(`${getApiBaseUrl()}/api/kv/keys?pattern=${encodeURIComponent(pattern)}`);
-    if (!response.ok) { console.error(`KV KEYS error: ${response.status}`); return []; }
+    if (!response.ok) throw new Error(`KV KEYS error: ${response.status}`);
     const data = await response.json();
     return data.keys || [];
-  } catch (error) { console.error('KV KEYS error:', error); return []; }
+  } catch (error) {
+    console.error('KV KEYS error:', error);
+    if (options?.throwOnError) throw error;
+    return [];
+  }
+}
+
+export async function kvCompareAndSet(
+  key: string,
+  value: { version: string },
+  expectedVersion: string | null,
+): Promise<void> {
+  const conflict = 'Este registro já foi salvo ou alterado em outra operação. Atualize as vendas antes de tentar novamente.';
+  if (IS_DEV) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(IDB_STORE, 'readwrite');
+      const store = transaction.objectStore(IDB_STORE);
+      const request = store.get(key);
+      let versionConflict = false;
+      request.onsuccess = () => {
+        const current = request.result;
+        if (expectedVersion === null ? current !== undefined : current?.version !== expectedVersion) {
+          versionConflict = true;
+          transaction.abort();
+          return;
+        }
+        store.put(value, key);
+      };
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(new Error(versionConflict ? conflict : `Não foi possível salvar o registro: ${transaction.error?.message ?? 'transação interrompida'}`));
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+  const response = await fetch(`${getApiBaseUrl()}/api/kv/set`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, value, expectedVersion }),
+  });
+  if (response.status === 409) throw new Error(conflict);
+  if (!response.ok) throw new Error(`Erro ao salvar o registro: ${response.status}`);
 }
 
 export async function kvBulkSet(items: Array<{ key: string; value: unknown }>): Promise<boolean> {

@@ -2,19 +2,18 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertCircle, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import {
   loadCadastroConsorcio,
   parsePercentualCadastro,
   type CadastroConsorcio,
 } from './cadastroStorage';
 import { calcularComissaoVendedor, validarCronograma } from './comissaoVendedor';
+import { criarVendaConsorcio, saveNovaVendaConsorcio } from './vendasStorage';
+import { formatCurrency, parseValorMonetario } from './valores';
 
 function parsePercent(value: string): number {
   return parsePercentualCadastro(value) ?? 0;
-}
-
-function formatCurrency(value: number): string {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function formatPercentLabel(value: string): string {
@@ -26,7 +25,10 @@ function getRegraBaseLabel(base: 'valor_carta' | 'bruta' | 'liquida'): string {
   return base === 'bruta' ? 'Comissão Sorana bruta' : 'Comissão Sorana líquida';
 }
 
-export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => void }) {
+export function LancarVendaForm({ onOpenCadastros, onVendaRegistrada }: {
+  onOpenCadastros: () => void;
+  onVendaRegistrada?: () => void;
+}) {
   const [cadastro, setCadastro] = useState<CadastroConsorcio | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -36,6 +38,9 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
   const [cliente, setCliente] = useState('');
   const [grupoCota, setGrupoCota] = useState('');
   const [valorCarta, setValorCarta] = useState('');
+  const [registroId, setRegistroId] = useState(() => crypto.randomUUID());
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   async function load() {
     setLoading(true);
@@ -66,8 +71,10 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
     ? cadastro?.regrasComissao.find(item => item.produtoId === produto.id && item.cargoId === vendedor.cargoId)
     : undefined;
 
-  const valorCartaNumero = Number(valorCarta);
-  const valorCartaValido = valorCarta.trim() !== '' && Number.isFinite(valorCartaNumero) && valorCartaNumero >= 0;
+  const valorCartaParseado = parseValorMonetario(valorCarta);
+  const valorCartaNumero = valorCartaParseado ?? 0;
+  const valorCartaValido = valorCartaParseado !== null;
+  const valorCartaInvalido = valorCarta.trim() !== '' && !valorCartaValido;
   const valorSoranaBruto = valorCartaValido && produto
     ? valorCartaNumero * parsePercent(produto.percentualSorana) / 100
     : 0;
@@ -78,6 +85,34 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
   const comissaoVendedor = regra && produto && valorCartaValido && !erroCronograma
     ? calcularComissaoVendedor(regra, produto, valorCartaNumero, aliquota)
     : null;
+  const podeRegistrar = Boolean(dataVenda && cliente.trim() && grupoCota.trim() && produto && vendedor && regra && valorCartaValido && valorCartaNumero > 0 && !erroCronograma);
+
+  async function registrar() {
+    if (!cadastro || saving) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      const venda = criarVendaConsorcio({
+        id: registroId, dataVenda, cliente, grupoCota, valorCarta: valorCartaValido ? valorCartaNumero : NaN, produtoId, vendedorId,
+      }, cadastro);
+      await saveNovaVendaConsorcio(venda);
+      toast.success('Venda registrada. As parcelas da Sorana estão disponíveis em Vendas.');
+      setRegistroId(crypto.randomUUID());
+      setDataVenda('');
+      setCliente('');
+      setGrupoCota('');
+      setValorCarta('');
+      setProdutoId('');
+      setVendedorId('');
+      onVendaRegistrada?.();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSaveError(message);
+      toast.error(`Não foi possível registrar a venda: ${message}`);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
     return <div className="flex-1 p-8 text-center text-sm text-slate-400">Carregando dados do cadastro...</div>;
@@ -105,9 +140,9 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
-      <div className="mx-auto max-w-6xl space-y-4">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-          O lançamento ainda não será salvo nesta etapa; o armazenamento será conectado depois.
+      <fieldset disabled={saving} className="mx-auto min-w-0 max-w-6xl space-y-4">
+        <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-xs text-cyan-900">
+          Ao registrar, as parcelas brutas da comissão da Sorana serão geradas em Vendas, sem vencimento. O imposto é controlado separadamente.
         </div>
 
         {(semProdutos || semVendedores) && (
@@ -150,8 +185,23 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
             <Field label="Valor da carta de crédito *">
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-sm text-slate-500">R$</span>
-                <Input type="number" min="0" step="0.01" value={valorCarta} onChange={event => setValorCarta(event.target.value)} placeholder="0,00" className="pl-10 text-right" />
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={valorCarta}
+                  onChange={event => setValorCarta(event.target.value)}
+                  onBlur={() => {
+                    if (valorCartaValido) {
+                      setValorCarta(valorCartaNumero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    }
+                  }}
+                  aria-invalid={valorCartaInvalido}
+                  aria-describedby={valorCartaInvalido ? 'valor-carta-erro' : undefined}
+                  placeholder="0,00"
+                  className="pl-10 text-right"
+                />
               </div>
+              {valorCartaInvalido && <span id="valor-carta-erro" role="alert" className="mt-1 block text-xs text-red-700">Informe um valor válido, maior ou igual a zero.</span>}
             </Field>
           </div>
 
@@ -212,13 +262,14 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
         </section>
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs text-slate-500">O registro desta venda será habilitado quando a etapa de armazenamento for implementada.</p>
-          <Button disabled className="bg-cyan-700 text-white">
+          <p className="text-xs text-slate-500">Preencha todos os campos obrigatórios. As condições do cadastro serão preservadas nesta venda.</p>
+          <Button disabled={saving || !podeRegistrar} onClick={() => void registrar()} className="bg-cyan-700 text-white">
             <Save className="mr-2 h-4 w-4" />
-            Registrar venda
+            {saving ? 'Registrando...' : 'Registrar venda'}
           </Button>
         </div>
-      </div>
+        {saveError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{saveError}</p>}
+      </fieldset>
     </div>
   );
 }

@@ -44,4 +44,24 @@ describe('KV — leitura estrita opcional', () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => { throw new Error('JSON inválido'); } });
     await expect(kvGet('selecao', { throwOnError: true })).rejects.toThrow('JSON inválido');
   });
+
+  it('não transforma falhas na listagem de chaves em uma lista vazia no modo estrito', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+    const { kvKeys } = await import('@/lib/kvClient');
+    await expect(kvKeys('consorcio_venda_*', { throwOnError: true })).rejects.toThrow('KV KEYS error: 503');
+    expect(await kvKeys('outro_*')).toEqual([]);
+  });
+
+  it('envia a versão esperada e diferencia conflitos de falhas de gravação', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: false, status: 409 })
+      .mockResolvedValueOnce({ ok: false, status: 503 });
+    vi.stubGlobal('fetch', fetchMock);
+    const { kvCompareAndSet } = await import('@/lib/kvClient');
+    await expect(kvCompareAndSet('venda', { version: 'v1' }, null)).resolves.toBeUndefined();
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ key: 'venda', value: { version: 'v1' }, expectedVersion: null });
+    await expect(kvCompareAndSet('venda', { version: 'v2' }, 'v1')).rejects.toThrow('alterado em outra operação');
+    await expect(kvCompareAndSet('venda', { version: 'v2' }, 'v1')).rejects.toThrow('503');
+  });
 });

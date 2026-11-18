@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
 import { Handshake, TableProperties, BarChart2, BookOpen, LogOut, ShoppingCart, Clock, CheckCircle2, FilePlus2 } from 'lucide-react';
 import { LancarVendaForm } from './LancarVendaForm';
+import { VendasReceber } from './VendasReceber';
 
 interface RegistroAnaliseVendasConsorcioDashboardProps {
   onChangeBrand: () => void;
@@ -234,21 +235,15 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
               </button>
             ))}
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex-1 flex items-center justify-center p-8">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <div className="p-5 rounded-full bg-cyan-50">
-                {vendasSubTab === 'a_receber'
-                  ? <Clock className="w-12 h-12 text-cyan-500" />
-                  : <CheckCircle2 className="w-12 h-12 text-cyan-500" />}
-              </div>
-              <h2 className="text-xl font-bold text-slate-800">Em desenvolvimento</h2>
-            </div>
-          </div>
+          <VendasReceber situacao={vendasSubTab} />
         </div>
       )}
 
       {activeTab === 'lancar' && canVendas && (
-        <LancarVendaForm onOpenCadastros={onOpenCadastros} />
+        <LancarVendaForm onOpenCadastros={onOpenCadastros} onVendaRegistrada={() => {
+          setVendasSubTab('a_receber');
+          setActiveTab('vendas');
+        }} />
       )}
 
       {activeTab === 'analise' && canAnalise && (

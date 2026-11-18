@@ -109,13 +109,52 @@ describe('cronograma de comissao do consorcio', () => {
     selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'produto' } });
     fireEvent.change(selects[1], { target: { value: 'vendedor' } });
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '100000' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /Valor da carta de crédito/ }), { target: { value: '100000' } });
     expect(screen.getByRole('textbox', { name: /Valor total da remuneração/ })).toHaveValue((3500).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
     const rows = within(screen.getByRole('table')).getAllByRole('row');
     expect(rows).toHaveLength(7);
     expect(rows[5]).toHaveTextContent('R$ 0,00');
     expect(rows[6]).toHaveTextContent('R$ 0,00');
     expect(screen.getByRole('button', { name: 'Registrar venda' })).toBeDisabled();
+  });
+
+  it('formats the letter value in BRL without changing calculations and supports editing or clearing it', async () => {
+    render(<LancarVendaForm onOpenCadastros={vi.fn()} />);
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Produto / tipo de carta *' }), { target: { value: 'produto' } });
+    fireEvent.change(screen.getByRole('combobox', { name: /Vendedor/ }), { target: { value: 'vendedor' } });
+    const input = screen.getByRole('textbox', { name: /Valor da carta de crédito/ });
+    const total = screen.getByRole('textbox', { name: /Valor total da remuneração/ });
+    const moeda = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    for (const value of ['100000', '100.000', '100.000,00', 'R$ 100.000,00']) {
+      fireEvent.change(input, { target: { value } });
+      fireEvent.blur(input);
+      expect(input).toHaveValue('100.000,00');
+      expect(total).toHaveValue(moeda(4000));
+    }
+
+    for (const value of ['123456,78', '123456.78', '123.456,78']) {
+      fireEvent.change(input, { target: { value } });
+      fireEvent.blur(input);
+      expect(input).toHaveValue('123.456,78');
+      expect(total).toHaveValue(moeda(4938.2712));
+    }
+
+    fireEvent.change(input, { target: { value: '0' } });
+    fireEvent.blur(input);
+    expect(input).toHaveValue('0,00');
+    expect(total).toHaveValue(moeda(0));
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    expect(input).toHaveValue('');
+    expect(total).toHaveValue('');
+    for (const value of ['invalido', '-100']) {
+      fireEvent.change(input, { target: { value } });
+      fireEvent.blur(input);
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByRole('alert')).toHaveTextContent('Informe um valor válido');
+      expect(total).toHaveValue('');
+    }
   });
 
   it('prevents dropping commissioned installments and adds zero-rate installments when the product grows', async () => {
