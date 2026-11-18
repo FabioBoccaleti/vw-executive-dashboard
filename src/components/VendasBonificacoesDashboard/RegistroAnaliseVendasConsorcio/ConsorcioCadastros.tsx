@@ -13,6 +13,7 @@ import {
   type RegraComissaoConsorcio,
   type VendedorConsorcio,
 } from './cadastroStorage';
+import { validarCronograma } from './comissaoVendedor';
 
 type SecaoCadastro = 'produtos' | 'equipe' | 'impostos';
 
@@ -27,9 +28,15 @@ function isValidPercent(value: string): boolean {
   return parsed !== null && parsed >= 0 && parsed <= 100;
 }
 
-function validateCadastro(data: CadastroConsorcio): string | null {
+function validateCadastro(data: CadastroConsorcio): { message: string; secao: SecaoCadastro } | null {
+  for (const regra of data.regrasComissao) {
+    const produto = data.produtos.find(item => item.id === regra.produtoId);
+    if (!produto) return { message: 'Produto da regra de comissão não encontrado.', secao: 'produtos' };
+    const erro = validarCronograma(regra, produto.parcelasSorana);
+    if (erro) return { message: erro, secao: 'produtos' };
+  }
   if (data.regrasComissao.some(regra => regra.base === 'liquida') && !isValidPercent(data.aliquotaImposto)) {
-    return 'Informe uma alíquota de imposto válida para usar a base líquida.';
+    return { message: 'Informe uma alíquota de imposto válida para usar a base líquida.', secao: 'impostos' };
   }
   return null;
 }
@@ -69,8 +76,8 @@ export function ConsorcioCadastros() {
     if (!data) return;
     const validationError = validateCadastro(data);
     if (validationError) {
-      toast.error(validationError);
-      setSecao('impostos');
+      toast.error(validationError.message);
+      setSecao(validationError.secao);
       return;
     }
 
@@ -199,6 +206,7 @@ function ProdutosSection({
   const [novoPercentual, setNovoPercentual] = useState('');
   const [novaBase, setNovaBase] = useState<RegraComissaoConsorcio['base']>('bruta');
   const [novoPagamento, setNovoPagamento] = useState<RegraComissaoConsorcio['pagamento']>('por_parcela');
+  const [novosPercentuaisParcelas, setNovosPercentuaisParcelas] = useState<string[]>([]);
   const [editingRule, setEditingRule] = useState<RegraComissaoConsorcio | null>(null);
 
   function addProduct() {
@@ -229,9 +237,22 @@ function ProdutosSection({
       return;
     }
     if (!isValidPercent(editingProduct.percentualSorana)) { toast.error('Informe uma remuneração válida entre 0 e 100%.'); return; }
+    const cronogramas = regras.filter(regra => regra.produtoId === editingProduct.id && regra.pagamento === 'cronograma');
+    if (cronogramas.some(regra => regra.percentuaisParcelas?.slice(editingProduct.parcelasSorana).some(value => parsePercentualCadastro(value) !== 0))) {
+      toast.error('Existem comissões nas parcelas que serão removidas. Ajuste os cronogramas antes de reduzir as parcelas do produto.');
+      return;
+    }
+    if (cronogramas.length > 0) {
+      onRegrasChange(regras.map(regra => regra.produtoId === editingProduct.id && regra.pagamento === 'cronograma'
+        ? { ...regra, percentuaisParcelas: Array.from({ length: editingProduct.parcelasSorana }, (_, index) => regra.percentuaisParcelas?.[index] ?? '0') }
+        : regra));
+    }
     onProdutosChange(produtos.map(item => item.id === editingProduct.id
       ? { ...editingProduct, nome: trimmedName, percentualSorana: editingProduct.percentualSorana.trim() }
       : item));
+    if (novoProdutoId === editingProduct.id) {
+      setNovosPercentuaisParcelas(current => Array.from({ length: editingProduct.parcelasSorana }, (_, index) => current[index] ?? '0'));
+    }
     setEditingProduct(null);
   }
 
@@ -245,26 +266,36 @@ function ProdutosSection({
 
   function addRule() {
     if (!novoCargoId || !novoProdutoId) { toast.error('Selecione o cargo e o produto.'); return; }
-    if (!isValidPercent(novoPercentual)) { toast.error('Informe um percentual de comissão válido entre 0 e 100%.'); return; }
+    if (novoPagamento !== 'cronograma' && !isValidPercent(novoPercentual)) { toast.error('Informe um percentual de comissão válido entre 0 e 100%.'); return; }
     if (regras.some(regra => regra.cargoId === novoCargoId && regra.produtoId === novoProdutoId)) {
       toast.error('Já existe uma regra para este cargo e produto.');
       return;
     }
-    onRegrasChange([...regras, {
+    const regra: RegraComissaoConsorcio = {
       id: crypto.randomUUID(),
       cargoId: novoCargoId,
       produtoId: novoProdutoId,
-      percentual: novoPercentual.trim(),
+      percentual: novoPagamento === 'cronograma' ? '0' : novoPercentual.trim(),
       base: novaBase,
       pagamento: novoPagamento,
-    }]);
+      ...(novoPagamento === 'cronograma' ? { percentuaisParcelas: novosPercentuaisParcelas } : {}),
+    };
+    const produto = produtos.find(item => item.id === novoProdutoId);
+    if (!produto) { toast.error('Selecione um produto válido.'); return; }
+    const erro = validarCronograma(regra, produto.parcelasSorana);
+    if (erro) { toast.error(erro); return; }
+    onRegrasChange([...regras, regra]);
     setNovoPercentual('');
   }
 
   function saveRuleEdit() {
     if (!editingRule) return;
     if (!editingRule.cargoId || !editingRule.produtoId) { toast.error('Selecione o cargo e o produto.'); return; }
-    if (!isValidPercent(editingRule.percentual)) { toast.error('Informe um percentual de comissão válido entre 0 e 100%.'); return; }
+    if (editingRule.pagamento !== 'cronograma' && !isValidPercent(editingRule.percentual)) { toast.error('Informe um percentual de comissão válido entre 0 e 100%.'); return; }
+    const produto = produtos.find(item => item.id === editingRule.produtoId);
+    if (!produto) { toast.error('Selecione um produto válido.'); return; }
+    const erro = validarCronograma(editingRule, produto.parcelasSorana);
+    if (erro) { toast.error(erro); return; }
     if (regras.some(regra => regra.id !== editingRule.id && regra.cargoId === editingRule.cargoId && regra.produtoId === editingRule.produtoId)) {
       toast.error('Já existe uma regra para este cargo e produto.');
       return;
@@ -334,6 +365,8 @@ function ProdutosSection({
           Escolha se o percentual incide sobre o valor da carta, a comissão bruta ou a líquida da Sorana.
           Na base carta, o pagamento por parcela divide o total igualmente pelo número de parcelas da Sorana.
           A alíquota de imposto só é descontada da comissão da Sorana na base líquida.
+          No cronograma, informe um percentual para cada parcela e use 0% quando não houver comissão.
+          As bases bruta e líquida usam somente a parcela correspondente da Sorana; a base carta usa o valor integral da carta em cada parcela.
         </p>
         {(cargos.length === 0 || produtos.length === 0) && (
           <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">Cadastre ao menos um cargo e um produto antes de configurar as comissões.</p>
@@ -342,10 +375,15 @@ function ProdutosSection({
           <select value={novoCargoId} onChange={event => setNovoCargoId(event.target.value)} disabled={disabled || cargos.length === 0} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
             <option value="">Cargo...</option>{cargos.map(cargo => <option key={cargo.id} value={cargo.id}>{cargo.nome}</option>)}
           </select>
-          <select value={novoProdutoId} onChange={event => setNovoProdutoId(event.target.value)} disabled={disabled || produtos.length === 0} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
+          <select value={novoProdutoId} onChange={event => {
+            setNovoProdutoId(event.target.value);
+            setNovosPercentuaisParcelas(Array(produtos.find(item => item.id === event.target.value)?.parcelasSorana ?? 0).fill('0'));
+          }} disabled={disabled || produtos.length === 0} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
             <option value="">Produto...</option>{produtos.map(produto => <option key={produto.id} value={produto.id}>{produto.nome}</option>)}
           </select>
-          <Input value={novoPercentual} onChange={event => setNovoPercentual(event.target.value)} placeholder="% comissão" inputMode="decimal" disabled={disabled} />
+          {novoPagamento === 'cronograma'
+            ? <p className="self-center text-xs text-cyan-800">Percentuais por parcela abaixo</p>
+            : <Input value={novoPercentual} onChange={event => setNovoPercentual(event.target.value)} placeholder="% comissão" inputMode="decimal" disabled={disabled} />}
           <select value={novaBase} onChange={event => setNovaBase(event.target.value as RegraComissaoConsorcio['base'])} disabled={disabled} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
             <option value="valor_carta">Valor da carta</option>
             <option value="bruta">Comissão Sorana bruta</option>
@@ -353,8 +391,16 @@ function ProdutosSection({
           </select>
           <select value={novoPagamento} onChange={event => setNovoPagamento(event.target.value as RegraComissaoConsorcio['pagamento'])} disabled={disabled} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
             <option value="por_parcela">Por parcela recebida</option><option value="unica">Pagamento único</option>
+            <option value="cronograma">Cronograma por parcela</option>
           </select>
         </div>
+        {novoPagamento === 'cronograma' && (
+          <div className="mt-4">
+            {novoProdutoId
+              ? <CronogramaEditor percentuais={novosPercentuaisParcelas} onChange={setNovosPercentuaisParcelas} disabled={disabled} />
+              : <p className="text-xs text-slate-500">Selecione o produto para configurar as parcelas.</p>}
+          </div>
+        )}
         <div className="mt-3 flex justify-end">
           <Button onClick={addRule} disabled={disabled || cargos.length === 0 || produtos.length === 0} className="bg-cyan-700 text-white hover:bg-cyan-800">Adicionar regra</Button>
         </div>
@@ -374,10 +420,24 @@ function ProdutosSection({
                 return (
                   <tr key={regra.id} className={index % 2 ? 'bg-slate-50' : 'bg-white'}>
                     <td className="px-3 py-2">{editing ? <select value={editingRule.cargoId} onChange={event => setEditingRule({ ...editingRule, cargoId: event.target.value })} disabled={disabled} className="w-full rounded border px-2 py-1">{cargos.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}</select> : cargoName}</td>
-                    <td className="px-3 py-2">{editing ? <select value={editingRule.produtoId} onChange={event => setEditingRule({ ...editingRule, produtoId: event.target.value })} disabled={disabled} className="w-full rounded border px-2 py-1">{produtos.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}</select> : productName}</td>
-                    <td className="px-3 py-2 text-center">{editing ? <Input value={editingRule.percentual} onChange={event => setEditingRule({ ...editingRule, percentual: event.target.value })} inputMode="decimal" disabled={disabled} className="h-8 text-center" /> : `${regra.percentual}%`}</td>
+                    <td className="px-3 py-2">{editing ? <select value={editingRule.produtoId} onChange={event => setEditingRule({
+                      ...editingRule,
+                      produtoId: event.target.value,
+                      percentuaisParcelas: Array(produtos.find(item => item.id === event.target.value)?.parcelasSorana ?? 0).fill('0'),
+                    })} disabled={disabled} className="w-full rounded border px-2 py-1">{produtos.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}</select> : productName}</td>
+                    <td className="px-3 py-2 text-center">{editing
+                      ? editingRule.pagamento === 'cronograma'
+                        ? <CronogramaEditor percentuais={editingRule.percentuaisParcelas ?? []} onChange={percentuaisParcelas => setEditingRule({ ...editingRule, percentuaisParcelas })} disabled={disabled} />
+                        : <Input value={editingRule.percentual} onChange={event => setEditingRule({ ...editingRule, percentual: event.target.value })} inputMode="decimal" disabled={disabled} className="h-8 text-center" />
+                      : regra.pagamento === 'cronograma'
+                        ? <div className="space-y-1 text-xs">{regra.percentuaisParcelas?.map((value, parcela) => <p key={parcela}>{parcela + 1}ª: {parsePercentualCadastro(value)}%</p>)}</div>
+                        : `${regra.percentual}%`}</td>
                     <td className="px-3 py-2 text-center">{editing ? <select value={editingRule.base} onChange={event => setEditingRule({ ...editingRule, base: event.target.value as RegraComissaoConsorcio['base'] })} disabled={disabled} className="rounded border px-2 py-1"><option value="valor_carta">Valor da carta</option><option value="bruta">Sorana bruta</option><option value="liquida">Sorana líquida</option></select> : regra.base === 'valor_carta' ? 'Valor da carta' : regra.base === 'bruta' ? 'Sorana bruta' : 'Sorana líquida'}</td>
-                    <td className="px-3 py-2 text-center">{editing ? <select value={editingRule.pagamento} onChange={event => setEditingRule({ ...editingRule, pagamento: event.target.value as RegraComissaoConsorcio['pagamento'] })} disabled={disabled} className="rounded border px-2 py-1"><option value="por_parcela">Por parcela</option><option value="unica">Único</option></select> : regra.pagamento === 'unica' ? 'Único' : 'Por parcela'}</td>
+                    <td className="px-3 py-2 text-center">{editing ? <select value={editingRule.pagamento} onChange={event => setEditingRule({
+                      ...editingRule,
+                      pagamento: event.target.value as RegraComissaoConsorcio['pagamento'],
+                      percentuaisParcelas: Array.from({ length: produtos.find(item => item.id === editingRule.produtoId)?.parcelasSorana ?? 0 }, (_, index) => editingRule.percentuaisParcelas?.[index] ?? '0'),
+                    })} disabled={disabled} className="rounded border px-2 py-1"><option value="por_parcela">Por parcela</option><option value="unica">Único</option><option value="cronograma">Cronograma por parcela</option></select> : regra.pagamento === 'cronograma' ? 'Cronograma por parcela' : regra.pagamento === 'unica' ? 'Único' : 'Por parcela'}</td>
                     <td className="px-3 py-2 text-center">{editing ? <div className="flex justify-center gap-2"><button type="button" onClick={saveRuleEdit} className="text-emerald-600">Salvar</button><button type="button" onClick={() => setEditingRule(null)} className="text-slate-500">Cancelar</button></div> : <div className="flex justify-center gap-3"><button type="button" onClick={() => setEditingRule({ ...regra })} disabled={disabled} className="text-cyan-700 hover:underline">Editar</button><button type="button" onClick={() => onRegrasChange(regras.filter(item => item.id !== regra.id))} disabled={disabled} className="text-red-600 hover:underline">Excluir</button></div>}</td>
                   </tr>
                 );
@@ -387,6 +447,28 @@ function ProdutosSection({
         </div>
       </section>
     </div>
+  );
+}
+
+function CronogramaEditor({ percentuais, onChange, disabled }: {
+  percentuais: string[];
+  onChange: (items: string[]) => void;
+  disabled: boolean;
+}) {
+  return (
+    <fieldset className="min-w-40 rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-left">
+      <legend className="px-1 text-xs font-semibold text-cyan-900">Comissão por parcela</legend>
+      <p className="mb-3 text-xs text-slate-600">Percentual sobre a base escolhida. Use 0% para não pagar.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {percentuais.map((value, index) => (
+          <label key={index} className="text-xs text-slate-600">
+            {index + 1}ª parcela (%)
+            <Input value={value} inputMode="decimal" disabled={disabled} className="mt-1 h-8 bg-white"
+              onChange={event => onChange(percentuais.map((item, parcela) => parcela === index ? event.target.value : item))} />
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

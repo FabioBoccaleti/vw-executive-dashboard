@@ -7,6 +7,7 @@ import {
   parsePercentualCadastro,
   type CadastroConsorcio,
 } from './cadastroStorage';
+import { calcularComissaoVendedor, validarCronograma } from './comissaoVendedor';
 
 function parsePercent(value: string): number {
   return parsePercentualCadastro(value) ?? 0;
@@ -73,14 +74,10 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
   const aliquota = parsePercent(cadastro?.aliquotaImposto ?? '');
   const valorImposto = valorSoranaBruto * aliquota / 100;
   const valorSoranaLiquido = valorSoranaBruto - valorImposto;
-  const baseComissao = !regra
-    ? 0
-    : regra.base === 'valor_carta'
-      ? valorCartaValido ? valorCartaNumero : 0
-      : regra.base === 'bruta'
-        ? valorSoranaBruto
-        : valorSoranaLiquido;
-  const comissaoVendedorTotal = regra ? baseComissao * parsePercent(regra.percentual) / 100 : 0;
+  const erroCronograma = regra && produto ? validarCronograma(regra, produto.parcelasSorana) : null;
+  const comissaoVendedor = regra && produto && valorCartaValido && !erroCronograma
+    ? calcularComissaoVendedor(regra, produto, valorCartaNumero, aliquota)
+    : null;
 
   if (loading) {
     return <div className="flex-1 p-8 text-center text-sm text-slate-400">Carregando dados do cadastro...</div>;
@@ -173,12 +170,13 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
               </Field>
               <Field label="Valor total da remuneração do vendedor">
                 <Input
-                  value={valorCartaValido && regra ? formatCurrency(comissaoVendedorTotal) : ''}
+                  value={comissaoVendedor ? formatCurrency(comissaoVendedor.total) : ''}
                   placeholder={regra ? 'Informe o valor da carta' : 'Cadastre a regra para cargo e produto'}
                   readOnly
                   className="bg-slate-50 font-semibold text-cyan-800"
                 />
-                {regra && <span className="mt-1 block text-xs text-slate-500">{regra.percentual}% sobre {getRegraBaseLabel(regra.base)}</span>}
+                {regra && <span className="mt-1 block text-xs text-slate-500">{regra.pagamento === 'cronograma' ? 'Cronograma por parcela' : formatPercentLabel(regra.percentual)} sobre {getRegraBaseLabel(regra.base)}</span>}
+                {erroCronograma && <span role="alert" className="mt-1 block text-xs text-red-700">{erroCronograma} Corrija a regra no cadastro.</span>}
               </Field>
               <Field label="Parcelas em que a Sorana receberá a comissão">
                 <Input
@@ -189,6 +187,27 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
                 />
               </Field>
             </div>
+            {regra?.pagamento === 'cronograma' && comissaoVendedor && (
+              <div className="mt-5 overflow-x-auto rounded-lg border border-slate-200">
+                <table className="w-full text-sm">
+                  <caption className="p-3 text-left text-xs text-slate-600">
+                    Remuneração do vendedor por parcela. Bases bruta e líquida consideram somente a parcela correspondente da Sorana.
+                  </caption>
+                  <thead className="bg-cyan-800 text-white"><tr>
+                    <th className="px-4 py-2 text-left">Parcela</th>
+                    <th className="px-4 py-2 text-right">Percentual</th>
+                    <th className="px-4 py-2 text-right">Comissão do vendedor</th>
+                  </tr></thead>
+                  <tbody>{comissaoVendedor.parcelas.map((valor, index) => (
+                    <tr key={index} className="border-t border-slate-100">
+                      <td className="px-4 py-2">{index + 1}ª</td>
+                      <td className="px-4 py-2 text-right">{formatPercentLabel(regra.percentuaisParcelas?.[index] ?? '0')}</td>
+                      <td className="px-4 py-2 text-right">{formatCurrency(valor)}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
           </div>
         </section>
 

@@ -3,7 +3,7 @@ import { kvGet, kvSet } from '@/lib/kvClient';
 const KEY = 'consorcio_cadastros';
 
 export type BaseComissaoConsorcio = 'valor_carta' | 'bruta' | 'liquida';
-export type PagamentoComissaoConsorcio = 'unica' | 'por_parcela';
+export type PagamentoComissaoConsorcio = 'unica' | 'por_parcela' | 'cronograma';
 
 export function parsePercentualCadastro(value: string): number | null {
   const cleaned = value.trim().replace(/[%\s]/g, '');
@@ -41,6 +41,7 @@ export interface RegraComissaoConsorcio {
   percentual: string;
   base: BaseComissaoConsorcio;
   pagamento: PagamentoComissaoConsorcio;
+  percentuaisParcelas?: string[];
 }
 
 export interface CadastroConsorcio {
