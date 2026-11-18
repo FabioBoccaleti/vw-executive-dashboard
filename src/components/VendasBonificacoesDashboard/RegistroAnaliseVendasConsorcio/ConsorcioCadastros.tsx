@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
   loadCadastroConsorcio,
+  parsePercentualCadastro,
   saveCadastroConsorcio,
   type CadastroConsorcio,
   type CargoConsorcio,
@@ -21,13 +22,9 @@ const SECOES: { id: SecaoCadastro; label: string; icon: React.ReactNode }[] = [
   { id: 'impostos', label: 'Alíquota de imposto', icon: <Receipt className="w-4 h-4" /> },
 ];
 
-function parsePercent(value: string): number {
-  return Number(value.trim().replace(',', '.'));
-}
-
 function isValidPercent(value: string): boolean {
-  const parsed = parsePercent(value);
-  return value.trim() !== '' && Number.isFinite(parsed) && parsed >= 0 && parsed <= 100;
+  const parsed = parsePercentualCadastro(value);
+  return parsed !== null && parsed >= 0 && parsed <= 100;
 }
 
 function validateCadastro(data: CadastroConsorcio): string | null {

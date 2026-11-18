@@ -65,19 +65,6 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
             <div className="flex items-center bg-white/10 rounded-lg p-0.5 gap-0.5">
               {canVendas && (
               <button
-                onClick={() => setActiveTab('vendas')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  activeTab === 'vendas'
-                    ? 'bg-cyan-500 text-white shadow-sm'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <ShoppingCart className="w-3.5 h-3.5" />
-                Vendas
-              </button>
-              )}
-              {canVendas && (
-              <button
                 onClick={() => setActiveTab('lancar')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                   activeTab === 'lancar'
@@ -87,6 +74,19 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
               >
                 <FilePlus2 className="w-3.5 h-3.5" />
                 Lançar Vendas
+              </button>
+              )}
+              {canVendas && (
+              <button
+                onClick={() => setActiveTab('vendas')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  activeTab === 'vendas'
+                    ? 'bg-cyan-500 text-white shadow-sm'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <ShoppingCart className="w-3.5 h-3.5" />
+                Vendas
               </button>
               )}
               {canTabela && (

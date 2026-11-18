@@ -4,16 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   loadCadastroConsorcio,
+  parsePercentualCadastro,
   type CadastroConsorcio,
 } from './cadastroStorage';
 
 function parsePercent(value: string): number {
-  const parsed = Number(value.trim().replace(',', '.'));
-  return Number.isFinite(parsed) ? parsed : 0;
+  return parsePercentualCadastro(value) ?? 0;
 }
 
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatPercentLabel(value: string): string {
+  return `${value.trim().replace(/\s*%+$/, '') || '0'}%`;
 }
 
 function getRegraBaseLabel(base: 'valor_carta' | 'bruta' | 'liquida'): string {
@@ -161,7 +165,7 @@ export function LancarVendaForm({ onOpenCadastros }: { onOpenCadastros: () => vo
               <Field label="Comissão bruta da Sorana">
                 <Input value={valorCartaValido && produto ? formatCurrency(valorSoranaBruto) : ''} placeholder="Selecione o produto e informe o valor da carta" readOnly className="bg-slate-50 text-slate-700" />
               </Field>
-              <Field label={`Imposto (${cadastro.aliquotaImposto || '0'}%)`}>
+              <Field label={`Imposto (${formatPercentLabel(cadastro.aliquotaImposto)})`}>
                 <Input value={valorCartaValido && produto ? formatCurrency(valorImposto) : ''} placeholder="Calculado pelo cadastro" readOnly className="bg-slate-50 text-slate-700" />
               </Field>
               <Field label="Comissão líquida da Sorana">

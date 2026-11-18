@@ -5,6 +5,17 @@ const KEY = 'consorcio_cadastros';
 export type BaseComissaoConsorcio = 'valor_carta' | 'bruta' | 'liquida';
 export type PagamentoComissaoConsorcio = 'unica' | 'por_parcela';
 
+export function parsePercentualCadastro(value: string): number | null {
+  const cleaned = value.trim().replace(/[%\s]/g, '');
+  if (!cleaned) return null;
+
+  const normalized = cleaned.includes(',')
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : cleaned;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export interface ProdutoConsorcio {
   id: string;
   nome: string;
