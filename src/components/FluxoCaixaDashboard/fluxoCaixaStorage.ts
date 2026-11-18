@@ -38,18 +38,19 @@ export async function saveFluxoCaixaData(rawText: string, fileName?: string, yea
  * Carrega o texto bruto do balancete do Redis para o mês/ano selecionado.
  * Para dez/2025 faz fallback na chave legada para migração automática.
  */
-export async function loadFluxoCaixaRaw(year = 2025, month = 12): Promise<FluxoCaixaRaw | null> {
+export async function loadFluxoCaixaRaw(year = 2025, month = 12, options?: { throwOnError?: boolean }): Promise<FluxoCaixaRaw | null> {
   try {
-    const data = await kvGet<FluxoCaixaRaw>(getKey(year, month));
+    const data = await kvGet<FluxoCaixaRaw>(getKey(year, month), options);
     if (data) return data;
 
     // Migração automática: dez/2025 pode estar na chave legada
     if (year === 2025 && month === 12) {
-      const legacy = await kvGet<FluxoCaixaRaw>(LEGACY_KEY_2025);
+      const legacy = await kvGet<FluxoCaixaRaw>(LEGACY_KEY_2025, options);
       if (legacy) {
         console.log('🔄 Migrando balancete dez/2025 da chave legada...');
         // Salva na nova chave para não precisar migrar de novo
-        await kvSet(getKey(2025, 12), legacy);
+        const saved = await kvSet(getKey(2025, 12), legacy);
+        if (!saved && options?.throwOnError) throw new Error('Não foi possível migrar o balancete legado.');
         return legacy;
       }
     }
@@ -57,6 +58,7 @@ export async function loadFluxoCaixaRaw(year = 2025, month = 12): Promise<FluxoC
     return null;
   } catch (error) {
     console.error('Erro ao carregar balancete do Redis:', error);
+    if (options?.throwOnError) throw error;
     return null;
   }
 }

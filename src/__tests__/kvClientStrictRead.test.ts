@@ -13,6 +13,13 @@ afterEach(() => {
 });
 
 describe('KV — leitura estrita opcional', () => {
+  it('propaga falhas do balancete apenas na leitura estrita, preservando o comportamento das demais abas', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+    const { loadFluxoCaixaRaw } = await import('@/components/FluxoCaixaDashboard/fluxoCaixaStorage');
+    await expect(loadFluxoCaixaRaw(2026, 3, { throwOnError: true })).rejects.toThrow('503');
+    expect(await loadFluxoCaixaRaw(2026, 3)).toBeNull();
+  });
+
   it('mantém null para chave inexistente e retorna seleção existente em produção', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ value: null }) })

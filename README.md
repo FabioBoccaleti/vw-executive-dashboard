@@ -69,3 +69,30 @@ Seguros**, após **Total Remuneração + Encargos**, reduz o resultado da opera�
 e sua margem, sem alterar impostos, receita líquida, remunerações ou o resultado
 por vendedor. **Ano todo** soma os valores dos meses com dados de financiamento;
 os lançamentos são editados mês a mês e não alteram as Deduções já existentes.
+
+## Emissão de Demonstrações Financeiras
+
+Em **Análise Financeira Sorana > Emissão de Demonstrações Financeiras**, a aba
+**Cadastros** reúne empresa/CNPJ, grupos de contas, totalizações e assinantes.
+O nome da empresa identifica o documento, sem separar os balancetes por empresa.
+Selecione contas pesquisando código/descrição. Na **DRE**, o sinal é automático:
+o movimento **créditos − débitos** preserva receitas, deduções, custos, despesas
+e estornos com seus sinais contábeis. As totalizações somam os grupos já com seus
+sinais, sem escolha de Somar/Subtrair. Operações manuais antigas da DRE deixam
+de interferir no cálculo, sem exigir recadastro.
+Somente contas completas (analíticas) podem ser selecionadas; contas
+com subcontas ou identificadas como sintéticas (`S`) ficam desabilitadas.
+Códigos repetidos no arquivo não bloqueiam a leitura: preserva-se a última
+ocorrência, como no painel existente, sem somar as repetições.
+Em **Ativo** e **Passivo**, permanece a escolha de **Somar/Subtrair** sobre os
+valores absolutos das contas e nas referências entre grupos. Totalizações
+referenciam grupos anteriores; não é permitido contar uma conta e suas subcontas
+ou o mesmo grupo duas vezes por meio de subtotais. **Salvar cadastro** persiste
+as configurações e detecta alterações concorrentes.
+
+A **DRE** usa o movimento líquido de cada conta no mês e de janeiro até o mês
+selecionado. No modo **Anual**, usa somente o arquivo anual importado. **Ativo**
+e **Passivo** usam os saldos em cada data, com mês/ano comparativo independente,
+sem somar saldos mensais. Balancetes ou contas ausentes deixam os valores afetados
+indisponíveis, em vez de gerar um acumulado parcial ou assumir zero.
+Impressão/PDF não estão incluídos nesta etapa.

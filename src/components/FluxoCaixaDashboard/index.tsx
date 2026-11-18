@@ -25,6 +25,7 @@ import { ComparativoReceitas } from "./ComparativoReceitas";
 import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
 import { ProjecaoTab } from './ProjecaoTab';
 import { PerguntasRespostasTab } from "./PerguntasRespostasTab";
+import { DemonstracoesFinanceiras } from "./DemonstracoesFinanceiras";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -636,7 +637,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             if (Object.keys(parsed.accounts).length >= 10) {
               setData(parsed);
               setSavedFileNames(prev => ({ ...prev, [savedFileKey]: currentRaw.fileName }));
-              setActiveTab('overview');
+              setActiveTab(current => current === 'emissaoDemonstracoes' ? current : 'overview');
               return;
             }
           }
@@ -665,7 +666,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             if (Object.keys(parsed.accounts).length >= 10) {
               setData(parsed);
               setSavedFileNames(prev => ({ ...prev, [savedFileKey]: raw.fileName }));
-              setActiveTab('overview');
+              setActiveTab(current => current === 'emissaoDemonstracoes' ? current : 'overview');
               return;
             }
           }
@@ -961,14 +962,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               <PerguntasRespostasTab data={data} selectedMonth={selectedMonth} selectedYear={selectedYear} prevMonthAccounts={prevMonthAccounts} janAccounts={janAccounts} />
             </div>
           ) : activeTab === 'emissaoDemonstracoes' ? (
-            <Card>
-              <CardHeader>
-                <CardTitle><h2>Emissão de Demonstrações Financeiras</h2></CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Em desenvolvimento.</p>
-              </CardContent>
-            </Card>
+            <DemonstracoesFinanceiras selectedYear={selectedYear} selectedMonth={selectedMonth} />
           ) : loading && !data ? (
             <div className="flex flex-col items-center justify-center py-32 gap-4 text-slate-500">
               <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />

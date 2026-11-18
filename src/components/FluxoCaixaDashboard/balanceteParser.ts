@@ -188,15 +188,39 @@ export function analyzeAccounts(accounts: Record<string, any>) {
 }
 
 /** Extrai o mapa de contas de um texto de balancete semicolonado */
-export function extractAccounts(text: string): Record<string, any> {
+export interface ContaBalancete {
+  nivel: string;
+  conta: string;
+  desc: string;
+  saldoAnt: number;
+  valDeb: number;
+  valCred: number;
+  saldoAtual: number;
+}
+
+export function extractAccounts(text: string, options?: { strict?: boolean }): Record<string, ContaBalancete> {
   const lines = text.split('\n').filter(l => l.trim());
-  const accounts: Record<string, any> = {};
+  const accounts: Record<string, ContaBalancete> = {};
   for (const line of lines) {
     const parts = line.split(';');
-    if (parts.length < 7) continue;
+    if (parts[0].trim() === 'T') continue;
+    if (parts.length < 7) {
+      if (options?.strict) throw new Error('Linha incompleta no balancete.');
+      continue;
+    }
     const [nivel, conta, desc, saldoAnt, valDeb, valCred, saldoAtual] = parts;
     if (nivel === 'T') continue;
-    const parse = (v: string) => parseFloat((v || '0').replace(',', '.')) || 0;
+    if (options?.strict && /^n[ií]vel$/i.test(nivel.trim()) && conta.trim().toLowerCase() === 'conta') continue;
+    const parse = (v: string) => {
+      if (!options?.strict) return parseFloat((v || '0').replace(',', '.')) || 0;
+      const clean = v.trim();
+      const number = Number(clean.includes(',') ? clean.replace(/\./g, '').replace(',', '.') : clean);
+      if (!clean || !Number.isFinite(number)) throw new Error(`Valor inválido na conta ${conta}.`);
+      return number;
+    };
+    if (options?.strict && !/^\d+(?:\.\d+)*$/.test(conta.trim())) {
+      throw new Error(`Conta inválida no balancete: ${conta}.`);
+    }
     accounts[conta?.trim()] = {
       nivel: nivel?.trim(),
       conta: conta?.trim(),
