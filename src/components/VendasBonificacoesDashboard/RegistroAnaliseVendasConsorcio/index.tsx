@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
-import { Handshake, TableProperties, BarChart2, BookOpen, LogOut, ShoppingCart, Clock, CheckCircle2 } from 'lucide-react';
+import { Handshake, TableProperties, BarChart2, BookOpen, LogOut, ShoppingCart, Clock, CheckCircle2, FilePlus2 } from 'lucide-react';
+import { LancarVendaForm } from './LancarVendaForm';
 
 interface RegistroAnaliseVendasConsorcioDashboardProps {
   onChangeBrand: () => void;
@@ -34,7 +35,7 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
   const canAnalise  = isAdmin() || canAccessVendasSub('consorcio.analise');
   const canCadastro = isAdmin() || canAccessVendasSub('consorcio.cadastro');
 
-  const [activeTab, setActiveTab] = useState<'tabela' | 'vendas' | 'analise'>(
+  const [activeTab, setActiveTab] = useState<'tabela' | 'vendas' | 'lancar' | 'analise'>(
     canTabela ? 'tabela' : canVendas ? 'vendas' : 'analise',
   );
   const [vendasSubTab, setVendasSubTab] = useState<'a_receber' | 'recebida'>('a_receber');
@@ -73,6 +74,19 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
               >
                 <ShoppingCart className="w-3.5 h-3.5" />
                 Vendas
+              </button>
+              )}
+              {canVendas && (
+              <button
+                onClick={() => setActiveTab('lancar')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  activeTab === 'lancar'
+                    ? 'bg-cyan-500 text-white shadow-sm'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <FilePlus2 className="w-3.5 h-3.5" />
+                Lançar Vendas
               </button>
               )}
               {canTabela && (
@@ -231,6 +245,10 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'lancar' && canVendas && (
+        <LancarVendaForm onOpenCadastros={onOpenCadastros} />
       )}
 
       {activeTab === 'analise' && canAnalise && (

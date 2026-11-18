@@ -29,6 +29,7 @@ import { SignDriveVendedoresSection } from './sections/SignDriveVendedoresSectio
 import { SignDriveTipoVendaSection } from './sections/SignDriveTipoVendaSection';
 import { SignDriveRegrasSection } from './sections/SignDriveRegrasSection';
 import { SignDriveSalariosFixosSection } from './sections/SignDriveSalariosFixosSection';
+import { ConsorcioCadastros } from '@/components/VendasBonificacoesDashboard/RegistroAnaliseVendasConsorcio/ConsorcioCadastros';
 
 type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr' | 'salariosFixos' | 'custoPreparacao' | 'tipoVenda';
 
@@ -131,14 +132,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
 
       {/* ── Body ── */}
       {isConsorcio ? (
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="p-5 rounded-full bg-cyan-50">
-              <WalletCards className="w-12 h-12 text-cyan-500" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-800">Em desenvolvimento</h2>
-          </div>
-        </div>
+        <ConsorcioCadastros />
       ) : (
       <div className="flex flex-1 overflow-hidden">
 
