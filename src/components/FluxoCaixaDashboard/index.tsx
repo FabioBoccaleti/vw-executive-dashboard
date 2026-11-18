@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download, Sparkles } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download, Sparkles, FileText } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData, loadFluxoCaixaIndex } from "./fluxoCaixaStorage";
@@ -859,11 +859,11 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       <>
           <aside
             className={cn(
-              'fixed left-0 top-[60px] bottom-0 w-64 bg-slate-800 text-white z-20 transition-transform duration-300',
+              'fixed left-0 top-[60px] bottom-0 w-64 flex flex-col bg-slate-800 text-white z-20 transition-transform duration-300',
               sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             )}
           >
-            <nav className="p-4 space-y-1">
+            <nav className="min-h-0 flex-1 overflow-y-auto p-4 space-y-1">
               {TABS.filter(tab => !tab.requiresData || data).map((tab) => (
                 <button
                   key={tab.id}
@@ -884,7 +884,23 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               ))}
             </nav>
 
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700 space-y-1">
+            <div className="shrink-0 p-4 border-t border-slate-700 space-y-1">
+              <button
+                onClick={() => {
+                  setActiveTab('emissaoDemonstracoes');
+                  setSidebarOpen(false);
+                }}
+                aria-current={activeTab === 'emissaoDemonstracoes' ? 'page' : undefined}
+                className={cn(
+                  'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-left',
+                  activeTab === 'emissaoDemonstracoes'
+                    ? 'bg-green-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                )}
+              >
+                <FileText className="w-5 h-5 shrink-0" />
+                <span className="text-sm font-medium">Emissão de Demonstrações Financeiras</span>
+              </button>
               <button
                 onClick={() => fileRef.current?.click()}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
@@ -944,6 +960,15 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             <div className="animate-in fade-in duration-500">
               <PerguntasRespostasTab data={data} selectedMonth={selectedMonth} selectedYear={selectedYear} prevMonthAccounts={prevMonthAccounts} janAccounts={janAccounts} />
             </div>
+          ) : activeTab === 'emissaoDemonstracoes' ? (
+            <Card>
+              <CardHeader>
+                <CardTitle><h2>Emissão de Demonstrações Financeiras</h2></CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">Em desenvolvimento.</p>
+              </CardContent>
+            </Card>
           ) : loading && !data ? (
             <div className="flex flex-col items-center justify-center py-32 gap-4 text-slate-500">
               <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
