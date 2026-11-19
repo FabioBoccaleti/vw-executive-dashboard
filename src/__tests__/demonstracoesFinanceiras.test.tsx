@@ -46,6 +46,126 @@ async function adicionarGrupo(nome: string, conta: string) {
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 }
 
+it('permite transformar uma linha da DRE em sublinhas e voltar sem perder suas contas', async () => {
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'despesas', nome: 'Despesas Operacionais', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.2', operacao: 1 }] },
+    { id: 'resultado', nome: 'Resultado', demonstracao: 'dre', tipo: 'total', itens: [{ referencia: 'despesas', operacao: 1 }] },
+  ] };
+  const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Despesas Operacionais' }));
+  const dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Tipo de linha'), { target: { value: 'bancos' } });
+  expect(dialogo.getByRole('checkbox', { name: /^3\.2 —/ })).toBeChecked();
+  fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Despesas gerais' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Adicionar sublinha' }));
+  fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Outras despesas' } });
+  expect(dialogo.getByRole('checkbox', { name: /^3\.2 —.*já vinculada/ })).toBeDisabled();
+  fireEvent.click(dialogo.getByRole('checkbox', { name: /^3\.1 —/ }));
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  tela.unmount();
+
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await screen.findByRole('rowheader', { name: 'Outras despesas' });
+  const linhas = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+  expect(linhas.map(linha => within(linha).getByRole('rowheader').textContent)).toEqual([
+    'Despesas Operacionais', 'Despesas gerais', 'Outras despesas', 'Resultado',
+  ]);
+  expect(linhas.map(linha => within(linha).getByRole('cell').textContent)).toEqual(['400', '(100)', '500', '400']);
+  fireEvent.click(screen.getByRole('button', { name: 'Acumulado (Jan–Fev/26)' }));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Resultado/ })).getByRole('cell')).toHaveTextContent('1.200'));
+
+  await abrirCadastros();
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Despesas Operacionais' }));
+  const edicao = within(await screen.findByRole('dialog'));
+  fireEvent.change(edicao.getByLabelText('Tipo de linha'), { target: { value: 'contas' } });
+  expect(edicao.getByRole('checkbox', { name: /^3\.1 —/ })).toBeChecked();
+  expect(edicao.getByRole('checkbox', { name: /^3\.2 —/ })).toBeChecked();
+  fireEvent.click(edicao.getByRole('button', { name: 'Aplicar linha' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  expect(persistido?.linhas).toHaveLength(2);
+  fireEvent.click(screen.getByRole('tab', { name: 'DRE' }));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Resultado/ })).getByRole('cell')).toHaveTextContent('1.200'));
+});
+
+it('cadastra uma linha nova da DRE com sublinhas opcionais', async () => {
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));
+  const dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Nome da linha *'), { target: { value: 'Despesas Operacionais' } });
+  fireEvent.change(dialogo.getByLabelText('Tipo de linha'), { target: { value: 'bancos' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  expect(dialogo.getByRole('alert')).toHaveTextContent('ao menos uma conta');
+  fireEvent.click(dialogo.getByRole('button', { name: 'Adicionar sublinha' }));
+  fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Despesas gerais' } });
+  fireEvent.click(await dialogo.findByRole('checkbox', { name: /^3\.2 —/ }));
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'DRE' }));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Despesas Operacionais/ })).getByRole('cell')).toHaveTextContent('(100)'));
+  expect(screen.getByRole('rowheader', { name: 'Despesas gerais' })).toBeInTheDocument();
+});
+
+it.each([
+  { demonstracao: 'ativo' as const, titulo: 'Ativo', codigo: '1' },
+  { demonstracao: 'passivo' as const, titulo: 'Passivo', codigo: '2' },
+])('permite sublinhas em $titulo preservando sinais, totalizações e comparação', async ({ demonstracao, titulo, codigo }) => {
+  mocks.raw.mockImplementation(async (ano: number) => ({
+    rawText: `A;${codigo}.1;Conta principal;0;0;0;${ano === 2026 ? 100 : 50}\nA;${codigo}.2;Outra conta;0;0;0;${ano === 2026 ? -20 : -10}`,
+  }));
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'principal', nome: 'Circulante', demonstracao, tipo: 'contas', itens: [{ referencia: `${codigo}.1`, operacao: -1 }] },
+    { id: 'total', nome: 'Total geral', demonstracao, tipo: 'total', itens: [{ referencia: 'principal', operacao: 1 }] },
+  ] };
+  const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: demonstracao } });
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Circulante' }));
+  const dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Tipo de linha'), { target: { value: 'bancos' } });
+  expect(dialogo.getByLabelText(`Operação de ${codigo}.1`)).toHaveValue('-1');
+  fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Primeiro grupo' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Adicionar sublinha' }));
+  fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Segundo grupo' } });
+  expect(dialogo.getByRole('checkbox', { name: new RegExp(`^${codigo}\\.1 —.*já vinculada`) })).toBeDisabled();
+  fireEvent.click(dialogo.getByRole('checkbox', { name: new RegExp(`^${codigo}\\.2 —`) }));
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  tela.unmount();
+
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: titulo }));
+  await screen.findByRole('rowheader', { name: 'Segundo grupo' });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  const linhas = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+  expect(linhas.map(linha => within(linha).getByRole('rowheader').textContent)).toEqual([
+    'Circulante', 'Primeiro grupo', 'Segundo grupo', 'Total geral',
+  ]);
+  expect(linhas.map(linha => within(linha).getAllByRole('cell').map(cell => cell.textContent))).toEqual([
+    ['(80)', '(40)'], ['(100)', '(50)'], ['20', '10'], ['(80)', '(40)'],
+  ]);
+
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: demonstracao } });
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Circulante' }));
+  const edicao = within(await screen.findByRole('dialog'));
+  fireEvent.change(edicao.getByLabelText('Tipo de linha'), { target: { value: 'contas' } });
+  expect(edicao.getByLabelText(`Operação de ${codigo}.1`)).toHaveValue('-1');
+  expect(edicao.getByLabelText(`Operação de ${codigo}.2`)).toHaveValue('1');
+  fireEvent.click(edicao.getByRole('button', { name: 'Aplicar linha' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  expect(persistido?.linhas).toHaveLength(2);
+  fireEvent.click(screen.getByRole('tab', { name: titulo }));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Total geral/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(80)', '(40)']));
+});
+
 it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE com mês e acumulado', async () => {
   const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   await abrirCadastros();

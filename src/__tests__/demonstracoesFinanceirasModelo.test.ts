@@ -19,6 +19,29 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     expect(calcularLinhas(linhas, 'dre', [fevereiro]).get('Receita')).toBe(-100);
   });
 
+  it('valida e calcula sublinhas da DRE sem permitir referências externas ou contas duplicadas', () => {
+    const primeira = { ...grupo('Primeira', '3.1'), sublinhaDe: 'Grupo' };
+    const segunda = { ...grupo('Segunda', '3.2'), sublinhaDe: 'Grupo' };
+    const principal = total('Grupo', ['Primeira', 'Segunda']);
+    const resultado = total('Resultado', ['Grupo']);
+    const linhas = [principal, primeira, segunda, resultado];
+    expect(validarLinhas(linhas)).toBeNull();
+    expect(calcularLinhas(linhas, 'dre', [janeiro]).get('Resultado')).toBe(800);
+    expect(validarLinhas([...linhas, total('Inválido', ['Primeira'])])).toMatch(/mesma demonstração/);
+    expect(validarLinhas([principal, primeira, { ...segunda, itens: primeira.itens }])).toMatch(/sobrepõe/);
+    expect(validarLinhas([total('Grupo', ['Primeira']), primeira, segunda])).toMatch(/soma da sua linha principal/);
+  });
+
+  it.each(['ativo', 'passivo'] as const)('valida sublinhas de %s e soma seus valores com os sinais das contas', demonstracao => {
+    const primeira = { ...grupo('Primeira', '1.1', -1), demonstracao, sublinhaDe: 'Grupo' };
+    const segunda = { ...grupo('Segunda', '1.2'), demonstracao, sublinhaDe: 'Grupo' };
+    const principal = { ...total('Grupo', ['Primeira', 'Segunda']), demonstracao };
+    const contas = extractAccounts('A;1.1;Conta;0;0;0;100\nA;1.2;Conta;0;0;0;-20', { strict: true });
+    expect(validarLinhas([principal, primeira, segunda])).toBeNull();
+    expect(calcularLinhas([principal, primeira, segunda], demonstracao, [contas]).get('Grupo')).toBe(-80);
+    expect(validarLinhas([principal, primeira, { ...segunda, demonstracao: 'dre' }])).toMatch(/linha principal/);
+  });
+
   it('usa saldos pontuais no patrimônio em vez de movimentos ou soma de meses', () => {
     const linha = { ...grupo('Caixa', '1.1'), demonstracao: 'ativo' as const };
     const atual = extractAccounts('A;1.1;Caixa;150,00;20,00;10,00;160,00', { strict: true });

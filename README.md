@@ -92,6 +92,15 @@ demonstração. Totalizações usam linhas da própria demonstração, sem dupla
 contagem. **Salvar cadastro** persiste as configurações e detecta alterações
 concorrentes.
 
+Na **DRE**, no **Ativo** e no **Passivo**, o tipo **Linha principal com sublinhas** é opcional: cada sublinha
+tem nome e contas próprios, e aparece abaixo da linha principal, que soma seus
+valores. Ao converter um grupo de contas existente, suas contas são preservadas
+em uma primeira sublinha editável. Ao voltar para grupo de contas, as contas
+das sublinhas são reunidas na linha principal. Totalizações existentes precisam
+ter suas referências removidas antes de serem convertidas em sublinhas.
+No Ativo e Passivo, os sinais Somar/Subtrair configurados em cada conta são
+mantidos na conversão e a linha principal soma as sublinhas com seus sinais.
+
 Em **Endividamento**, ao adicionar uma linha principal, informe seu nome e
 cadastre os bancos ou dívidas, cada um com suas próprias contas. A linha
 principal mostra a soma dos saldos dos bancos ou dívidas, apresentados logo

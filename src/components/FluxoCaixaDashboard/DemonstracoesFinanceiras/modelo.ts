@@ -27,6 +27,7 @@ const linhaSchema = z.object({
   tipo: z.enum(['contas', 'total']),
   itens: z.array(itemSchema).min(1),
   bancoDe: z.string().min(1).optional(),
+  sublinhaDe: z.string().min(1).optional(),
   captacao: captacaoSchema.optional(),
 });
 export const cadastroSchema = z.object({
@@ -41,6 +42,7 @@ export type ItemDemonstracao = z.infer<typeof itemSchema>;
 export type ContasBalancete = Record<string, ContaBalancete>;
 export interface PeriodoDemonstracao { ano: number; mes: number }
 export type DadosDemonstracoes = Record<string, ContasBalancete | null>;
+export const linhaPai = (linha: LinhaDemonstracao) => linha.bancoDe ?? linha.sublinhaDe;
 
 export const chavePeriodo = ({ ano, mes }: PeriodoDemonstracao) => `${ano}_${mes}`;
 export const rotuloPeriodo = ({ ano, mes }: PeriodoDemonstracao) => `${MESES[mes]}/${String(ano).slice(-2)}`;
@@ -85,7 +87,7 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
     if (ids.has(linha.id)) return 'Existem linhas com identificadores repetidos.';
     ids.add(linha.id);
     porId.set(linha.id, linha);
-    if (linhas.some(item => item.id !== linha.id && item.demonstracao === linha.demonstracao && item.bancoDe === linha.bancoDe && item.nome.trim().toLocaleLowerCase() === linha.nome.trim().toLocaleLowerCase())) {
+    if (linhas.some(item => item.id !== linha.id && item.demonstracao === linha.demonstracao && linhaPai(item) === linhaPai(linha) && item.nome.trim().toLocaleLowerCase() === linha.nome.trim().toLocaleLowerCase())) {
       return `Já existe uma linha chamada "${linha.nome}" nesta demonstração.`;
     }
     const referencias = new Set<string>();
@@ -101,12 +103,18 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
   }
 
   for (const linha of linhas) {
-    if (!linha.bancoDe) continue;
-    const principal = porId.get(linha.bancoDe);
-    if (linha.demonstracao !== 'endividamento' || linha.tipo !== 'contas' || principal?.demonstracao !== 'endividamento'
-      || principal.tipo !== 'total' || !principal.itens.every(item => porId.get(item.referencia)?.bancoDe === principal.id && item.operacao === 1)
+    const pai = linhaPai(linha);
+    if (!pai) continue;
+    const principal = porId.get(pai);
+    const demonstracao = linha.demonstracao;
+    if ((linha.bancoDe && linha.sublinhaDe) || (linha.bancoDe ? demonstracao !== 'endividamento' : demonstracao === 'endividamento')
+      || linha.tipo !== 'contas' || principal?.demonstracao !== demonstracao
+      || linhaPai(principal) || principal.tipo !== 'total' || !principal.itens.every(item => {
+        const filha = porId.get(item.referencia);
+        return filha && linhaPai(filha) === principal.id && item.operacao === 1;
+      })
       || !principal.itens.some(item => item.referencia === linha.id)) {
-      return `O banco ou dívida "${linha.nome}" deve fazer parte da soma da sua linha principal de Endividamento.`;
+      return `A sublinha "${linha.nome}" deve fazer parte da soma da sua linha principal de ${TIPOS[demonstracao]}.`;
     }
   }
 
@@ -121,7 +129,7 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
     else {
       for (const item of linha.itens) {
         const origem = porId.get(item.referencia);
-        if (!origem || origem.demonstracao !== linha.demonstracao || (origem.bancoDe && origem.bancoDe !== linha.id)) {
+        if (!origem || origem.demonstracao !== linha.demonstracao || (linhaPai(origem) && linhaPai(origem) !== linha.id)) {
           return `A totalização "${linha.nome}" deve usar somente linhas cadastradas na mesma demonstração.`;
         }
         const erro = resolverComposicao(origem);
