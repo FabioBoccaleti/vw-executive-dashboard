@@ -1,8 +1,8 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { kvKeys } from '@/lib/kvClient';
-import { getBaseGerencialMes, loadPinheirosContasFixas, savePinheirosContasFixas } from '@/components/BaseGerencialDashboard/baseGerencialStorage';
+import { getAllImportedMesesData, getBaseGerencialMes, loadClassificacoesConta, loadPinheirosContasFixas, saveClassificacoesConta, savePinheirosContasFixas } from '@/components/BaseGerencialDashboard/baseGerencialStorage';
 import { BaseGerencialDashboard } from '@/components/BaseGerencialDashboard';
 import { CustoFixoPinheirosTab } from '@/components/BaseGerencialDashboard/CustoFixoPinheirosTab';
 import {
@@ -15,6 +15,9 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), info: vi.fn(), success: vi.f
 vi.mock('@/components/BaseGerencialDashboard/baseGerencialStorage', async importOriginal => ({
   ...await importOriginal<typeof import('@/components/BaseGerencialDashboard/baseGerencialStorage')>(),
   getBaseGerencialMes: vi.fn().mockResolvedValue(null),
+  getAllImportedMesesData: vi.fn(),
+  loadClassificacoesConta: vi.fn(),
+  saveClassificacoesConta: vi.fn(),
   loadPinheirosContasFixas: vi.fn(),
   savePinheirosContasFixas: vi.fn(),
 }));
@@ -51,6 +54,9 @@ const dados: CustoFixoPinheirosData = {
 beforeEach(() => {
   vi.mocked(kvKeys).mockReset().mockResolvedValue([]);
   vi.mocked(getBaseGerencialMes).mockReset().mockResolvedValue(null);
+  vi.mocked(getAllImportedMesesData).mockReset().mockResolvedValue([]);
+  vi.mocked(loadClassificacoesConta).mockReset().mockResolvedValue({});
+  vi.mocked(saveClassificacoesConta).mockReset().mockResolvedValue(undefined);
   vi.mocked(processCustoFixoPinheirosData).mockReset().mockResolvedValue(dados);
   vi.mocked(loadPinheirosContasFixas).mockReset().mockResolvedValue(['51101', '51102']);
   vi.mocked(savePinheirosContasFixas).mockReset().mockResolvedValue(undefined);
@@ -60,6 +66,88 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+describe('Classificação de Tipo de Conta — impressão', () => {
+  const row = (conta: string, valor = 1) => ({
+    conta, isMain: true, saldoAnterior: 0, valDebito: valor, valCredito: 0, saldoPeriodo: 0, saldoAtual: 0,
+  });
+
+  it('imprime somente as contas classificadas com as descrições e os rótulos atuais', async () => {
+    const printRoot = document.createElement('div');
+    printRoot.id = 'print-root';
+    document.body.appendChild(printRoot);
+    try {
+      vi.mocked(getAllImportedMesesData).mockResolvedValue([
+        { rows: [row('100 - VENDAS'), row('200 - SERVIÇOS'), row('300 - PENDENTE'), row('400 - SEM MOVIMENTO', 0)], totalRow: null, importedAt: '', fileName: '' },
+        { rows: [row('100 - VENDAS')], totalRow: null, importedAt: '', fileName: '' },
+      ]);
+      vi.mocked(loadClassificacoesConta).mockResolvedValue({
+        '100 - VENDAS': 'receita_vendas', '200 - SERVIÇOS': 'despesas_pessoal',
+      });
+      const imprimir = vi.spyOn(window, 'print').mockImplementation(() => {});
+      render(<BaseGerencialDashboard onChangeBrand={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Classificação de Tipo de Conta' }));
+      await screen.findByText('300 - PENDENTE');
+      expect(screen.queryByRole('button', { name: 'Imprimir contas classificadas em PDF' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Classificadas' }));
+      const linhas = () => [...printRoot.querySelectorAll('tbody tr')].map(tr => [...tr.querySelectorAll('td')].map(td => td.textContent));
+      expect(linhas()).toEqual([['100 - VENDAS', 'Receita de Vendas'], ['200 - SERVIÇOS', 'Despesas c/ Pessoal']]);
+      fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'custos_operacionais' } });
+      await waitFor(() => expect(saveClassificacoesConta).toHaveBeenCalled());
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Imprimir contas classificadas em PDF' })).toBeEnabled());
+      fireEvent.click(screen.getByRole('button', { name: 'Imprimir contas classificadas em PDF' }));
+      expect(imprimir).toHaveBeenCalledOnce();
+      expect(linhas()).toEqual([['100 - VENDAS', 'Custos Operacionais'], ['200 - SERVIÇOS', 'Despesas c/ Pessoal']]);
+      fireEvent.click(screen.getByRole('button', { name: 'Pendentes' }));
+      expect(printRoot.querySelector('table')).toBeNull();
+    } finally {
+      printRoot.remove();
+    }
+  });
+
+  it('desabilita a impressão sem contas classificadas e informa quando a área de impressão não existe', async () => {
+    vi.mocked(getAllImportedMesesData).mockResolvedValue([
+      { rows: [row('100 - VENDAS')], totalRow: null, importedAt: '', fileName: '' },
+    ]);
+    vi.mocked(loadClassificacoesConta).mockResolvedValue({});
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => {});
+    render(<BaseGerencialDashboard onChangeBrand={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Classificação de Tipo de Conta' }));
+    await screen.findByText('100 - VENDAS');
+    fireEvent.click(screen.getByRole('button', { name: 'Classificadas' }));
+    expect(screen.getByRole('button', { name: 'Imprimir contas classificadas em PDF' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Todas' }));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'receita_vendas' } });
+    await waitFor(() => expect(saveClassificacoesConta).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Classificadas' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Imprimir contas classificadas em PDF' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Imprimir contas classificadas em PDF' }));
+    expect(toast.error).toHaveBeenCalledWith('Não foi possível preparar a impressão das contas classificadas.');
+    expect(imprimir).not.toHaveBeenCalled();
+  });
+
+  it('inclui todas as contas em uma lista longa sem limitar a tabela a uma única página', async () => {
+    const printRoot = document.createElement('div');
+    printRoot.id = 'print-root';
+    document.body.appendChild(printRoot);
+    try {
+      const contas = Array.from({ length: 225 }, (_, index) => `${String(index).padStart(3, '0')} - CONTA`);
+      vi.mocked(getAllImportedMesesData).mockResolvedValue([
+        { rows: contas.map(conta => row(conta)), totalRow: null, importedAt: '', fileName: '' },
+      ]);
+      vi.mocked(loadClassificacoesConta).mockResolvedValue(Object.fromEntries(contas.map(conta => [conta, 'receita_vendas'])));
+      render(<BaseGerencialDashboard onChangeBrand={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Classificação de Tipo de Conta' }));
+      await screen.findByText('224 - CONTA');
+      fireEvent.click(screen.getByRole('button', { name: 'Classificadas' }));
+      expect(printRoot.querySelectorAll('tbody tr')).toHaveLength(225);
+      expect(printRoot.querySelector('tbody tr:last-child')).toHaveTextContent('224 - CONTA');
+      expect(printRoot.querySelector('.print-page')).toBeNull();
+    } finally {
+      printRoot.remove();
+    }
+  });
 });
 
 describe('Custo Fixo Pinheiros — interface', () => {

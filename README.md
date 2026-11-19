@@ -70,6 +70,12 @@ e sua margem, sem alterar impostos, receita líquida, remunerações ou o result
 por vendedor. **Ano todo** soma os valores dos meses com dados de financiamento;
 os lançamentos são editados mês a mês e não alteram as Deduções já existentes.
 
+## Base Gerencial — contas classificadas
+
+Em **Importar Dados > Classificação de Tipo de Conta > Classificadas**, use
+**Imprimir PDF** para abrir a impressão do navegador e salvar em PDF. O relatório
+inclui as contas classificadas exibidas, suas descrições e classificações atuais.
+
 ## Emissão de Demonstrações Financeiras
 
 Em **Análise Financeira Sorana > Emissão de Demonstrações Financeiras**, a aba

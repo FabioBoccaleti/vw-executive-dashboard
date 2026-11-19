@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Upload, Trash2, FileText, AlertCircle, Printer, CheckCircle2, Tag, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { kvKeys } from '@/lib/kvClient';
@@ -157,6 +158,14 @@ function ClassificacaoTipoContaTab() {
                   : filter === 'classified' ? classified
                   : [...pending, ...classified]; // pendentes primeiro
 
+  function imprimirClassificadas() {
+    if (!document.getElementById('print-root')) {
+      toast.error('Não foi possível preparar a impressão das contas classificadas.');
+      return;
+    }
+    window.print();
+  }
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center py-16">
@@ -197,6 +206,17 @@ function ClassificacaoTipoContaTab() {
           {saving && <span className="text-xs text-slate-400 italic">Salvando...</span>}
         </div>
         <div className="flex items-center gap-1">
+          {filter === 'classified' && (
+            <button
+              type="button"
+              onClick={imprimirClassificadas}
+              disabled={saving || classified.length === 0}
+              aria-label="Imprimir contas classificadas em PDF"
+              className="mr-2 inline-flex items-center gap-1.5 rounded border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Printer className="w-3.5 h-3.5" /> Imprimir PDF
+            </button>
+          )}
           {(['all', 'pending', 'classified'] as const).map(f => (
             <button
               key={f}
@@ -269,6 +289,32 @@ function ClassificacaoTipoContaTab() {
           </tbody>
         </table>
       </div>
+      {filter === 'classified' && document.getElementById('print-root') && createPortal(
+        <div className="classificacao-contas-print">
+          <style>{`
+            @media print {
+              .classificacao-contas-print { font-family: Inter, sans-serif; color: #0f172a; }
+              .classificacao-contas-print table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
+              .classificacao-contas-print thead { display: table-header-group; }
+              .classificacao-contas-print tr { break-inside: avoid; page-break-inside: avoid; }
+              .classificacao-contas-print th, .classificacao-contas-print td {
+                text-align: left; vertical-align: top; padding: 5px 7px;
+                border-bottom: 1px solid #cbd5e1; overflow-wrap: anywhere;
+              }
+              .classificacao-contas-print th { background: #e2e8f0; }
+            }
+          `}</style>
+          <h1 style={{ fontSize: '14pt', marginBottom: '4px' }}>Base Gerencial — Contas classificadas</h1>
+          <p style={{ fontSize: '9pt', marginBottom: '12px' }}>{classified.length} contas classificadas</p>
+          <table>
+            <thead><tr><th style={{ width: '70%' }}>Conta / Descrição</th><th>Classificação de Conta</th></tr></thead>
+            <tbody>{classified.map(conta => (
+              <tr key={conta}><td>{conta}</td><td>{TIPO_CONTA_LABELS[classificacoes[conta]]}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>,
+        document.getElementById('print-root')!,
+      )}
     </div>
   );
 }
