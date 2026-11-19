@@ -6,6 +6,20 @@ export type TipoDemonstracao = keyof typeof TIPOS;
 export const MESES = ['Anual', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 const itemSchema = z.object({ referencia: z.string().min(1), operacao: z.union([z.literal(1), z.literal(-1)]) });
+const mesCaptacaoSchema = z.string().regex(/^\d{4}_(?:[1-9]|1[0-2])$/);
+export const captacaoSchema = z.object({
+  data: z.string().date('Informe uma data de captação válida.').optional(),
+  valorCentavos: z.number().int().safe().nonnegative('Informe um valor de captação válido.').optional(),
+  taxa: z.string().trim().min(1).optional(),
+  parcelasTotais: z.number().int('Informe um número inteiro de parcelas.').positive('O total de parcelas deve ser maior que zero.').safe().optional(),
+  restantesPorMes: z.record(mesCaptacaoSchema, z.number().int().nonnegative().safe()),
+  jurosProvisionadosPorMes: z.record(mesCaptacaoSchema, z.number().int().nonnegative().safe()).optional(),
+}).refine(
+  ({ parcelasTotais, restantesPorMes }) => parcelasTotais === undefined || Object.values(restantesPorMes).every(restantes => restantes <= parcelasTotais),
+  'As parcelas restantes de cada mês não podem exceder o total de parcelas.',
+);
+export type Captacao = z.infer<typeof captacaoSchema>;
+
 const linhaSchema = z.object({
   id: z.string().min(1),
   nome: z.string().trim().min(1),
@@ -13,6 +27,7 @@ const linhaSchema = z.object({
   tipo: z.enum(['contas', 'total']),
   itens: z.array(itemSchema).min(1),
   bancoDe: z.string().min(1).optional(),
+  captacao: captacaoSchema.optional(),
 });
 export const cadastroSchema = z.object({
   version: z.string(),

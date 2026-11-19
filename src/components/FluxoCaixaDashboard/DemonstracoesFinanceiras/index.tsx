@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TIPOS, MESES, calcularLinhas, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia,
+  TIPOS, MESES, calcularLinhas, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
 import { loadCadastroDemonstracoes, loadDadosDemonstracoes, saveCadastroDemonstracoes } from './storage';
 
 const moeda = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+const moedaComCentavos = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const titulosDemonstracoes: Record<TipoDemonstracao, string> = {
   dre: 'Demonstração do Resultado do Exercício',
   ativo: 'Balanço Patrimonial — Ativo',
@@ -20,6 +21,28 @@ const titulosDemonstracoes: Record<TipoDemonstracao, string> = {
 const selectClass = 'h-10 rounded-md border border-input bg-background px-3 text-sm';
 const mensagem = (error: unknown) => error instanceof Error ? error.message : String(error);
 const formatarMoeda = (valor: number) => valor < 0 ? `(${moeda.format(Math.abs(valor))})` : moeda.format(valor);
+function lerCentavos(texto: string): number | undefined | null {
+  const valor = texto.trim();
+  if (!valor) return undefined;
+  if (!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(valor)) return null;
+  const [reais, centavos = ''] = valor.replace(/\./g, '').split(',');
+  const total = Number(reais) * 100 + Number(centavos.padEnd(2, '0'));
+  return Number.isSafeInteger(total) ? total : null;
+}
+const camposCaptacao = [
+  { campo: 'data', rotulo: 'Data da captação', tipo: 'date' },
+  { campo: 'valor', rotulo: 'Valor da captação (R$)', tipo: 'text', placeholder: 'Ex.: 1.000,00' },
+  { campo: 'taxa', rotulo: 'Taxa', tipo: 'text', placeholder: 'Ex.: CDI + 2% a.a.' },
+  { campo: 'total', rotulo: 'Total de parcelas', tipo: 'number', min: 1 },
+  { campo: 'restantes', rotulo: 'Parcelas restantes', tipo: 'number', min: 0 },
+  { campo: 'juros', rotulo: 'Juros Provisionados (R$)', tipo: 'text', placeholder: 'Ex.: 1.000,00' },
+] as const;
+type EditorCaptacao = {
+  id: string;
+  nome: string;
+  periodo: PeriodoDemonstracao;
+  campos: Record<(typeof camposCaptacao)[number]['campo'], string>;
+};
 
 export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { selectedYear: number; selectedMonth: number }) {
   const [aba, setAba] = useState<TipoDemonstracao | 'cadastros'>('dre');
@@ -37,6 +60,8 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [anoAdicionar, setAnoAdicionar] = useState(String(selectedYear - 1));
   const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
   const [editor, setEditor] = useState<LinhaDemonstracao | null>(null);
+  const [editorCaptacao, setEditorCaptacao] = useState<EditorCaptacao | null>(null);
+  const [erroCaptacao, setErroCaptacao] = useState('');
   const [bancosEditor, setBancosEditor] = useState<LinhaDemonstracao[] | null>(null);
   const [bancoAtivo, setBancoAtivo] = useState('');
   const alvoEditor = bancosEditor ? bancosEditor.find(banco => banco.id === bancoAtivo) : editor;
@@ -100,22 +125,78 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     return true;
   }
 
-  async function salvar() {
-    if (!cadastro) return;
-    const erro = validarContasCompletas(cadastro.linhas, contasIncompletas);
-    if (erro) { setErroAcao(erro); return; }
+  async function salvar(novo: CadastroDemonstracoes, informarErro = setErroAcao) {
+    const erro = validarContasCompletas(novo.linhas, contasIncompletas);
+    if (erro) { informarErro(erro); return false; }
     setSalvando(true);
     setErroAcao('');
     setAviso('');
     try {
-      const salva = await saveCadastroDemonstracoes(cadastro);
+      const salva = await saveCadastroDemonstracoes(novo);
       setCadastro(salva);
       setAlterado(false);
       setAviso('Cadastro salvo com sucesso.');
+      return true;
     } catch (error) {
-      setErroAcao(mensagem(error));
+      informarErro(mensagem(error));
+      return false;
     } finally {
       setSalvando(false);
+    }
+  }
+
+  function abrirCaptacao(linha: LinhaDemonstracao) {
+    const captacao = linha.captacao;
+    const chave = chavePeriodo(principal);
+    const juros = captacao?.jurosProvisionadosPorMes?.[chave];
+    setErroCaptacao('');
+    setEditorCaptacao({ id: linha.id, nome: linha.nome, periodo: principal, campos: {
+      data: captacao?.data ?? '',
+      valor: captacao?.valorCentavos === undefined ? '' : moedaComCentavos.format(captacao.valorCentavos / 100),
+      taxa: captacao?.taxa ?? '',
+      total: captacao?.parcelasTotais?.toString() ?? '',
+      restantes: captacao?.restantesPorMes[chave]?.toString() ?? '',
+      juros: juros === undefined ? '' : moedaComCentavos.format(juros / 100),
+    } });
+  }
+
+  async function salvarCaptacao() {
+    if (!editorCaptacao || !cadastro || salvando) return;
+    const { id, periodo, campos } = editorCaptacao;
+    const linha = cadastro.linhas.find(item => item.id === id);
+    if (!linha?.bancoDe) { setErroCaptacao('O banco ou dívida não está mais no cadastro.'); return; }
+    const valorCentavos = lerCentavos(campos.valor);
+    if (valorCentavos === null) {
+      setErroCaptacao('Informe o valor da captação no formato 1.000,00.');
+      return;
+    }
+    const juros = lerCentavos(campos.juros);
+    if (juros === null) {
+      setErroCaptacao('Informe os juros provisionados no formato 1.000,00.');
+      return;
+    }
+    const chave = chavePeriodo(periodo);
+    const restantesPorMes = { ...linha.captacao?.restantesPorMes };
+    if (campos.restantes === '') delete restantesPorMes[chave];
+    else restantesPorMes[chave] = Number(campos.restantes);
+    const jurosProvisionadosPorMes = { ...linha.captacao?.jurosProvisionadosPorMes };
+    if (juros === undefined) delete jurosProvisionadosPorMes[chave];
+    else jurosProvisionadosPorMes[chave] = juros;
+    const resultado = captacaoSchema.safeParse({
+      data: campos.data || undefined,
+      valorCentavos,
+      taxa: campos.taxa.trim() || undefined,
+      parcelasTotais: campos.total === '' ? undefined : Number(campos.total),
+      restantesPorMes,
+      jurosProvisionadosPorMes,
+    });
+    if (!resultado.success) {
+      setErroCaptacao(resultado.error.issues[0]?.message ?? 'Confira os dados da captação.');
+      return;
+    }
+    setErroCaptacao('');
+    if (await salvar({ ...cadastro, linhas: cadastro.linhas.map(item => item.id === id ? { ...item, captacao: resultado.data } : item) }, setErroCaptacao)) {
+      setEditorCaptacao(null);
     }
   }
 
@@ -363,7 +444,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                   ))}
                   <Button variant="outline" onClick={() => atualizar({ ...cadastro, assinantes: [...cadastro.assinantes, { id: crypto.randomUUID(), nome: '', cargo: '', registro: '' }] })}>Adicionar assinante</Button>
                 </section>
-                <Button onClick={salvar}>{salvando ? 'Salvando...' : 'Salvar cadastro'}</Button>
+                <Button onClick={() => salvar(cadastro)}>{salvando ? 'Salvando...' : 'Salvar cadastro'}</Button>
               </fieldset>
             ) : (
               <section className="space-y-4" aria-label={`Demonstração ${TIPOS[aba]}`}>
@@ -415,9 +496,28 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                       <tbody>
                         {linhasTabela.map(linha => <tr key={linha.id} className={linha.tipo === 'total' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
                           <th scope="row" className={`p-3 text-left font-inherit ${linha.bancoDe ? 'pl-8' : ''}`}>{linha.nome}</th>
-                          {colunas.map((_, index) => {
+                          {colunas.map((coluna, index) => {
                             const valor = valores[index]?.get(linha.id);
-                            return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : ''}`}>{valor === null || valor === undefined ? '—' : formatarMoeda(valor)}</td>;
+                            const periodo = coluna.periodos[0];
+                            const podeEditarCaptacao = aba === 'endividamento' && linha.bancoDe && principal.mes > 0
+                              && periodo.ano === principal.ano && periodo.mes === principal.mes;
+                            const captacao = linha.captacao;
+                            const restantes = captacao?.restantesPorMes[chavePeriodo(principal)];
+                            const juros = captacao?.jurosProvisionadosPorMes?.[chavePeriodo(principal)];
+                            return <td key={index} className="whitespace-nowrap p-3 text-right tabular-nums">
+                              <span className={valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : undefined}>{valor === null || valor === undefined ? '—' : formatarMoeda(valor)}</span>
+                              {podeEditarCaptacao && <>
+                                {captacao && <div className="mt-1 whitespace-normal text-xs text-muted-foreground">
+                                  {captacao.data && <p>Data da captação: {captacao.data.split('-').reverse().join('/')}</p>}
+                                  {captacao.valorCentavos !== undefined && <p>Valor da captação: R$ {moedaComCentavos.format(captacao.valorCentavos / 100)}</p>}
+                                  {captacao.taxa && <p>Taxa: {captacao.taxa}</p>}
+                                  {captacao.parcelasTotais !== undefined && <p>Total de parcelas: {captacao.parcelasTotais}</p>}
+                                  {restantes !== undefined && <p>Parcelas restantes: {restantes}</p>}
+                                  {juros !== undefined && <p>Juros Provisionados: R$ {moedaComCentavos.format(juros / 100)}</p>}
+                                </div>}
+                                <Button variant="ghost" size="sm" aria-label={`Editar captação de ${linha.nome}`} onClick={() => abrirCaptacao(linha)}>Editar captação</Button>
+                              </>}
+                            </td>;
                           })}
                         </tr>)}
                         {linhas.length === 0 && <tr><td colSpan={colunas.length + 1} className="p-6 text-center text-muted-foreground">Nenhum grupo cadastrado. Configure as linhas na aba Cadastros.</td></tr>}
@@ -437,6 +537,31 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
             )}
           </>
         )}
+        <Dialog open={editorCaptacao !== null} onOpenChange={open => { if (!open && !salvando) setEditorCaptacao(null); }}>
+          {editorCaptacao && <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar captação — {editorCaptacao.nome}</DialogTitle>
+              <DialogDescription>As parcelas restantes e os juros provisionados são registrados para {rotuloPeriodo(editorCaptacao.periodo)}. Os demais dados valem para a captação.</DialogDescription>
+            </DialogHeader>
+            <form className="space-y-4" onSubmit={event => { event.preventDefault(); void salvarCaptacao(); }}>
+              <fieldset disabled={salvando} className="grid gap-3 sm:grid-cols-2">
+                {camposCaptacao.map(config => <label key={config.campo} className="space-y-1 text-sm">
+                  <span>{config.rotulo}</span>
+                  <Input type={config.tipo} min={'min' in config ? config.min : undefined}
+                    inputMode={config.campo === 'valor' || config.campo === 'juros' ? 'decimal' : undefined}
+                    placeholder={'placeholder' in config ? config.placeholder : undefined} value={editorCaptacao.campos[config.campo]}
+                    onChange={event => setEditorCaptacao({ ...editorCaptacao, campos: { ...editorCaptacao.campos, [config.campo]: event.target.value } })} />
+                </label>)}
+              </fieldset>
+              {erroCaptacao && <p role="alert" className="text-sm text-red-700">{erroCaptacao}</p>}
+              {alterado && <p className="text-sm text-muted-foreground">Salvar a captação também salva as alterações pendentes do cadastro.</p>}
+              <DialogFooter>
+                <Button type="button" variant="outline" disabled={salvando} onClick={() => setEditorCaptacao(null)}>Cancelar</Button>
+                <Button type="submit" disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar captação'}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>}
+        </Dialog>
         <Dialog open={editor !== null} onOpenChange={open => { if (!open) setEditor(null); }}>
           <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto sm:max-w-6xl">
             <DialogHeader><DialogTitle>Configurar linha — {editor ? TIPOS[editor.demonstracao] : ''}</DialogTitle><DialogDescription>{bancosEditor

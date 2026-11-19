@@ -227,7 +227,7 @@ it('salva bancos com contas próprias e exibe seus saldos abaixo do total da lin
   await screen.findByRole('columnheader', { name: 'Fev/25' });
   const linhas = within(screen.getByRole('table')).getAllByRole('row').slice(1);
   expect(linhas.map(linha => within(linha).getByRole('rowheader').textContent)).toEqual(['Endividamento bancário', 'Banco Itaú', 'Banco Bradesco']);
-  expect(linhas.map(linha => within(linha).getAllByRole('cell').map(cell => cell.textContent))).toEqual([['121', '91'], ['111', '81'], ['10', '10']]);
+  expect(linhas.map(linha => within(linha).getAllByRole('cell').map(cell => within(cell).getByText(/^\d+$/).textContent))).toEqual([['121', '91'], ['111', '81'], ['10', '10']]);
 
   await abrirCadastros();
   fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'endividamento' } });
@@ -235,6 +235,73 @@ it('salva bancos com contas próprias e exibe seus saldos abaixo do total da lin
   const edicao = within(await screen.findByRole('dialog'));
   fireEvent.click(edicao.getByRole('button', { name: 'Banco Bradesco' }));
   expect(edicao.getByRole('checkbox', { name: /^2\.3 —/ })).toBeChecked();
+});
+
+it('preserva parcelas e juros provisionados por mês sem detalhar as colunas comparativas', async () => {
+  const banco = 'Banco Itaú';
+  mocks.raw.mockResolvedValue({ rawText: 'P;2.1;Empréstimos;0;0;0;1250,25' });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'principal', nome: 'Dívida bancária', demonstracao: 'endividamento', tipo: 'total', itens: [{ referencia: 'itau', operacao: 1 }] },
+    { id: 'itau', nome: banco, demonstracao: 'endividamento', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }], bancoDe: 'principal' },
+  ] };
+  const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  const abrirCap = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: `Editar captação de ${banco}` }));
+    return within(await screen.findByRole('dialog'));
+  };
+  const salvarCap = async (dialogo: ReturnType<typeof within>) => {
+    fireEvent.click(dialogo.getByRole('button', { name: 'Salvar captação' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  };
+  fireEvent.click(screen.getByRole('tab', { name: 'Endividamento' }));
+  const dialogo = await abrirCap();
+  fireEvent.change(dialogo.getByLabelText('Data da captação'), { target: { value: '2025-03-15' } });
+  fireEvent.change(dialogo.getByLabelText('Valor da captação (R$)'), { target: { value: '5.000,25' } });
+  fireEvent.change(dialogo.getByLabelText('Taxa'), { target: { value: 'CDI + 2% a.a.' } });
+  fireEvent.change(dialogo.getByLabelText('Total de parcelas'), { target: { value: '24' } });
+  fireEvent.change(dialogo.getByLabelText('Parcelas restantes'), { target: { value: '25' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Salvar captação' }));
+  expect(dialogo.getByRole('alert')).toHaveTextContent('não podem exceder');
+  expect(mocks.cas).not.toHaveBeenCalled();
+  fireEvent.change(dialogo.getByLabelText('Parcelas restantes'), { target: { value: '8' } });
+  fireEvent.change(dialogo.getByLabelText('Juros Provisionados (R$)'), { target: { value: '100,123' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Salvar captação' }));
+  expect(dialogo.getByRole('alert')).toHaveTextContent('Informe os juros provisionados');
+  expect(mocks.cas).not.toHaveBeenCalled();
+  fireEvent.change(dialogo.getByLabelText('Juros Provisionados (R$)'), { target: { value: '1.234,56' } });
+  await salvarCap(dialogo);
+
+  tela.unmount();
+  const recarregada = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={3} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Endividamento' }));
+  const marco = await abrirCap();
+  expect(marco.getByLabelText('Parcelas restantes')).toHaveValue(null);
+  expect(marco.getByLabelText('Taxa')).toHaveValue('CDI + 2% a.a.');
+  expect(marco.getByLabelText('Juros Provisionados (R$)')).toHaveValue('');
+  fireEvent.change(marco.getByLabelText('Parcelas restantes'), { target: { value: '0' } });
+  fireEvent.change(marco.getByLabelText('Juros Provisionados (R$)'), { target: { value: '0' } });
+  await salvarCap(marco);
+  expect(screen.getByText('Parcelas restantes: 0')).toBeInTheDocument();
+  expect(screen.getByText('Juros Provisionados: R$ 0,00')).toBeInTheDocument();
+
+  recarregada.rerender(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await screen.findByText('Parcelas restantes: 8');
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  fireEvent.click(screen.getByRole('button', { name: 'Subir 2025' }));
+  const linha = screen.getByRole('row', { name: /Banco Itaú/ });
+  const [comparado, atual] = within(linha).getAllByRole('cell');
+  expect(comparado.textContent).toBe('1.250');
+  expect(atual).toHaveTextContent('Data da captação: 15/03/2025');
+  expect(atual).toHaveTextContent('Valor da captação: R$ 5.000,25');
+  expect(atual).toHaveTextContent('Taxa: CDI + 2% a.a.');
+  expect(atual).toHaveTextContent('Total de parcelas: 24');
+  expect(atual).toHaveTextContent('Parcelas restantes: 8');
+  expect(atual).toHaveTextContent('Juros Provisionados: R$ 1.234,56');
+  expect(within(atual).getByText('1.250')).toBeInTheDocument();
+  recarregada.rerender(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={0} />);
+  await screen.findByRole('columnheader', { name: 'Ano/2026' });
+  expect(screen.queryByRole('button', { name: /Editar captação/ })).not.toBeInTheDocument();
 });
 
 it('considera conta ausente em um balancete importado como zero e mantém o saldo do grupo', async () => {

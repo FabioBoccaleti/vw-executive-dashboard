@@ -96,6 +96,12 @@ Em **Endividamento**, ao adicionar uma linha principal, informe seu nome e
 cadastre os bancos ou dívidas, cada um com suas próprias contas. A linha
 principal mostra a soma dos saldos dos bancos ou dívidas, apresentados logo
 abaixo, por período.
+No demonstrativo mensal, use **Editar captação** na linha do banco ou dívida
+para informar data, valor, taxa (texto livre), total de parcelas, parcelas
+restantes e juros provisionados. As parcelas restantes e os juros são informados
+manualmente por mês. Os juros são informativos e não alteram os saldos.
+Os detalhes aparecem só na coluna do período mensal selecionado no topo;
+as colunas comparativas mostram apenas o saldo.
 
 A **DRE** usa o movimento líquido de cada conta no mês e de janeiro até o mês
 selecionado. No modo **Anual**, usa somente o arquivo anual importado.
