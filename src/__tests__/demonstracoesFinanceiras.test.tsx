@@ -76,22 +76,22 @@ it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE c
   expect(screen.queryByRole('columnheader', { name: 'Jan–Fev/26' })).not.toBeInTheDocument();
   const linhasDre = [...screen.getByRole('table').querySelectorAll('tbody tr')].map(linha => linha.querySelector('th')?.textContent);
   expect(linhasDre).toEqual(['Lucro Bruto', 'Receita líquida', 'Custos de vendas']);
-  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00']);
+  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400']);
   fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2025' } });
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
   await screen.findByRole('columnheader', { name: 'Fev/25' });
-  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00', '160,00']);
+  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400', '160']);
   fireEvent.click(screen.getByRole('button', { name: 'Acumulado (Jan–Fev/26)' }));
   expect(await screen.findByRole('columnheader', { name: 'Jan–Fev/26' })).toBeInTheDocument();
   expect(await screen.findByRole('columnheader', { name: 'Jan–Fev/25' })).toBeInTheDocument();
-  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['1.200,00', '410,00']);
+  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['1.200', '410']);
   expect(screen.getByText('Responsável exemplo')).toBeInTheDocument();
   expect(screen.getByText('CRC exemplo')).toBeInTheDocument();
 
   tela.unmount();
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   expect(await screen.findByText('Empresa exemplo')).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole('row', { name: /Lucro Bruto/ })).toHaveTextContent('400,00'));
+  await waitFor(() => expect(screen.getByRole('row', { name: /Lucro Bruto/ })).toHaveTextContent('400'));
   await abrirCadastros();
   fireEvent.click(screen.getByRole('button', { name: 'Excluir Receita líquida' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/mesma demonstração/);
@@ -100,6 +100,22 @@ it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE c
   fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
   await screen.findByText('Cadastro salvo com sucesso.');
   expect(mocks.cas.mock.calls[1][2]).toBe(mocks.cas.mock.calls[0][1].version);
+});
+
+it('arredonda valores apenas na exibição e apresenta negativos entre parênteses', async () => {
+  mocks.raw.mockResolvedValue({
+    rawText: 'R;3.1;Receita;0,00;0,00;594.251.675,97;0,00\nD;3.2;Custos;0,00;563.706.749,42;0,00;0,00',
+  });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'receita', nome: 'Receita líquida', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1', operacao: 1 }] },
+    { id: 'custos', nome: 'Custos', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.2', operacao: 1 }] },
+    { id: 'lucro', nome: 'Lucro Bruto', demonstracao: 'dre', tipo: 'total', itens: [{ referencia: 'receita', operacao: 1 }, { referencia: 'custos', operacao: 1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+
+  expect(within(await screen.findByRole('row', { name: /Receita líquida/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['594.251.676']);
+  expect(within(screen.getByRole('row', { name: /Custos/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(563.706.749)']);
+  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['30.544.927']);
 });
 
 it('compara saldos pontuais no mesmo mês sem acumular os valores patrimoniais', async () => {
@@ -121,11 +137,11 @@ it('compara saldos pontuais no mesmo mês sem acumular os valores patrimoniais',
   fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2024' } });
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
   await screen.findByRole('columnheader', { name: 'Fev/24' });
-  expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['300,00', '75,00']);
+  expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['300', '75']);
   expect(screen.queryByRole('columnheader', { name: 'Jan/24' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('tab', { name: 'Passivo' }));
   await screen.findByRole('columnheader', { name: 'Fev/24' });
-  expect(within(screen.getByRole('row', { name: /Fornecedores/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['90,00', '60,00']);
+  expect(within(screen.getByRole('row', { name: /Fornecedores/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['90', '60']);
   await abrirCadastros();
   fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'ativo' } });
   fireEvent.click(screen.getByRole('button', { name: 'Editar Disponibilidades' }));
@@ -133,7 +149,7 @@ it('compara saldos pontuais no mesmo mês sem acumular os valores patrimoniais',
   fireEvent.change(dialogo.getByLabelText('Operação de 1.1'), { target: { value: '-1' } });
   fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
   fireEvent.click(screen.getByRole('tab', { name: 'Ativo' }));
-  await waitFor(() => expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['-300,00', '-75,00']));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(300)', '(75)']));
 });
 
 it('considera conta ausente em um balancete importado como zero e mantém o saldo do grupo', async () => {
@@ -154,8 +170,8 @@ it('considera conta ausente em um balancete importado como zero e mantém o sald
 
   const linha = await screen.findByRole('row', { name: /Circulante/ });
   await screen.findByRole('columnheader', { name: 'Fev/25' });
-  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['300,00', '0,00']);
-  expect(screen.getByText(/Contas cadastradas ausentes/)).toHaveTextContent('considerado 0,00');
+  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['300', '0']);
+  expect(screen.getByText(/Contas cadastradas ausentes/)).toHaveTextContent('considerado zero');
 });
 
 it('compara até três anos anuais em todas as demonstrações e permite reordenar as colunas', async () => {
@@ -185,15 +201,15 @@ it('compara até três anos anuais em todas as demonstrações e permite reorden
   fireEvent.click(screen.getByRole('button', { name: 'Subir 2024' }));
   const cabecalhosDre = within(screen.getByRole('table')).getAllByRole('columnheader').map(item => item.textContent);
   expect(cabecalhosDre).toEqual(['Descrição', 'Ano/2024', 'Ano/2025', 'Ano/2023']);
-  expect(within(screen.getByRole('row', { name: /Receita líquida/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['800,00', '1.000,00', '600,00']);
+  expect(within(screen.getByRole('row', { name: /Receita líquida/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['800', '1.000', '600']);
   expect(screen.getByRole('button', { name: 'Adicionar ano' })).toBeDisabled();
 
   fireEvent.click(screen.getByRole('tab', { name: 'Ativo' }));
   await screen.findByRole('columnheader', { name: 'Ano/2023' });
-  expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['100,00', '150,00', '80,00']);
+  expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['100', '150', '80']);
   fireEvent.click(screen.getByRole('tab', { name: 'Passivo' }));
   await screen.findByRole('columnheader', { name: 'Ano/2023' });
-  expect(within(screen.getByRole('row', { name: /Fornecedores/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['70,00', '90,00', '50,00']);
+  expect(within(screen.getByRole('row', { name: /Fornecedores/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['70', '90', '50']);
 });
 
 it('aplica os sinais automáticos da DRE a grupos e totalizações já salvos, sem recadastro', async () => {
@@ -204,8 +220,8 @@ it('aplica os sinais automáticos da DRE a grupos e totalizações já salvos, s
   ] };
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   const linha = await screen.findByRole('row', { name: /Resultado/ });
-  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00']);
-  expect(within(screen.getByRole('row', { name: /^Custos/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['-100,00']);
+  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400']);
+  expect(within(screen.getByRole('row', { name: /^Custos/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(100)']);
   expect(mocks.cas).not.toHaveBeenCalled();
   await abrirCadastros();
   fireEvent.click(screen.getByRole('button', { name: 'Editar Resultado' }));
@@ -276,7 +292,7 @@ it('desabilita contas já vinculadas a outro grupo e mantém a edição do grupo
   ] };
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   const linha = await screen.findByRole('row', { name: /Receita líquida/ });
-  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['15,00']);
+  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['15']);
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   await abrirCadastros();
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));

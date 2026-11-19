@@ -10,9 +10,10 @@ import {
 } from './modelo';
 import { loadCadastroDemonstracoes, loadDadosDemonstracoes, saveCadastroDemonstracoes } from './storage';
 
-const moeda = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const moeda = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const selectClass = 'h-10 rounded-md border border-input bg-background px-3 text-sm';
 const mensagem = (error: unknown) => error instanceof Error ? error.message : String(error);
+const formatarMoeda = (valor: number) => valor < 0 ? `(${moeda.format(Math.abs(valor))})` : moeda.format(valor);
 
 export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { selectedYear: number; selectedMonth: number }) {
   const [aba, setAba] = useState<TipoDemonstracao | 'cadastros'>('dre');
@@ -359,7 +360,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                   <p className="text-xs text-muted-foreground">Valores em R$</p>
                 </header>
                 {faltantes.length > 0 && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Balancetes não importados: {faltantes.map(rotuloPeriodo).join(', ')}. As colunas afetadas ficam indisponíveis.</p>}
-                {contasAusentes.length > 0 && <p role="alert" className="text-sm text-amber-800">Contas cadastradas ausentes em algum período: {contasAusentes.join(', ')}. O saldo dessas contas é considerado 0,00 nos períodos em que não constam.</p>}
+                {contasAusentes.length > 0 && <p role="alert" className="text-sm text-amber-800">Contas cadastradas ausentes em algum período: {contasAusentes.join(', ')}. O saldo dessas contas é considerado zero nos períodos em que não constam.</p>}
                 {contasIncompletasVinculadas.length > 0 && <p role="alert" className="text-sm text-amber-800">Existem contas incompletas/agrupadoras vinculadas: {contasIncompletasVinculadas.map(item => item.referencia).join(', ')}. Substitua-as por contas completas em Cadastros. Os valores afetados ficam indisponíveis.</p>}
                 {!dados && !erroDados ? <p role="status">Carregando balancetes...</p> : !erroDados && (
                   <div className="overflow-x-auto">
@@ -371,7 +372,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                           <th scope="row" className="p-3 text-left font-inherit">{linha.nome}</th>
                           {colunas.map((_, index) => {
                             const valor = valores[index]?.get(linha.id);
-                            return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : ''}`}>{valor === null || valor === undefined ? '—' : moeda.format(valor)}</td>;
+                            return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : ''}`}>{valor === null || valor === undefined ? '—' : formatarMoeda(valor)}</td>;
                           })}
                         </tr>)}
                         {linhas.length === 0 && <tr><td colSpan={colunas.length + 1} className="p-6 text-center text-muted-foreground">Nenhum grupo cadastrado. Configure as linhas na aba Cadastros.</td></tr>}
