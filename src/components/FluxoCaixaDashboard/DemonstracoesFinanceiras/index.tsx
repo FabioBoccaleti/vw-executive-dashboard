@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TIPOS, MESES, calcularLinhas, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas,
+  TIPOS, MESES, calcularLinhas, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
@@ -133,6 +133,13 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
       setErroEditor(`A conta ${referencia} está incompleta ou é agrupadora. Selecione uma conta completa.`);
       return;
     }
+    if (marcado && editor.tipo === 'contas') {
+      const grupoExistente = grupoDaConta(referencia);
+      if (grupoExistente) {
+        setErroEditor(`A conta ${referencia} já está vinculada ao grupo "${grupoExistente.nome}" nesta demonstração.`);
+        return;
+      }
+    }
     setEditor({ ...editor, itens: marcado ? [...editor.itens, { referencia, operacao: 1 }] : editor.itens.filter(item => item.referencia !== referencia) });
   }
 
@@ -169,10 +176,16 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     : [];
   const contasIncompletasVinculadas = linhas.filter(linha => linha.tipo === 'contas')
     .flatMap(linha => linha.itens).filter(item => contasIncompletas.has(item.referencia));
-  const anterioresEditor = editor && cadastro
-    ? cadastro.linhas.slice(0, cadastro.linhas.findIndex(item => item.id === editor.id) === -1 ? undefined : cadastro.linhas.findIndex(item => item.id === editor.id))
-      .filter(item => item.demonstracao === editor.demonstracao)
+  const linhasDisponiveisEditor = editor && cadastro
+    ? cadastro.linhas.filter(item => item.id !== editor.id && item.demonstracao === editor.demonstracao)
     : [];
+
+  function grupoDaConta(referencia: string) {
+    if (!editor || !cadastro || editor.tipo !== 'contas') return undefined;
+    return cadastro.linhas.find(linha =>
+      linha.id !== editor.id && linha.demonstracao === editor.demonstracao && linha.tipo === 'contas' &&
+      linha.itens.some(item => mesmaHierarquia(item.referencia, referencia)));
+  }
 
   return (
     <Card>
@@ -225,7 +238,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </label>
                     <Button onClick={() => abrirEditor()}>Adicionar linha</Button>
                   </div>
-                  <p className="text-sm text-muted-foreground">Cadastre grupos de contas e depois totalizações dos grupos anteriores. A ordem abaixo será a ordem da demonstração.</p>
+                  <p className="text-sm text-muted-foreground">Cadastre grupos de contas e totalizações das linhas desejadas. Use as setas para definir a posição de cada linha na demonstração; a posição não altera o cálculo.</p>
                   <div className="space-y-2">
                     {cadastro.linhas.filter(item => item.demonstracao === tipoCadastro).map((linha, index, lista) => (
                       <div key={linha.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3">
@@ -314,14 +327,18 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
         )}
         <Dialog open={editor !== null} onOpenChange={open => { if (!open) setEditor(null); }}>
           <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto sm:max-w-6xl">
-            <DialogHeader><DialogTitle>Configurar linha — {editor ? TIPOS[editor.demonstracao] : ''}</DialogTitle><DialogDescription>{editor?.demonstracao === 'dre'
-              ? 'Selecione contas ou grupos. Na DRE, os sinais são automáticos e as totalizações somam os grupos com seus respectivos sinais.'
-              : 'Selecione contas ou grupos e defina se cada item soma ou subtrai.'}</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Configurar linha — {editor ? TIPOS[editor.demonstracao] : ''}</DialogTitle><DialogDescription>{editor?.tipo === 'total'
+              ? editor.demonstracao === 'dre'
+                ? 'Selecione linhas já cadastradas. Na DRE, os sinais são automáticos e as totalizações somam os valores com seus respectivos sinais.'
+                : 'Selecione linhas já cadastradas e defina se cada item soma ou subtrai.'
+              : editor?.demonstracao === 'dre'
+                ? 'Selecione contas completas. Na DRE, os sinais seguem o movimento do balancete automaticamente.'
+                : 'Selecione contas completas e defina se cada item soma ou subtrai.'}</DialogDescription></DialogHeader>
             {editor && <>
               <label className="space-y-1 text-sm"><span>Nome da linha *</span><Input value={editor.nome} onChange={event => setEditor({ ...editor, nome: event.target.value })} /></label>
               <label className="space-y-1 text-sm"><span className="block">Tipo de linha</span>
                 <select className={selectClass} value={editor.tipo} onChange={event => setEditor({ ...editor, tipo: event.target.value === 'total' ? 'total' : 'contas', itens: [] })}>
-                  <option value="contas">Grupo de contas do balancete</option><option value="total">Totalização de grupos anteriores</option>
+                  <option value="contas">Grupo de contas do balancete</option><option value="total">Totalização de linhas selecionadas</option>
                 </select>
               </label>
               {editor.tipo === 'contas' ? <>
@@ -330,17 +347,24 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                   : 'Os sinais são aplicados aos valores absolutos das contas.'}</p>
                 <Input aria-label="Pesquisar contas" placeholder="Pesquisar por código ou descrição" value={busca} onChange={event => setBusca(event.target.value)} />
                 <div className="h-[45vh] min-h-64 space-y-1 overflow-y-auto rounded border p-2">
-                  {catalogo.filter(conta => `${conta.codigo} ${conta.descricao}`.toLocaleLowerCase().includes(busca.toLocaleLowerCase())).map(conta => (
-                    <label key={conta.codigo} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-3 py-2 text-base hover:bg-muted">
-                      <input type="checkbox" className="size-5 shrink-0" disabled={contasIncompletas.has(conta.codigo)} checked={editor.itens.some(item => item.referencia === conta.codigo)} onChange={event => selecionar(conta.codigo, event.target.checked)} />
-                      <span className={contasIncompletas.has(conta.codigo) ? 'text-muted-foreground' : ''}>{conta.codigo} — {conta.descricao}{contasIncompletas.has(conta.codigo) && ' (incompleta/agrupadora — não selecionável)'}</span>
-                    </label>
-                  ))}
+                  {catalogo.filter(conta => `${conta.codigo} ${conta.descricao}`.toLocaleLowerCase().includes(busca.toLocaleLowerCase())).map(conta => {
+                    const grupoExistente = grupoDaConta(conta.codigo);
+                    const incompleta = contasIncompletas.has(conta.codigo);
+                    const indisponivel = incompleta || Boolean(grupoExistente);
+                    return (
+                      <label key={conta.codigo} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-3 py-2 text-base hover:bg-muted">
+                        <input type="checkbox" className="size-5 shrink-0" disabled={indisponivel} checked={editor.itens.some(item => item.referencia === conta.codigo)} onChange={event => selecionar(conta.codigo, event.target.checked)} />
+                        <span className={indisponivel ? 'text-muted-foreground' : ''}>{conta.codigo} — {conta.descricao}{incompleta
+                          ? ' (incompleta/agrupadora — não selecionável)'
+                          : grupoExistente ? ` (já vinculada ao grupo "${grupoExistente.nome}")` : ''}</span>
+                      </label>
+                    );
+                  })}
                   {catalogo.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma conta disponível. Importe um balancete ou corrija o erro de carregamento.</p>}
                 </div>
               </> : <div className="space-y-2 rounded border p-3">
-                {anterioresEditor.map(linha => <label key={linha.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editor.itens.some(item => item.referencia === linha.id)} onChange={event => selecionar(linha.id, event.target.checked)} />{linha.nome}</label>)}
-                {anterioresEditor.length === 0 && <p className="text-sm text-muted-foreground">Cadastre primeiro os grupos que formarão esta totalização.</p>}
+                {linhasDisponiveisEditor.map(linha => <label key={linha.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editor.itens.some(item => item.referencia === linha.id)} onChange={event => selecionar(linha.id, event.target.checked)} />{linha.nome}</label>)}
+                {linhasDisponiveisEditor.length === 0 && <p className="text-sm text-muted-foreground">Cadastre primeiro as linhas que formarão esta totalização.</p>}
               </div>}
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold">Itens selecionados ({editor.itens.length})</h4>

@@ -63,17 +63,16 @@ export function cadastroVazio(): CadastroDemonstracoes {
 export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
   const ids = new Set<string>();
   const contas: Array<{ conta: string; grupo: string; demonstracao: TipoDemonstracao }> = [];
-  const anteriores = new Map<string, LinhaDemonstracao>();
-  const composicoes = new Map<string, Set<string>>();
+  const porId = new Map<string, LinhaDemonstracao>();
   for (const linha of linhas) {
     if (!linhaSchema.safeParse(linha).success) return 'Preencha o nome e selecione ao menos uma conta ou grupo em cada linha.';
     if (ids.has(linha.id)) return 'Existem linhas com identificadores repetidos.';
     ids.add(linha.id);
+    porId.set(linha.id, linha);
     if (linhas.some(item => item.id !== linha.id && item.demonstracao === linha.demonstracao && item.nome.trim().toLocaleLowerCase() === linha.nome.trim().toLocaleLowerCase())) {
       return `Já existe uma linha chamada "${linha.nome}" nesta demonstração.`;
     }
     const referencias = new Set<string>();
-    const composicao = new Set<string>();
     for (const item of linha.itens) {
       if (referencias.has(item.referencia)) return `Referência repetida em "${linha.nome}".`;
       referencias.add(item.referencia);
@@ -81,18 +80,39 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
         const duplicada = contas.find(conta => conta.demonstracao === linha.demonstracao && mesmaHierarquia(conta.conta, item.referencia));
         if (duplicada) return `A conta ${item.referencia} se sobrepõe à conta ${duplicada.conta}, no grupo "${duplicada.grupo}". Não selecione uma conta totalizadora junto com suas subcontas.`;
         contas.push({ conta: item.referencia, grupo: linha.nome, demonstracao: linha.demonstracao });
-        composicao.add(linha.id);
-      } else {
-        const origem = anteriores.get(item.referencia);
-        if (!origem || origem.demonstracao !== linha.demonstracao) return `A totalização "${linha.nome}" deve usar somente grupos anteriores da mesma demonstração.`;
+      }
+    }
+  }
+
+  const composicoes = new Map<string, Set<string>>();
+  const visitando = new Set<string>();
+  function resolverComposicao(linha: LinhaDemonstracao): string | null {
+    if (composicoes.has(linha.id)) return null;
+    if (visitando.has(linha.id)) return `A totalização "${linha.nome}" não pode criar uma dependência circular.`;
+    visitando.add(linha.id);
+    const composicao = new Set<string>();
+    if (linha.tipo === 'contas') composicao.add(linha.id);
+    else {
+      for (const item of linha.itens) {
+        const origem = porId.get(item.referencia);
+        if (!origem || origem.demonstracao !== linha.demonstracao) {
+          return `A totalização "${linha.nome}" deve usar somente linhas cadastradas na mesma demonstração.`;
+        }
+        const erro = resolverComposicao(origem);
+        if (erro) return erro;
         for (const id of composicoes.get(origem.id) ?? []) {
           if (composicao.has(id)) return `A totalização "${linha.nome}" inclui o mesmo grupo mais de uma vez, diretamente ou por outro subtotal.`;
           composicao.add(id);
         }
       }
     }
-    anteriores.set(linha.id, linha);
+    visitando.delete(linha.id);
     composicoes.set(linha.id, composicao);
+    return null;
+  }
+  for (const linha of linhas) {
+    const erro = resolverComposicao(linha);
+    if (erro) return erro;
   }
   return null;
 }
@@ -109,16 +129,20 @@ export function calcularLinhas(
   demonstracao: TipoDemonstracao,
   periodos: Array<ContasBalancete | null>,
 ): Map<string, number | null> {
-  const resultado = new Map<string, number | null>();
   const erro = validarLinhas(linhas);
   if (erro) throw new Error(erro);
   const incompletas = identificarContasIncompletas(periodos);
-  for (const linha of linhas.filter(item => item.demonstracao === demonstracao)) {
+  const linhasDemonstracao = linhas.filter(item => item.demonstracao === demonstracao);
+  const porId = new Map(linhasDemonstracao.map(linha => [linha.id, linha]));
+  const resultado = new Map<string, number | null>();
+  function calcular(linha: LinhaDemonstracao): number | null {
+    if (resultado.has(linha.id)) return resultado.get(linha.id) ?? null;
     let total = 0;
     let disponivel = periodos.length > 0 && periodos.every(periodo => periodo !== null);
     for (const item of linha.itens) {
       if (linha.tipo === 'total') {
-        const valor = resultado.get(item.referencia);
+        const origem = porId.get(item.referencia);
+        const valor = origem ? calcular(origem) : null;
         if (valor === null || valor === undefined) disponivel = false;
         else total += Math.round(valor * 100) * (demonstracao === 'dre' ? 1 : item.operacao);
       } else {
@@ -134,7 +158,9 @@ export function calcularLinhas(
           : Math.round(Math.abs(valor) * 100) * item.operacao;
       }
     }
-    resultado.set(linha.id, disponivel ? total / 100 : null);
+    const valor = disponivel ? total / 100 : null;
+    resultado.set(linha.id, valor);
+    return valor;
   }
-  return resultado;
+  return new Map(linhasDemonstracao.map(linha => [linha.id, calcular(linha)]));
 }

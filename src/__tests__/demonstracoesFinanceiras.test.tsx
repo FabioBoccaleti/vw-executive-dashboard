@@ -53,12 +53,14 @@ it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE c
   await adicionarGrupo('Custos de vendas', '3.2');
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));
   const dialogo = within(await screen.findByRole('dialog'));
-  fireEvent.change(dialogo.getByLabelText('Nome da linha *'), { target: { value: 'Resultado' } });
+  fireEvent.change(dialogo.getByLabelText('Nome da linha *'), { target: { value: 'Lucro Bruto' } });
   fireEvent.change(dialogo.getByLabelText('Tipo de linha'), { target: { value: 'total' } });
   fireEvent.click(dialogo.getByRole('checkbox', { name: 'Receita líquida' }));
   fireEvent.click(dialogo.getByRole('checkbox', { name: 'Custos de vendas' }));
   expect(dialogo.queryByRole('combobox', { name: /^Operação de/ })).not.toBeInTheDocument();
   fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Subir Lucro Bruto' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Subir Lucro Bruto' }));
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar assinante' }));
   fireEvent.change(screen.getByLabelText('Nome do assinante *'), { target: { value: 'Responsável exemplo' } });
   fireEvent.change(screen.getByLabelText('Cargo *'), { target: { value: 'Contador' } });
@@ -70,17 +72,19 @@ it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE c
   fireEvent.click(screen.getByRole('tab', { name: 'DRE' }));
   expect(await screen.findByRole('columnheader', { name: 'Fev/26' })).toBeInTheDocument();
   expect(screen.getByRole('columnheader', { name: 'Jan–Fev/26' })).toBeInTheDocument();
-  expect(within(screen.getByRole('row', { name: /Resultado/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00', '1.200,00']);
+  const linhasDre = [...screen.getByRole('table').querySelectorAll('tbody tr')].map(linha => linha.querySelector('th')?.textContent);
+  expect(linhasDre).toEqual(['Lucro Bruto', 'Receita líquida', 'Custos de vendas']);
+  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00', '1.200,00']);
   expect(screen.getByText('Responsável exemplo')).toBeInTheDocument();
   expect(screen.getByText('CRC exemplo')).toBeInTheDocument();
 
   tela.unmount();
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   expect(await screen.findByText('Empresa exemplo')).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole('row', { name: /Resultado/ })).toHaveTextContent('1.200,00'));
+  await waitFor(() => expect(screen.getByRole('row', { name: /Lucro Bruto/ })).toHaveTextContent('1.200,00'));
   await abrirCadastros();
   fireEvent.click(screen.getByRole('button', { name: 'Excluir Receita líquida' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent(/grupos anteriores/);
+  expect(await screen.findByRole('alert')).toHaveTextContent(/mesma demonstração/);
   expect(screen.getByRole('button', { name: 'Editar Receita líquida' })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Nome da empresa *'), { target: { value: 'Nome atualizado' } });
   fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
@@ -183,8 +187,8 @@ it('carrega apenas os períodos necessários, sem bloquear uma demonstração po
   expect(Object.keys(patrimonio)).toEqual(['2026_2', '2024_1']);
 });
 
-it('carrega códigos repetidos e permite selecionar somente as contas completas', async () => {
-  mocks.raw.mockResolvedValue({ rawText: '2;3.1;Receitas;0;0;100;0\n2;3.1;Receitas repetidas;0;0;200;0\nA;3.1.1;Receita completa;0;0;10;0\nA;3.1.1;Receita completa;0;0;15;0\nS;3.2;Agrupadora sem filhas no arquivo;0;0;100;0' });
+it('desabilita contas já vinculadas a outro grupo e mantém a edição do grupo atual', async () => {
+  mocks.raw.mockResolvedValue({ rawText: '2;3.1;Receitas;0;0;100;0\n2;3.1;Receitas repetidas;0;0;200;0\nA;3.1.1;Receita completa;0;0;10;0\nA;3.1.1;Receita completa;0;0;15;0\nA;3.1.2;Outra receita completa;0;0;5;0\nS;3.2;Agrupadora sem filhas no arquivo;0;0;100;0' });
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
     { id: 'receita', nome: 'Receita líquida', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1.1', operacao: 1 }] },
   ] };
@@ -196,10 +200,16 @@ it('carrega códigos repetidos e permite selecionar somente as contas completas'
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));
   const dialogo = within(await screen.findByRole('dialog'));
   expect(await dialogo.findByRole('checkbox', { name: /^3\.1 —/ })).toBeDisabled();
-  expect(dialogo.getByRole('checkbox', { name: /^3\.1\.1 —/ })).toBeEnabled();
+  expect(dialogo.getByRole('checkbox', { name: /^3\.1\.1 —/ })).toBeDisabled();
+  expect(dialogo.getByRole('checkbox', { name: /^3\.1\.2 —/ })).toBeEnabled();
   expect(dialogo.getByRole('checkbox', { name: /^3\.2 —/ })).toBeDisabled();
   fireEvent.change(dialogo.getByLabelText('Pesquisar contas'), { target: { value: '3.1' } });
   expect(dialogo.getByRole('checkbox', { name: /^3\.1 —/ })).toBeDisabled();
+  fireEvent.click(dialogo.getByRole('button', { name: 'Cancelar' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Receita líquida' }));
+  const editor = within(await screen.findByRole('dialog'));
+  expect(editor.getByRole('checkbox', { name: /^3\.1\.1 —/ })).toBeChecked();
+  expect(editor.getByRole('checkbox', { name: /^3\.1\.1 —/ })).toBeEnabled();
 });
 
 it('avisa sobre agrupadoras já cadastradas e exige a substituição por contas completas', async () => {

@@ -67,10 +67,12 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     expect(validarLinhas([{ ...grupo('Ativo', '1'), demonstracao: 'ativo' }, { ...grupo('Passivo', '1'), demonstracao: 'passivo' }])).toBeNull();
   });
 
-  it('impede ciclos, referências futuras, exclusão de grupos usados e dupla contagem por subtotal', () => {
-    expect(validarLinhas([total('Total', ['Total'])])).toMatch(/anteriores/);
-    expect(validarLinhas([total('Total', ['Receita']), grupo('Receita', '3.1')])).toMatch(/anteriores/);
-    expect(validarLinhas([total('Total', ['excluido'])])).toMatch(/anteriores/);
+  it('calcula totalizações independentemente da posição e impede ciclos, referências inválidas e dupla contagem', () => {
+    const linhas = [total('Lucro Bruto', ['Receita', 'Custo']), grupo('Receita', '3.1'), grupo('Custo', '3.2')];
+    expect(validarLinhas(linhas)).toBeNull();
+    expect([...calcularLinhas(linhas, 'dre', [janeiro]).values()]).toEqual([800, 1000, -200]);
+    expect(validarLinhas([total('Total', ['Total'])])).toMatch(/circular/);
+    expect(validarLinhas([total('Total', ['excluido'])])).toMatch(/mesma demonstração/);
     expect(validarLinhas([grupo('Receita', '3.1'), total('Subtotal', ['Receita']), total('Total', ['Receita', 'Subtotal'])])).toMatch(/mais de uma vez/);
   });
 
