@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TIPOS, MESES, calcularConta, calcularLinhas, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai,
+  TIPOS, MESES, calcularConta, calcularLinhas, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
@@ -60,6 +60,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [anosComparados, setAnosComparados] = useState<number[] | null>(null);
   const [anoAdicionar, setAnoAdicionar] = useState(String(selectedYear - 1));
   const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
+  const [naoClassificadasAberto, setNaoClassificadasAberto] = useState(false);
   const [editor, setEditor] = useState<LinhaDemonstracao | null>(null);
   const [editorCaptacao, setEditorCaptacao] = useState<EditorCaptacao | null>(null);
   const [erroCaptacao, setErroCaptacao] = useState('');
@@ -374,6 +375,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     ? [...new Set(linhas.filter(linha => linha.tipo === 'contas').flatMap(linha => linha.itens.map(item => item.referencia)))]
       .filter(codigo => colunas.some(coluna => coluna.periodos.some(periodo => dados[chavePeriodo(periodo)] && !dados[chavePeriodo(periodo)]?.[codigo])))
     : [];
+  const contasNaoClassificadas = aba === 'dre' && cadastro && dados
+    ? identificarContasNaoClassificadas(cadastro.linhas, detalhesColunas.map(detalhe => detalhe.periodos))
+    : [];
   const contasIncompletasVinculadas = linhas.filter(linha => linha.tipo === 'contas')
     .flatMap(linha => linha.itens).filter(item => contasIncompletas.has(item.referencia));
   const linhasDisponiveisEditor = editor && cadastro
@@ -527,6 +531,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 {faltantes.length > 0 && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Balancetes não importados: {faltantes.map(rotuloPeriodo).join(', ')}. As colunas afetadas ficam indisponíveis.</p>}
                 {contasAusentes.length > 0 && <p role="alert" className="text-sm text-amber-800">Contas cadastradas ausentes em algum período: {contasAusentes.join(', ')}. O saldo dessas contas é considerado zero nos períodos em que não constam.</p>}
                 {contasIncompletasVinculadas.length > 0 && <p role="alert" className="text-sm text-amber-800">Existem contas incompletas/agrupadoras vinculadas: {contasIncompletasVinculadas.map(item => item.referencia).join(', ')}. Substitua-as por contas completas em Cadastros. Os valores afetados ficam indisponíveis.</p>}
+                {contasNaoClassificadas.length > 0 && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  {contasNaoClassificadas.length === 1 ? 'Existe 1 conta de resultado' : `Existem ${contasNaoClassificadas.length} contas de resultado`} com movimento que não {contasNaoClassificadas.length === 1 ? 'está' : 'estão'} em nenhum grupo da DRE. Veja o quadro "Contas com movimento não classificadas" abaixo da tabela.
+                </p>}
                 {!dados && !erroDados ? <p role="status">Carregando balancetes...</p> : !erroDados && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -580,6 +587,33 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </table>
                   </div>
                 )}
+                {contasNaoClassificadas.length > 0 && <section aria-label="Contas com movimento não classificadas" className="rounded border border-amber-300">
+                  <button type="button" aria-expanded={naoClassificadasAberto} onClick={() => setNaoClassificadasAberto(value => !value)}
+                    className="flex w-full items-center gap-2 bg-amber-50 p-3 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
+                    {naoClassificadasAberto ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+                    Contas com movimento não classificadas ({contasNaoClassificadas.length})
+                  </button>
+                  {naoClassificadasAberto && <div className="overflow-x-auto">
+                    <p className="p-3 text-xs text-muted-foreground">Contas analíticas dos grupos 3, 4, 5 e 6 com movimento líquido (créditos − débitos) no período exibido que não estão vinculadas a nenhum grupo da DRE. Inclua-as em Cadastros para que entrem na demonstração.</p>
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Conta</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
+                      <tbody>
+                        {contasNaoClassificadas.map(conta => <tr key={conta.conta} className="border-b">
+                          <th scope="row" className="p-3 text-left font-normal">{conta.conta} — {conta.desc}</th>
+                          {conta.valores.map((valor, index) => <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>)}
+                        </tr>)}
+                        <tr className="border-y bg-muted/40 font-semibold">
+                          <th scope="row" className="p-3 text-left">Total não classificado</th>
+                          {colunas.map((_, index) => {
+                            const valores = contasNaoClassificadas.map(conta => conta.valores[index]);
+                            const total = valores.some(valor => valor === null) ? null : valores.reduce<number>((soma, valor) => soma + Math.round((valor ?? 0) * 100), 0) / 100;
+                            return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${total !== null && total < 0 ? 'text-red-700' : ''}`}>{total === null ? '—' : formatarMoeda(total)}</td>;
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>}
+                </section>}
                 <p className="text-xs text-muted-foreground">{aba === 'dre'
                   ? `DRE: movimento líquido (créditos − débitos), preservando o sinal contábil e os estornos; ${selectedMonth === 0 || periodoDre === 'acumulado' ? 'acumulado de janeiro até o mês selecionado' : 'somente o mês selecionado'}. Grupos e totalizações somam os valores com seus sinais automaticamente.`
                   : 'Patrimonial: valor absoluto do saldo atual de cada conta em cada data, sem somar saldos mensais. O sinal de cada conta é definido por Somar/Subtrair no cadastro.'}</p>

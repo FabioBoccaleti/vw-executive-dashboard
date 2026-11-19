@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
-import { calcularLinhas, identificarContasIncompletas, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { calcularLinhas, identificarContasIncompletas, identificarContasNaoClassificadas, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 
 const grupo = (id: string, conta: string, operacao: 1 | -1 = 1): LinhaDemonstracao => ({
   id, nome: id, demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: conta, operacao }],
@@ -12,6 +12,19 @@ const janeiro = extractAccounts('R;3.1;Receita;0,00;0,00;1.000,00;10.000,00\nD;3
 const fevereiro = extractAccounts('R;3.1;Receita;0,00;100,00;0,00;9.900,00\nD;3.2;Custo;0,00;50,00;0,00;2.050,00', { strict: true });
 
 describe('Demonstrações financeiras — cálculo e integridade', () => {
+  it('lista contas de resultado com movimento que não estão em grupos da DRE, por coluna', () => {
+    const balancete = (texto: string) => extractAccounts(texto, { strict: true });
+    const mes1 = balancete([
+      'S;5;Despesas;0;0;0;0', 'A;5.1;Pessoal;0,00;300,00;0,00;300,00', 'A;5.2;Aluguel;0,00;100,00;100,00;0,00',
+      'A;3.1;Receita;0,00;0,00;1.000,00;1.000,00', 'A;1.1;Caixa;0,00;500,00;0,00;500,00', 'A;6.1;IR;0,00;0,00;0,00;0,00',
+    ].join('\n'));
+    const mes2 = balancete('A;6.1;IR;0,00;40,00;0,00;40,00\nA;3.1;Receita;0,00;0,00;10,00;10,00');
+    const resultado = identificarContasNaoClassificadas([grupo('Receita', '3.1'), { ...grupo('Ativo', '5.1'), demonstracao: 'ativo' }], [[mes1], [mes1, mes2], [null]]);
+    expect(resultado).toEqual([
+      { conta: '5.1', desc: 'Pessoal', valores: [-300, -300, null] },
+      { conta: '6.1', desc: 'IR', valores: [0, -40, null] },
+    ]);
+  });
   it('calcula DRE pelo movimento com sinais automáticos, inclusive estornos, totalizações e subtotais', () => {
     const linhas = [grupo('Receita', '3.1'), grupo('Custo', '3.2', -1), total('Resultado', ['Receita', 'Custo']), total('Resultado final', ['Resultado'])];
     expect([...calcularLinhas(linhas, 'dre', [janeiro]).values()]).toEqual([1000, -200, 800, 800]);

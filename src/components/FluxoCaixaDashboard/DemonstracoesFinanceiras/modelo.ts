@@ -74,6 +74,41 @@ export function validarContasCompletas(linhas: LinhaDemonstracao[], incompletas:
   return conta ? `A conta ${conta.referencia} está incompleta ou é agrupadora. Selecione apenas contas completas (analíticas).` : null;
 }
 
+export const GRUPOS_RESULTADO = ['3', '4', '5', '6'];
+
+export interface ContaNaoClassificada { conta: string; desc: string; valores: Array<number | null> }
+
+export function identificarContasNaoClassificadas(
+  linhas: LinhaDemonstracao[],
+  colunas: Array<Array<ContasBalancete | null>>,
+): ContaNaoClassificada[] {
+  const incompletas = identificarContasIncompletas(colunas.flat());
+  const referencias = linhas.filter(linha => linha.demonstracao === 'dre' && linha.tipo === 'contas')
+    .flatMap(linha => linha.itens.map(item => item.referencia));
+  const contas = new Map<string, string>();
+  for (const periodo of colunas.flat()) {
+    for (const conta of Object.values(periodo ?? {})) {
+      if (GRUPOS_RESULTADO.includes(conta.conta.split('.')[0]) && !incompletas.has(conta.conta)
+        && !referencias.some(referencia => conta.conta === referencia || conta.conta.startsWith(`${referencia}.`))) {
+        contas.set(conta.conta, conta.desc);
+      }
+    }
+  }
+  return [...contas]
+    .map(([conta, desc]) => ({
+      conta,
+      desc,
+      valores: colunas.map(periodos => periodos.length === 0 || periodos.some(periodo => periodo === null)
+        ? null
+        : Math.round(periodos.reduce((total, periodo) => {
+          const item = periodo?.[conta];
+          return item ? total + Math.round((item.valCred - item.valDeb) * 100) : total;
+        }, 0)) / 100),
+    }))
+    .filter(conta => conta.valores.some(valor => valor !== null && valor !== 0))
+    .sort((a, b) => a.conta.localeCompare(b.conta, undefined, { numeric: true }));
+}
+
 export function cadastroVazio(): CadastroDemonstracoes {
   return { version: '', empresa: { nome: '', cnpj: '', nire: '' }, linhas: [], assinantes: [] };
 }
