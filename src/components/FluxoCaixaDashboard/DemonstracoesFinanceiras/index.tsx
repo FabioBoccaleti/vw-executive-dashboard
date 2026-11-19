@@ -11,6 +11,12 @@ import {
 import { loadCadastroDemonstracoes, loadDadosDemonstracoes, saveCadastroDemonstracoes } from './storage';
 
 const moeda = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+const titulosDemonstracoes: Record<TipoDemonstracao, string> = {
+  dre: 'Demonstração do Resultado do Exercício',
+  ativo: 'Balanço Patrimonial — Ativo',
+  passivo: 'Balanço Patrimonial — Passivo',
+  endividamento: 'Demonstrativo de Endividamento',
+};
 const selectClass = 'h-10 rounded-md border border-input bg-background px-3 text-sm';
 const mensagem = (error: unknown) => error instanceof Error ? error.message : String(error);
 const formatarMoeda = (valor: number) => valor < 0 ? `(${moeda.format(Math.abs(valor))})` : moeda.format(valor);
@@ -31,10 +37,13 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [anoAdicionar, setAnoAdicionar] = useState(String(selectedYear - 1));
   const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
   const [editor, setEditor] = useState<LinhaDemonstracao | null>(null);
+  const [bancosEditor, setBancosEditor] = useState<LinhaDemonstracao[] | null>(null);
+  const [bancoAtivo, setBancoAtivo] = useState('');
+  const alvoEditor = bancosEditor ? bancosEditor.find(banco => banco.id === bancoAtivo) : editor;
   const [erroEditor, setErroEditor] = useState('');
   const [busca, setBusca] = useState('');
   const [tipoCadastro, setTipoCadastro] = useState<TipoDemonstracao>('dre');
-  const escopoDados = aba === 'ativo' || aba === 'passivo' ? 'patrimonial' : aba;
+  const escopoDados = aba === 'dre' || aba === 'cadastros' ? aba : 'patrimonial';
   const periodosComparados = useMemo(
     () => (anosComparados ?? [selectedYear]).map(ano => ({ ano, mes: selectedMonth })),
     [anosComparados, selectedYear, selectedMonth],
@@ -111,17 +120,50 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   }
 
   function abrirEditor(linha?: LinhaDemonstracao) {
-    setEditor(linha ?? { id: crypto.randomUUID(), nome: '', demonstracao: tipoCadastro, tipo: 'contas', itens: [] });
+    const nova = linha ?? { id: crypto.randomUUID(), nome: '', demonstracao: tipoCadastro, tipo: 'contas', itens: [] };
+    const bancos = linha ? (cadastro?.linhas ?? []).filter(item => item.bancoDe === linha.id) : [];
+    setEditor(nova);
+    setBancosEditor(bancos.length || (!linha && tipoCadastro === 'endividamento') ? bancos : null);
+    setBancoAtivo(bancos[0]?.id ?? '');
     setErroEditor('');
     setBusca('');
   }
 
+  function adicionarBanco() {
+    if (!editor || !bancosEditor) return;
+    const banco: LinhaDemonstracao = { id: crypto.randomUUID(), nome: '', demonstracao: 'endividamento', tipo: 'contas', itens: [], bancoDe: editor.id };
+    setBancosEditor([...bancosEditor, banco]);
+    escolherBanco(banco.id);
+  }
+
+  function escolherBanco(id: string) {
+    setBancoAtivo(id);
+    setBusca('');
+    setErroEditor('');
+  }
+
+  function atualizarAlvo(linha: LinhaDemonstracao) {
+    if (bancosEditor) setBancosEditor(bancosEditor.map(banco => banco.id === linha.id ? linha : banco));
+    else setEditor(linha);
+  }
+
   function confirmarLinha() {
     if (!editor || !cadastro) return;
-    const linhas = cadastro.linhas.some(item => item.id === editor.id)
-      ? cadastro.linhas.map(item => item.id === editor.id ? { ...editor, nome: editor.nome.trim() } : item)
-      : [...cadastro.linhas, { ...editor, nome: editor.nome.trim() }];
-    const erro = validarLinhas(linhas) ?? validarContasCompletas([editor], contasIncompletas);
+    if (bancosEditor && (!editor.nome.trim() || !bancosEditor.length || bancosEditor.some(banco => !banco.nome.trim() || !banco.itens.length))) {
+      setErroEditor('Preencha o nome da linha principal e informe o nome e ao menos uma conta para cada banco ou dívida.');
+      return;
+    }
+    const principal = { ...editor, nome: editor.nome.trim() };
+    if (bancosEditor) {
+      principal.tipo = 'total';
+      principal.itens = bancosEditor.map(banco => ({ referencia: banco.id, operacao: 1 }));
+    }
+    const novos = [principal, ...(bancosEditor ?? []).map(banco => ({ ...banco, nome: banco.nome.trim() }))];
+    const linhas = cadastro.linhas.filter(item => item.bancoDe !== editor.id);
+    const indice = linhas.findIndex(item => item.id === editor.id);
+    if (indice < 0) linhas.push(...novos);
+    else linhas.splice(indice, 1, ...novos);
+    const erro = validarLinhas(linhas) ?? validarContasCompletas(novos, contasIncompletas);
     if (erro) { setErroEditor(erro); return; }
     atualizar({ ...cadastro, linhas });
     setEditor(null);
@@ -129,7 +171,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
 
   function moverLinha(id: string, direcao: number) {
     if (!cadastro) return;
-    const visiveis = cadastro.linhas.filter(item => item.demonstracao === tipoCadastro);
+    const visiveis = cadastro.linhas.filter(item => item.demonstracao === tipoCadastro && !item.bancoDe);
     const destino = visiveis[visiveis.findIndex(item => item.id === id) + direcao];
     if (!destino) return;
     const linhas = [...cadastro.linhas];
@@ -176,26 +218,26 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   }
 
   function selecionar(referencia: string, marcado: boolean) {
-    if (!editor) return;
-    if (marcado && editor.tipo === 'contas' && contasIncompletas.has(referencia)) {
+    if (!alvoEditor) return;
+    if (marcado && alvoEditor.tipo === 'contas' && contasIncompletas.has(referencia)) {
       setErroEditor(`A conta ${referencia} está incompleta ou é agrupadora. Selecione uma conta completa.`);
       return;
     }
-    if (marcado && editor.tipo === 'contas') {
+    if (marcado && alvoEditor.tipo === 'contas') {
       const grupoExistente = grupoDaConta(referencia);
       if (grupoExistente) {
         setErroEditor(`A conta ${referencia} já está vinculada ao grupo "${grupoExistente.nome}" nesta demonstração.`);
         return;
       }
     }
-    setEditor({ ...editor, itens: marcado ? [...editor.itens, { referencia, operacao: 1 }] : editor.itens.filter(item => item.referencia !== referencia) });
+    atualizarAlvo({ ...alvoEditor, itens: marcado ? [...alvoEditor.itens, { referencia, operacao: 1 }] : alvoEditor.itens.filter(item => item.referencia !== referencia) });
   }
 
   function operacao(item: ItemDemonstracao) {
     return (
       <select aria-label={`Operação de ${item.referencia}`} className={selectClass} value={item.operacao}
         onChange={event => {
-          if (editor) setEditor({ ...editor, itens: editor.itens.map(value => value.referencia === item.referencia ? { ...value, operacao: event.target.value === '1' ? 1 : -1 } : value) });
+          if (alvoEditor) atualizarAlvo({ ...alvoEditor, itens: alvoEditor.itens.map(value => value.referencia === item.referencia ? { ...value, operacao: event.target.value === '1' ? 1 : -1 } : value) });
         }}>
         <option value="1">+ Somar</option><option value="-1">− Subtrair</option>
       </select>
@@ -204,6 +246,8 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
 
   const principal = { ano: selectedYear, mes: selectedMonth };
   const linhas = cadastro?.linhas.filter(item => item.demonstracao === aba) ?? [];
+  const linhasTabela = linhas.filter(linha => !linha.bancoDe)
+    .flatMap(linha => [linha, ...linhas.filter(banco => banco.bancoDe === linha.id)]);
   const colunas = selectedMonth === 0
     ? periodosComparados.map(periodo => ({ titulo: `Ano/${periodo.ano}`, periodos: [periodo] }))
     : aba === 'dre'
@@ -227,13 +271,14 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const contasIncompletasVinculadas = linhas.filter(linha => linha.tipo === 'contas')
     .flatMap(linha => linha.itens).filter(item => contasIncompletas.has(item.referencia));
   const linhasDisponiveisEditor = editor && cadastro
-    ? cadastro.linhas.filter(item => item.id !== editor.id && item.demonstracao === editor.demonstracao)
+    ? cadastro.linhas.filter(item => item.id !== editor.id && item.demonstracao === editor.demonstracao && !item.bancoDe)
     : [];
 
   function grupoDaConta(referencia: string) {
-    if (!editor || !cadastro || editor.tipo !== 'contas') return undefined;
-    return cadastro.linhas.find(linha =>
-      linha.id !== editor.id && linha.demonstracao === editor.demonstracao && linha.tipo === 'contas' &&
+    if (!editor || !alvoEditor || !cadastro || alvoEditor.tipo !== 'contas') return undefined;
+    const disponiveis = bancosEditor ? [...cadastro.linhas.filter(linha => linha.bancoDe !== editor.id && linha.id !== editor.id), ...bancosEditor] : cadastro.linhas;
+    return disponiveis.find(linha =>
+      linha.id !== alvoEditor.id && linha.demonstracao === alvoEditor.demonstracao && linha.tipo === 'contas' &&
       linha.itens.some(item => mesmaHierarquia(item.referencia, referencia)));
   }
 
@@ -290,14 +335,14 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                   </div>
                   <p className="text-sm text-muted-foreground">Cadastre grupos de contas e totalizações das linhas desejadas. Use as setas para definir a posição de cada linha na demonstração; a posição não altera o cálculo.</p>
                   <div className="space-y-2">
-                    {cadastro.linhas.filter(item => item.demonstracao === tipoCadastro).map((linha, index, lista) => (
+                    {cadastro.linhas.filter(item => item.demonstracao === tipoCadastro && !item.bancoDe).map((linha, index, lista) => (
                       <div key={linha.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3">
-                        <div><p className="font-medium">{linha.nome}</p><p className="text-xs text-muted-foreground">{linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · {linha.itens.length} itens</p></div>
+                        <div><p className="font-medium">{linha.nome}</p><p className="text-xs text-muted-foreground">{cadastro.linhas.some(item => item.bancoDe === linha.id) ? `${linha.itens.length} bancos ou dívidas` : `${linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · ${linha.itens.length} itens`}</p></div>
                         <div className="flex flex-wrap gap-1">
                           <Button variant="outline" size="sm" aria-label={`Subir ${linha.nome}`} disabled={index === 0} onClick={() => moverLinha(linha.id, -1)}>↑</Button>
                           <Button variant="outline" size="sm" aria-label={`Descer ${linha.nome}`} disabled={index === lista.length - 1} onClick={() => moverLinha(linha.id, 1)}>↓</Button>
                           <Button variant="outline" size="sm" onClick={() => abrirEditor(linha)}>Editar {linha.nome}</Button>
-                          <Button variant="outline" size="sm" onClick={() => atualizarLinhas(cadastro.linhas.filter(item => item.id !== linha.id))}>Excluir {linha.nome}</Button>
+                          <Button variant="outline" size="sm" onClick={() => atualizarLinhas(cadastro.linhas.filter(item => item.id !== linha.id && item.bancoDe !== linha.id))}>Excluir {linha.nome}</Button>
                         </div>
                       </div>
                     ))}
@@ -333,7 +378,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 </div>}
                 <div className="space-y-3 rounded border bg-muted/30 p-3">
                   <p className="text-sm font-medium">{selectedMonth === 0 ? 'Comparação anual' : 'Comparação por ano'} — inclua até três anos e ajuste a ordem das colunas.</p>
-                  {(aba === 'ativo' || aba === 'passivo') && <p className="text-xs text-muted-foreground">Os valores patrimoniais são saldos na data correspondente de cada ano; não são acumulados.</p>}
+                  {aba !== 'dre' && <p className="text-xs text-muted-foreground">Os valores patrimoniais são saldos na data correspondente de cada ano; não são acumulados.</p>}
                   <div className="flex flex-wrap items-end gap-3">
                     <label className="space-y-1 text-sm"><span className="block">Ano para adicionar</span>
                       <Input aria-label="Ano para adicionar à comparação" type="number" min={1900} max={9999} value={anoAdicionar} onChange={event => setAnoAdicionar(event.target.value)} className="w-32" />
@@ -356,7 +401,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 <header className="space-y-1 py-3 text-center">
                   <h3 className="text-lg font-semibold">{cadastro.empresa.nome || 'Cadastre o nome da empresa'}</h3>
                   {cadastro.empresa.cnpj && <p className="text-sm">CNPJ: {cadastro.empresa.cnpj}{cadastro.empresa.nire && ` · NIRE: ${cadastro.empresa.nire}`}</p>}
-                  <p className="font-medium">{aba === 'dre' ? 'Demonstração do Resultado do Exercício' : aba === 'ativo' ? 'Balanço Patrimonial — Ativo' : 'Balanço Patrimonial — Passivo'}</p>
+                  <p className="font-medium">{titulosDemonstracoes[aba]}</p>
                   <p className="text-xs text-muted-foreground">Valores em R$</p>
                 </header>
                 {faltantes.length > 0 && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Balancetes não importados: {faltantes.map(rotuloPeriodo).join(', ')}. As colunas afetadas ficam indisponíveis.</p>}
@@ -368,8 +413,8 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                       <caption className="sr-only">{TIPOS[aba]} — {colunas.map(coluna => coluna.titulo).join(' e ')}</caption>
                       <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
                       <tbody>
-                        {linhas.map(linha => <tr key={linha.id} className={linha.tipo === 'total' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
-                          <th scope="row" className="p-3 text-left font-inherit">{linha.nome}</th>
+                        {linhasTabela.map(linha => <tr key={linha.id} className={linha.tipo === 'total' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
+                          <th scope="row" className={`p-3 text-left font-inherit ${linha.bancoDe ? 'pl-8' : ''}`}>{linha.nome}</th>
                           {colunas.map((_, index) => {
                             const valor = valores[index]?.get(linha.id);
                             return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : ''}`}>{valor === null || valor === undefined ? '—' : formatarMoeda(valor)}</td>;
@@ -394,7 +439,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
         )}
         <Dialog open={editor !== null} onOpenChange={open => { if (!open) setEditor(null); }}>
           <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto sm:max-w-6xl">
-            <DialogHeader><DialogTitle>Configurar linha — {editor ? TIPOS[editor.demonstracao] : ''}</DialogTitle><DialogDescription>{editor?.tipo === 'total'
+            <DialogHeader><DialogTitle>Configurar linha — {editor ? TIPOS[editor.demonstracao] : ''}</DialogTitle><DialogDescription>{bancosEditor
+              ? 'Informe o nome da linha principal e adicione os bancos ou dívidas. A linha principal soma os saldos de todos eles.'
+              : editor?.tipo === 'total'
               ? editor.demonstracao === 'dre'
                 ? 'Selecione linhas já cadastradas. Na DRE, os sinais são automáticos e as totalizações somam os valores com seus respectivos sinais.'
                 : 'Selecione linhas já cadastradas e defina se cada item soma ou subtrai.'
@@ -402,13 +449,33 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 ? 'Selecione contas completas. Na DRE, os sinais seguem o movimento do balancete automaticamente.'
                 : 'Selecione contas completas e defina se cada item soma ou subtrai.'}</DialogDescription></DialogHeader>
             {editor && <>
-              <label className="space-y-1 text-sm"><span>Nome da linha *</span><Input value={editor.nome} onChange={event => setEditor({ ...editor, nome: event.target.value })} /></label>
-              <label className="space-y-1 text-sm"><span className="block">Tipo de linha</span>
-                <select className={selectClass} value={editor.tipo} onChange={event => setEditor({ ...editor, tipo: event.target.value === 'total' ? 'total' : 'contas', itens: [] })}>
+              <label className="space-y-1 text-sm"><span>{bancosEditor ? 'Nome da linha principal *' : 'Nome da linha *'}</span><Input value={editor.nome} onChange={event => setEditor({ ...editor, nome: event.target.value })} /></label>
+              {!cadastro?.linhas.some(item => item.bancoDe === editor.id) && <label className="space-y-1 text-sm"><span className="block">Tipo de linha</span>
+                <select className={selectClass} value={bancosEditor ? 'bancos' : editor.tipo} onChange={event => {
+                  const tipo = event.target.value;
+                  setBancosEditor(tipo === 'bancos' ? [] : null);
+                  escolherBanco('');
+                  setEditor({ ...editor, tipo: tipo === 'total' ? 'total' : 'contas', itens: [] });
+                }}>
+                  {editor.demonstracao === 'endividamento' && <option value="bancos">Linha principal com bancos ou dívidas</option>}
                   <option value="contas">Grupo de contas do balancete</option><option value="total">Totalização de linhas selecionadas</option>
                 </select>
-              </label>
-              {editor.tipo === 'contas' ? <>
+              </label>}
+              {bancosEditor && <div className="space-y-3 rounded border p-3">
+                <div className="flex flex-wrap gap-2">
+                  {bancosEditor.map((banco, index) => <Button key={banco.id} variant={banco.id === bancoAtivo ? 'default' : 'outline'} aria-pressed={banco.id === bancoAtivo} onClick={() => escolherBanco(banco.id)}>{banco.nome.trim() || `Banco ou dívida ${index + 1}`}</Button>)}
+                  <Button variant="outline" onClick={adicionarBanco}>Adicionar banco ou dívida</Button>
+                </div>
+                {alvoEditor && <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex-1 space-y-1 text-sm"><span>Nome do banco ou dívida *</span><Input value={alvoEditor.nome} onChange={event => atualizarAlvo({ ...alvoEditor, nome: event.target.value })} /></label>
+                  <Button variant="outline" onClick={() => {
+                    const restantes = bancosEditor.filter(banco => banco.id !== bancoAtivo);
+                    setBancosEditor(restantes);
+                    escolherBanco(restantes[0]?.id ?? '');
+                  }}>Remover banco ou dívida</Button>
+                </div>}
+              </div>}
+              {alvoEditor && <>{alvoEditor.tipo === 'contas' ? <>
                 <p className="text-xs text-muted-foreground">Selecione apenas contas completas (analíticas). Contas incompletas/agrupadoras ficam desabilitadas para evitar dupla contagem. Uma conta não pode pertencer a dois grupos da mesma demonstração. {editor.demonstracao === 'dre'
                   ? 'O sinal segue o movimento da conta no balancete, inclusive estornos, sem escolha manual.'
                   : 'Os sinais são aplicados aos valores absolutos das contas.'}</p>
@@ -420,7 +487,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     const indisponivel = incompleta || Boolean(grupoExistente);
                     return (
                       <label key={conta.codigo} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-3 py-2 text-base hover:bg-muted">
-                        <input type="checkbox" className="size-5 shrink-0" disabled={indisponivel} checked={editor.itens.some(item => item.referencia === conta.codigo)} onChange={event => selecionar(conta.codigo, event.target.checked)} />
+                        <input type="checkbox" className="size-5 shrink-0" disabled={indisponivel} checked={alvoEditor.itens.some(item => item.referencia === conta.codigo)} onChange={event => selecionar(conta.codigo, event.target.checked)} />
                         <span className={indisponivel ? 'text-muted-foreground' : ''}>{conta.codigo} — {conta.descricao}{incompleta
                           ? ' (incompleta/agrupadora — não selecionável)'
                           : grupoExistente ? ` (já vinculada ao grupo "${grupoExistente.nome}")` : ''}</span>
@@ -434,12 +501,13 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 {linhasDisponiveisEditor.length === 0 && <p className="text-sm text-muted-foreground">Cadastre primeiro as linhas que formarão esta totalização.</p>}
               </div>}
               <div className="space-y-2">
-                <h4 className="text-sm font-semibold">Itens selecionados ({editor.itens.length})</h4>
-                {editor.itens.map(item => <div key={item.referencia} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-sm">
-                  <span>{editor.tipo === 'contas' ? `${item.referencia} — ${catalogo.find(conta => conta.codigo === item.referencia)?.descricao ?? 'Conta não encontrada nos períodos carregados'}` : cadastro?.linhas.find(linha => linha.id === item.referencia)?.nome}</span>
+                <h4 className="text-sm font-semibold">Itens selecionados ({alvoEditor.itens.length})</h4>
+                {alvoEditor.itens.map(item => <div key={item.referencia} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-sm">
+                  <span>{alvoEditor.tipo === 'contas' ? `${item.referencia} — ${catalogo.find(conta => conta.codigo === item.referencia)?.descricao ?? 'Conta não encontrada nos períodos carregados'}` : cadastro?.linhas.find(linha => linha.id === item.referencia)?.nome}</span>
                   <div className="flex gap-2">{editor.demonstracao !== 'dre' && operacao(item)}<Button variant="outline" size="sm" aria-label={`Remover item ${item.referencia}`} onClick={() => selecionar(item.referencia, false)}>Remover</Button></div>
                 </div>)}
               </div>
+              </>}
               {erroEditor && <p role="alert" className="text-sm text-red-700">{erroEditor}</p>}
               <DialogFooter><Button variant="outline" onClick={() => setEditor(null)}>Cancelar</Button><Button onClick={confirmarLinha}>Aplicar linha</Button></DialogFooter>
             </>}

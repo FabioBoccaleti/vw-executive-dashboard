@@ -152,6 +152,91 @@ it('compara saldos pontuais no mesmo mês sem acumular os valores patrimoniais',
   await waitFor(() => expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(300)', '(75)']));
 });
 
+it('cadastra Endividamento separadamente do Passivo e compara os saldos após recarregar', async () => {
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+    if (mes !== 2) throw new Error('Endividamento não deve carregar outros meses');
+    return { rawText: `P;2.1;Empréstimos;0;10;20;${ano === 2026 ? '90,75' : '60,25'}` };
+  });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'passivo', nome: 'Obrigações', demonstracao: 'passivo', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }] },
+  ] };
+  const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['DRE', 'Ativo', 'Passivo', 'Endividamento', 'Cadastros']);
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'endividamento' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));
+  const dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Tipo de linha'), { target: { value: 'contas' } });
+  fireEvent.change(dialogo.getByLabelText('Nome da linha *'), { target: { value: 'Dívida bancária' } });
+  fireEvent.click(await dialogo.findByRole('checkbox', { name: /^2\.1 —/ }));
+  fireEvent.change(dialogo.getByLabelText('Operação de 2.1'), { target: { value: '-1' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));
+  const novoDialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(novoDialogo.getByLabelText('Tipo de linha'), { target: { value: 'contas' } });
+  expect(novoDialogo.getByRole('checkbox', { name: /já vinculada ao grupo "Dívida bancária"/ })).toBeDisabled();
+  fireEvent.change(novoDialogo.getByLabelText('Nome da linha *'), { target: { value: 'Endividamento total' } });
+  fireEvent.change(novoDialogo.getByLabelText('Tipo de linha'), { target: { value: 'total' } });
+  expect(novoDialogo.queryByRole('checkbox', { name: 'Obrigações' })).not.toBeInTheDocument();
+  fireEvent.click(novoDialogo.getByRole('checkbox', { name: 'Dívida bancária' }));
+  fireEvent.click(novoDialogo.getByRole('button', { name: 'Aplicar linha' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+
+  tela.unmount();
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Endividamento' }));
+  await screen.findByRole('row', { name: /Endividamento total/ });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  expect(within(screen.getByRole('row', { name: /Endividamento total/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(91)', '(60)']);
+  expect(screen.queryByRole('row', { name: /Obrigações/ })).not.toBeInTheDocument();
+});
+
+it('salva bancos com contas próprias e exibe seus saldos abaixo do total da linha principal', async () => {
+  mocks.raw.mockImplementation(async (ano: number) => ({
+    rawText: `P;2.1;Credor A;0;0;0;${ano === 2026 ? '90,40' : '60,40'}\nP;2.2;Credor B;0;0;0;20,40\nP;2.3;Credor C;0;0;0;10,40`,
+  }));
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
+  const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'endividamento' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));
+  const dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Nome da linha principal *'), { target: { value: 'Endividamento bancário' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Adicionar banco ou dívida' }));
+  fireEvent.change(dialogo.getByLabelText('Nome do banco ou dívida *'), { target: { value: 'Banco Itaú' } });
+  fireEvent.click(await dialogo.findByRole('checkbox', { name: /^2\.1 —/ }));
+  fireEvent.click(dialogo.getByRole('checkbox', { name: /^2\.2 —/ }));
+  fireEvent.click(dialogo.getByRole('button', { name: 'Adicionar banco ou dívida' }));
+  fireEvent.change(dialogo.getByLabelText('Nome do banco ou dívida *'), { target: { value: 'Banco Bradesco' } });
+  expect(dialogo.getByRole('checkbox', { name: /^2\.1 —.*já vinculada ao grupo "Banco Itaú"/ })).toBeDisabled();
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  expect(dialogo.getByRole('alert')).toHaveTextContent('ao menos uma conta');
+  fireEvent.click(dialogo.getByRole('checkbox', { name: /^2\.3 —/ }));
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+
+  tela.unmount();
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Endividamento' }));
+  await screen.findByRole('rowheader', { name: 'Banco Bradesco' });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  const linhas = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+  expect(linhas.map(linha => within(linha).getByRole('rowheader').textContent)).toEqual(['Endividamento bancário', 'Banco Itaú', 'Banco Bradesco']);
+  expect(linhas.map(linha => within(linha).getAllByRole('cell').map(cell => cell.textContent))).toEqual([['121', '91'], ['111', '81'], ['10', '10']]);
+
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'endividamento' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Endividamento bancário' }));
+  const edicao = within(await screen.findByRole('dialog'));
+  fireEvent.click(edicao.getByRole('button', { name: 'Banco Bradesco' }));
+  expect(edicao.getByRole('checkbox', { name: /^2\.3 —/ })).toBeChecked();
+});
+
 it('considera conta ausente em um balancete importado como zero e mantém o saldo do grupo', async () => {
   mocks.raw.mockImplementation(async (ano: number, mes: number) => {
     if (mes !== 2) return null;

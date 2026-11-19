@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ContaBalancete } from '../balanceteParser';
 
-export const TIPOS = { dre: 'DRE', ativo: 'Ativo', passivo: 'Passivo' } as const;
+export const TIPOS = { dre: 'DRE', ativo: 'Ativo', passivo: 'Passivo', endividamento: 'Endividamento' } as const;
 export type TipoDemonstracao = keyof typeof TIPOS;
 export const MESES = ['Anual', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -9,9 +9,10 @@ const itemSchema = z.object({ referencia: z.string().min(1), operacao: z.union([
 const linhaSchema = z.object({
   id: z.string().min(1),
   nome: z.string().trim().min(1),
-  demonstracao: z.enum(['dre', 'ativo', 'passivo']),
+  demonstracao: z.enum(['dre', 'ativo', 'passivo', 'endividamento']),
   tipo: z.enum(['contas', 'total']),
   itens: z.array(itemSchema).min(1),
+  bancoDe: z.string().min(1).optional(),
 });
 export const cadastroSchema = z.object({
   version: z.string(),
@@ -69,7 +70,7 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
     if (ids.has(linha.id)) return 'Existem linhas com identificadores repetidos.';
     ids.add(linha.id);
     porId.set(linha.id, linha);
-    if (linhas.some(item => item.id !== linha.id && item.demonstracao === linha.demonstracao && item.nome.trim().toLocaleLowerCase() === linha.nome.trim().toLocaleLowerCase())) {
+    if (linhas.some(item => item.id !== linha.id && item.demonstracao === linha.demonstracao && item.bancoDe === linha.bancoDe && item.nome.trim().toLocaleLowerCase() === linha.nome.trim().toLocaleLowerCase())) {
       return `Já existe uma linha chamada "${linha.nome}" nesta demonstração.`;
     }
     const referencias = new Set<string>();
@@ -84,6 +85,16 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
     }
   }
 
+  for (const linha of linhas) {
+    if (!linha.bancoDe) continue;
+    const principal = porId.get(linha.bancoDe);
+    if (linha.demonstracao !== 'endividamento' || linha.tipo !== 'contas' || principal?.demonstracao !== 'endividamento'
+      || principal.tipo !== 'total' || !principal.itens.every(item => porId.get(item.referencia)?.bancoDe === principal.id && item.operacao === 1)
+      || !principal.itens.some(item => item.referencia === linha.id)) {
+      return `O banco ou dívida "${linha.nome}" deve fazer parte da soma da sua linha principal de Endividamento.`;
+    }
+  }
+
   const composicoes = new Map<string, Set<string>>();
   const visitando = new Set<string>();
   function resolverComposicao(linha: LinhaDemonstracao): string | null {
@@ -95,7 +106,7 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
     else {
       for (const item of linha.itens) {
         const origem = porId.get(item.referencia);
-        if (!origem || origem.demonstracao !== linha.demonstracao) {
+        if (!origem || origem.demonstracao !== linha.demonstracao || (origem.bancoDe && origem.bancoDe !== linha.id)) {
           return `A totalização "${linha.nome}" deve usar somente linhas cadastradas na mesma demonstração.`;
         }
         const erro = resolverComposicao(origem);

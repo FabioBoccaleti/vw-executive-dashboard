@@ -84,15 +84,22 @@ Somente contas completas (analíticas) podem ser selecionadas; contas
 com subcontas ou identificadas como sintéticas (`S`) ficam desabilitadas.
 Códigos repetidos no arquivo não bloqueiam a leitura: preserva-se a última
 ocorrência, como no painel existente, sem somar as repetições.
-Em **Ativo** e **Passivo**, permanece a escolha de **Somar/Subtrair** sobre os
-valores absolutos das contas e nas referências entre grupos. Totalizações
-referenciam grupos anteriores; não é permitido contar uma conta e suas subcontas
-ou o mesmo grupo duas vezes por meio de subtotais. **Salvar cadastro** persiste
-as configurações e detecta alterações concorrentes.
+Em **Ativo**, **Passivo** e **Endividamento**, use **Somar/Subtrair** sobre os
+valores absolutos das contas e nas referências entre grupos. Cada demonstração
+tem grupos e totalizações próprios. Uma conta do Passivo também pode ser usada
+em Endividamento, mas não pode ser cadastrada em dois grupos da mesma
+demonstração. Totalizações usam linhas da própria demonstração, sem dupla
+contagem. **Salvar cadastro** persiste as configurações e detecta alterações
+concorrentes.
+
+Em **Endividamento**, ao adicionar uma linha principal, informe seu nome e
+cadastre os bancos ou dívidas, cada um com suas próprias contas. A linha
+principal mostra a soma dos saldos dos bancos ou dívidas, apresentados logo
+abaixo, por período.
 
 A **DRE** usa o movimento líquido de cada conta no mês e de janeiro até o mês
-selecionado. No modo **Anual**, usa somente o arquivo anual importado. **Ativo**
-e **Passivo** usam os saldos em cada data, com mês/ano comparativo independente,
-sem somar saldos mensais. Balancetes ou contas ausentes deixam os valores afetados
-indisponíveis, em vez de gerar um acumulado parcial ou assumir zero.
+selecionado. No modo **Anual**, usa somente o arquivo anual importado.
+**Ativo**, **Passivo** e **Endividamento** usam os saldos na data de cada coluna, sem
+somar saldos mensais. Se faltar o balancete, a coluna afetada fica indisponível;
+se faltar apenas uma conta em um balancete importado, ela contribui com zero.
 Impressão/PDF não estão incluídos nesta etapa.
