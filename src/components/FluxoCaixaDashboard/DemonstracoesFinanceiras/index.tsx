@@ -26,27 +26,24 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [dados, setDados] = useState<DadosDemonstracoes | null>(null);
   const [erroDados, setErroDados] = useState('');
   const [tentativaDados, setTentativaDados] = useState(0);
-  const [comparacao, setComparacao] = useState<PeriodoDemonstracao>({ ano: selectedYear - 1, mes: 12 });
-  const [anoComparacao, setAnoComparacao] = useState(String(selectedYear - 1));
-  const [mesComparacao, setMesComparacao] = useState(12);
-  const [anosAnuais, setAnosAnuais] = useState<number[] | null>(null);
+  const [anosComparados, setAnosComparados] = useState<number[] | null>(null);
   const [anoAdicionar, setAnoAdicionar] = useState(String(selectedYear - 1));
+  const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
   const [editor, setEditor] = useState<LinhaDemonstracao | null>(null);
   const [erroEditor, setErroEditor] = useState('');
   const [busca, setBusca] = useState('');
   const [tipoCadastro, setTipoCadastro] = useState<TipoDemonstracao>('dre');
   const escopoDados = aba === 'ativo' || aba === 'passivo' ? 'patrimonial' : aba;
-  const periodosAnuais = useMemo(
-    () => (anosAnuais ?? [selectedYear]).map(ano => ({ ano, mes: 0 })),
-    [anosAnuais, selectedYear],
+  const periodosComparados = useMemo(
+    () => (anosComparados ?? [selectedYear]).map(ano => ({ ano, mes: selectedMonth })),
+    [anosComparados, selectedYear, selectedMonth],
   );
-  const chaveAnosAnuais = periodosAnuais.map(periodo => periodo.ano).sort((a, b) => a - b).join(',');
+  const chaveAnosComparados = periodosComparados.map(periodo => periodo.ano).sort((a, b) => a - b).join(',');
   const periodosParaCarregar = useMemo(
-    () => selectedMonth === 0
-      ? chaveAnosAnuais.split(',').map(ano => ({ ano: Number(ano), mes: 0 }))
-      : escopoDados === 'patrimonial' ? [comparacao] : [],
-    [selectedMonth, chaveAnosAnuais, escopoDados, comparacao],
+    () => chaveAnosComparados.split(',').map(ano => ({ ano: Number(ano), mes: selectedMonth })),
+    [chaveAnosComparados, selectedMonth],
   );
+  const acumuladoDre = aba === 'dre' && selectedMonth > 0 && periodoDre === 'acumulado';
 
   useEffect(() => {
     let ativo = true;
@@ -61,14 +58,12 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     let ativo = true;
     setDados(null);
     setErroDados('');
-    const principal = selectedMonth === 0
-      ? periodosParaCarregar[0] ?? { ano: selectedYear, mes: 0 }
-      : { ano: selectedYear, mes: selectedMonth };
-    loadDadosDemonstracoes(principal, periodosParaCarregar, escopoDados).then(value => {
+    const principal = periodosParaCarregar[0] ?? { ano: selectedYear, mes: selectedMonth };
+    loadDadosDemonstracoes(principal, periodosParaCarregar, escopoDados, acumuladoDre).then(value => {
       if (ativo) setDados(value);
     }).catch(error => { if (ativo) setErroDados(mensagem(error)); });
     return () => { ativo = false; };
-  }, [selectedYear, selectedMonth, periodosParaCarregar, tentativaDados, escopoDados]);
+  }, [selectedYear, selectedMonth, periodosParaCarregar, tentativaDados, escopoDados, acumuladoDre]);
 
   const catalogo = useMemo(() => {
     const contas = new Map<string, string>();
@@ -143,13 +138,13 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     atualizarLinhas(linhas);
   }
 
-  function adicionarAnoAnual() {
+  function adicionarAnoComparacao() {
     const ano = Number(anoAdicionar);
     if (!Number.isInteger(ano) || ano < 1900 || ano > 9999) {
       setErroAcao('Informe um ano entre 1900 e 9999.');
       return;
     }
-    const atuais = anosAnuais ?? [selectedYear];
+    const atuais = anosComparados ?? [selectedYear];
     if (atuais.includes(ano)) {
       setErroAcao(`Ano/${ano} já está incluído na comparação.`);
       return;
@@ -158,25 +153,25 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
       setErroAcao('A comparação anual permite no máximo três anos.');
       return;
     }
-    setAnosAnuais([...atuais, ano]);
+    setAnosComparados([...atuais, ano]);
     setAnoAdicionar(String(ano - 1));
     setErroAcao('');
   }
 
-  function moverAnoAnual(ano: number, direcao: number) {
-    const atuais = anosAnuais ?? [selectedYear];
+  function moverAnoComparacao(ano: number, direcao: number) {
+    const atuais = anosComparados ?? [selectedYear];
     const origem = atuais.indexOf(ano);
     const destino = origem + direcao;
     if (origem < 0 || destino < 0 || destino >= atuais.length) return;
     const atualizados = [...atuais];
     [atualizados[origem], atualizados[destino]] = [atualizados[destino], atualizados[origem]];
-    setAnosAnuais(atualizados);
+    setAnosComparados(atualizados);
   }
 
-  function removerAnoAnual(ano: number) {
-    const atuais = anosAnuais ?? [selectedYear];
+  function removerAnoComparacao(ano: number) {
+    const atuais = anosComparados ?? [selectedYear];
     if (atuais.length <= 1) return;
-    setAnosAnuais(atuais.filter(item => item !== ano));
+    setAnosComparados(atuais.filter(item => item !== ano));
   }
 
   function selecionar(referencia: string, marcado: boolean) {
@@ -208,16 +203,18 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
 
   const principal = { ano: selectedYear, mes: selectedMonth };
   const linhas = cadastro?.linhas.filter(item => item.demonstracao === aba) ?? [];
-  const periodosAcumulados = selectedMonth === 0 ? [principal]
-    : Array.from({ length: selectedMonth }, (_, index) => ({ ano: selectedYear, mes: index + 1 }));
   const colunas = selectedMonth === 0
-    ? periodosAnuais.map(periodo => ({ titulo: `Ano/${periodo.ano}`, periodos: [periodo] }))
+    ? periodosComparados.map(periodo => ({ titulo: `Ano/${periodo.ano}`, periodos: [periodo] }))
     : aba === 'dre'
-      ? [
-        { titulo: rotuloPeriodo(principal), periodos: [principal] },
-        { titulo: `Jan–${MESES[selectedMonth]}/${String(selectedYear).slice(-2)}`, periodos: periodosAcumulados },
-      ]
-      : [{ titulo: rotuloPeriodo(principal), periodos: [principal] }, { titulo: rotuloPeriodo(comparacao), periodos: [comparacao] }];
+      ? periodosComparados.map(periodo => ({
+        titulo: periodoDre === 'mes'
+          ? rotuloPeriodo(periodo)
+          : `Jan–${MESES[periodo.mes]}/${String(periodo.ano).slice(-2)}`,
+        periodos: periodoDre === 'mes'
+          ? [periodo]
+          : Array.from({ length: periodo.mes }, (_, index) => ({ ano: periodo.ano, mes: index + 1 })),
+      }))
+      : periodosComparados.map(periodo => ({ titulo: rotuloPeriodo(periodo), periodos: [periodo] }));
   const valores = aba !== 'cadastros' && cadastro && dados
     ? colunas.map(coluna => calcularLinhas(cadastro.linhas, aba, coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null)))
     : [];
@@ -324,41 +321,37 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
               </fieldset>
             ) : (
               <section className="space-y-4" aria-label={`Demonstração ${TIPOS[aba]}`}>
-                {selectedMonth === 0 && <div className="space-y-3 rounded border bg-muted/30 p-3">
-                  <p className="text-sm font-medium">Comparação anual — inclua até três anos e ajuste a ordem das colunas.</p>
+                {aba === 'dre' && selectedMonth !== 0 && <div role="group" aria-label="Período da DRE" className="flex flex-wrap items-center gap-2 rounded border bg-muted/30 p-3">
+                  <span className="mr-2 text-sm font-medium">Período da DRE:</span>
+                  <Button variant={periodoDre === 'mes' ? 'default' : 'outline'} aria-pressed={periodoDre === 'mes'} onClick={() => setPeriodoDre('mes')}>
+                    Mês ({rotuloPeriodo(principal)})
+                  </Button>
+                  <Button variant={periodoDre === 'acumulado' ? 'default' : 'outline'} aria-pressed={periodoDre === 'acumulado'} onClick={() => setPeriodoDre('acumulado')}>
+                    Acumulado (Jan–{MESES[selectedMonth]}/{String(selectedYear).slice(-2)})
+                  </Button>
+                </div>}
+                <div className="space-y-3 rounded border bg-muted/30 p-3">
+                  <p className="text-sm font-medium">{selectedMonth === 0 ? 'Comparação anual' : 'Comparação por ano'} — inclua até três anos e ajuste a ordem das colunas.</p>
+                  {(aba === 'ativo' || aba === 'passivo') && <p className="text-xs text-muted-foreground">Os valores patrimoniais são saldos na data correspondente de cada ano; não são acumulados.</p>}
                   <div className="flex flex-wrap items-end gap-3">
                     <label className="space-y-1 text-sm"><span className="block">Ano para adicionar</span>
                       <Input aria-label="Ano para adicionar à comparação" type="number" min={1900} max={9999} value={anoAdicionar} onChange={event => setAnoAdicionar(event.target.value)} className="w-32" />
                     </label>
-                    <Button variant="outline" onClick={adicionarAnoAnual} disabled={periodosAnuais.length >= 3}>Adicionar ano</Button>
+                    <Button variant="outline" onClick={adicionarAnoComparacao} disabled={periodosComparados.length >= 3}>Adicionar ano</Button>
                   </div>
                   <div className="space-y-2">
-                    {periodosAnuais.map((periodo, index) => (
+                    {periodosComparados.map((periodo, index) => (
                       <div key={periodo.ano} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-background p-2 text-sm">
-                        <span className="font-medium">Ano/{periodo.ano}</span>
+                        <span className="font-medium">{selectedMonth === 0 ? `Ano/${periodo.ano}` : `${MESES[selectedMonth]}/${String(periodo.ano).slice(-2)}`}</span>
                         <div className="flex gap-1">
-                          <Button variant="outline" size="sm" aria-label={`Subir Ano/${periodo.ano}`} disabled={index === 0} onClick={() => moverAnoAnual(periodo.ano, -1)}>↑</Button>
-                          <Button variant="outline" size="sm" aria-label={`Descer Ano/${periodo.ano}`} disabled={index === periodosAnuais.length - 1} onClick={() => moverAnoAnual(periodo.ano, 1)}>↓</Button>
-                          <Button variant="outline" size="sm" aria-label={`Remover Ano/${periodo.ano}`} disabled={periodosAnuais.length <= 1} onClick={() => removerAnoAnual(periodo.ano)}>Remover</Button>
+                          <Button variant="outline" size="sm" aria-label={`Subir ${periodo.ano}`} disabled={index === 0} onClick={() => moverAnoComparacao(periodo.ano, -1)}>↑</Button>
+                          <Button variant="outline" size="sm" aria-label={`Descer ${periodo.ano}`} disabled={index === periodosComparados.length - 1} onClick={() => moverAnoComparacao(periodo.ano, 1)}>↓</Button>
+                          <Button variant="outline" size="sm" aria-label={`Remover ${periodo.ano}`} disabled={periodosComparados.length <= 1} onClick={() => removerAnoComparacao(periodo.ano)}>Remover</Button>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>}
-                {selectedMonth !== 0 && (aba === 'ativo' || aba === 'passivo') && <div className="flex flex-wrap items-end gap-3 rounded border bg-muted/30 p-3">
-                  <label className="space-y-1 text-sm"><span className="block">Mês de comparação</span>
-                    <select className={selectClass} value={mesComparacao} onChange={event => setMesComparacao(Number(event.target.value))}>
-                      {MESES.map((mes, index) => <option key={mes} value={index}>{mes}</option>)}
-                    </select>
-                  </label>
-                  <label className="space-y-1 text-sm"><span className="block">Ano de comparação</span><Input type="number" min={1900} max={9999} value={anoComparacao} onChange={event => setAnoComparacao(event.target.value)} className="w-28" /></label>
-                  <Button variant="outline" onClick={() => {
-                    const ano = Number(anoComparacao);
-                    if (!Number.isInteger(ano) || ano < 1900 || ano > 9999) { setErroAcao('Informe um ano de comparação entre 1900 e 9999.'); return; }
-                    setErroAcao('');
-                    setComparacao({ ano, mes: mesComparacao });
-                  }}>Comparar</Button>
-                </div>}
+                </div>
                 <header className="space-y-1 py-3 text-center">
                   <h3 className="text-lg font-semibold">{cadastro.empresa.nome || 'Cadastre o nome da empresa'}</h3>
                   {cadastro.empresa.cnpj && <p className="text-sm">CNPJ: {cadastro.empresa.cnpj}{cadastro.empresa.nire && ` · NIRE: ${cadastro.empresa.nire}`}</p>}
@@ -387,7 +380,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">{aba === 'dre'
-                  ? 'DRE: movimento líquido (créditos − débitos), preservando o sinal contábil e os estornos; acumulado calculado de janeiro até o mês selecionado. Grupos e totalizações somam os valores com seus sinais automaticamente.'
+                  ? `DRE: movimento líquido (créditos − débitos), preservando o sinal contábil e os estornos; ${selectedMonth === 0 || periodoDre === 'acumulado' ? 'acumulado de janeiro até o mês selecionado' : 'somente o mês selecionado'}. Grupos e totalizações somam os valores com seus sinais automaticamente.`
                   : 'Patrimonial: valor absoluto do saldo atual de cada conta em cada data, sem somar saldos mensais. O sinal de cada conta é definido por Somar/Subtrair no cadastro.'}</p>
                 {cadastro.assinantes.length > 0 && <div className="grid gap-8 pt-12 sm:grid-cols-2">
                   {cadastro.assinantes.map(assinante => <div key={assinante.id} className="border-t pt-2 text-center text-sm">

@@ -23,7 +23,9 @@ beforeEach(() => {
   mocks.raw.mockImplementation(async (ano: number, mes: number) => {
     if (ano === 2026 && mes === 1) return raw(1000, 200, 150);
     if (ano === 2026 && mes === 2) return raw(500, 100, 300);
-    if (ano === 2024 && mes === 1) return raw(100, 20, 75);
+    if (ano === 2025 && mes === 1) return raw(300, 50, 250);
+    if (ano === 2025 && mes === 2) return raw(200, 40, 300);
+    if (ano === 2024 && (mes === 1 || mes === 2)) return raw(100, 20, 75);
     return null;
   });
 });
@@ -71,17 +73,25 @@ it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE c
 
   fireEvent.click(screen.getByRole('tab', { name: 'DRE' }));
   expect(await screen.findByRole('columnheader', { name: 'Fev/26' })).toBeInTheDocument();
-  expect(screen.getByRole('columnheader', { name: 'Jan–Fev/26' })).toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: 'Jan–Fev/26' })).not.toBeInTheDocument();
   const linhasDre = [...screen.getByRole('table').querySelectorAll('tbody tr')].map(linha => linha.querySelector('th')?.textContent);
   expect(linhasDre).toEqual(['Lucro Bruto', 'Receita líquida', 'Custos de vendas']);
-  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00', '1.200,00']);
+  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00']);
+  fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2025' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00', '160,00']);
+  fireEvent.click(screen.getByRole('button', { name: 'Acumulado (Jan–Fev/26)' }));
+  expect(await screen.findByRole('columnheader', { name: 'Jan–Fev/26' })).toBeInTheDocument();
+  expect(await screen.findByRole('columnheader', { name: 'Jan–Fev/25' })).toBeInTheDocument();
+  expect(within(screen.getByRole('row', { name: /Lucro Bruto/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['1.200,00', '410,00']);
   expect(screen.getByText('Responsável exemplo')).toBeInTheDocument();
   expect(screen.getByText('CRC exemplo')).toBeInTheDocument();
 
   tela.unmount();
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   expect(await screen.findByText('Empresa exemplo')).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole('row', { name: /Lucro Bruto/ })).toHaveTextContent('1.200,00'));
+  await waitFor(() => expect(screen.getByRole('row', { name: /Lucro Bruto/ })).toHaveTextContent('400,00'));
   await abrirCadastros();
   fireEvent.click(screen.getByRole('button', { name: 'Excluir Receita líquida' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/mesma demonstração/);
@@ -92,19 +102,30 @@ it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE c
   expect(mocks.cas.mock.calls[1][2]).toBe(mocks.cas.mock.calls[0][1].version);
 });
 
-it('permite escolher a data comparativa e mantém saldos separados dos movimentos da DRE', async () => {
+it('compara saldos pontuais no mesmo mês sem acumular os valores patrimoniais', async () => {
+  const monthlyRaw = (receita: number, custo: number, caixa: number, passivo: number) => ({
+    rawText: `${raw(receita, custo, caixa).rawText}\nP;2.1;Fornecedores;0,00;0,00;0,00;${passivo},00`,
+  });
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+    if (ano === 2026 && mes === 2) return monthlyRaw(500, 100, 300, 90);
+    if (ano === 2024 && mes === 2) return monthlyRaw(100, 20, 75, 60);
+    return null;
+  });
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
     { id: 'caixa', nome: 'Disponibilidades', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.1', operacao: 1 }] },
+    { id: 'fornecedores', nome: 'Fornecedores', demonstracao: 'passivo', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }] },
   ] };
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   await screen.findByText('Empresa exemplo');
   fireEvent.click(screen.getByRole('tab', { name: 'Ativo' }));
-  fireEvent.change(screen.getByLabelText('Mês de comparação'), { target: { value: '1' } });
-  fireEvent.change(screen.getByLabelText('Ano de comparação'), { target: { value: '2024' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Comparar' }));
-  await waitFor(() => expect(screen.getByRole('row', { name: /Disponibilidades/ })).toHaveTextContent('75,00'));
+  fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2024' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/24' });
   expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['300,00', '75,00']);
-  expect(screen.getByRole('columnheader', { name: 'Jan/24' })).toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: 'Jan/24' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: 'Passivo' }));
+  await screen.findByRole('columnheader', { name: 'Fev/24' });
+  expect(within(screen.getByRole('row', { name: /Fornecedores/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['90,00', '60,00']);
   await abrirCadastros();
   fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'ativo' } });
   fireEvent.click(screen.getByRole('button', { name: 'Editar Disponibilidades' }));
@@ -139,7 +160,7 @@ it('compara até três anos anuais em todas as demonstrações e permite reorden
   fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2023' } });
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
   await screen.findByRole('columnheader', { name: 'Ano/2023' });
-  fireEvent.click(screen.getByRole('button', { name: 'Subir Ano/2024' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Subir 2024' }));
   const cabecalhosDre = within(screen.getByRole('table')).getAllByRole('columnheader').map(item => item.textContent);
   expect(cabecalhosDre).toEqual(['Descrição', 'Ano/2024', 'Ano/2025', 'Ano/2023']);
   expect(within(screen.getByRole('row', { name: /Receita líquida/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['800,00', '1.000,00', '600,00']);
@@ -161,8 +182,8 @@ it('aplica os sinais automáticos da DRE a grupos e totalizações já salvos, s
   ] };
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   const linha = await screen.findByRole('row', { name: /Resultado/ });
-  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00', '1.200,00']);
-  expect(within(screen.getByRole('row', { name: /^Custos/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['-100,00', '-300,00']);
+  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['400,00']);
+  expect(within(screen.getByRole('row', { name: /^Custos/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['-100,00']);
   expect(mocks.cas).not.toHaveBeenCalled();
   await abrirCadastros();
   fireEvent.click(screen.getByRole('button', { name: 'Editar Resultado' }));
@@ -177,8 +198,9 @@ it('mostra mês ausente sem apresentar acumulado incompleto como zero ou total v
   ] };
   mocks.raw.mockImplementation(async (ano: number, mes: number) => ano === 2026 && mes === 2 ? raw(500, 100, 300) : null);
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Acumulado (Jan–Fev/26)' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Jan/26');
-  expect(within(screen.getByRole('row', { name: /Receita líquida/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['500,00', '—']);
+  expect(within(screen.getByRole('row', { name: /Receita líquida/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['—']);
 });
 
 it('bloqueia edição após falha na carga do cadastro e preserva alterações se a gravação falhar', async () => {
@@ -215,7 +237,7 @@ it('carrega apenas os períodos necessários, sem bloquear uma demonstração po
     if (ano === 2025) throw new Error('Comparativo inválido');
     return raw(500, 100, 300);
   });
-  const dre = await loadDadosDemonstracoes({ ano: 2026, mes: 2 }, { ano: 2025, mes: 12 }, 'dre');
+  const dre = await loadDadosDemonstracoes({ ano: 2026, mes: 2 }, [{ ano: 2026, mes: 2 }], 'dre');
   expect(Object.keys(dre).sort()).toEqual(['2026_1', '2026_2']);
   mocks.raw.mockImplementation(async (ano: number, mes: number) => {
     if (ano === 2026 && mes === 1) throw new Error('Janeiro inválido');
@@ -232,7 +254,7 @@ it('desabilita contas já vinculadas a outro grupo e mantém a edição do grupo
   ] };
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   const linha = await screen.findByRole('row', { name: /Receita líquida/ });
-  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['15,00', '30,00']);
+  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['15,00']);
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   await abrirCadastros();
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));
@@ -258,7 +280,7 @@ it('avisa sobre agrupadoras já cadastradas e exige a substituição por contas 
   ] };
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('contas incompletas/agrupadoras vinculadas: 3.1');
-  expect(within(screen.getByRole('row', { name: /Receita antiga/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['—', '—']);
+  expect(within(screen.getByRole('row', { name: /Receita antiga/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['—']);
   await abrirCadastros();
   await waitFor(() => expect(screen.queryByText('Carregando balancetes...')).not.toBeInTheDocument());
   fireEvent.click(screen.getByRole('button', { name: 'Editar Receita antiga' }));

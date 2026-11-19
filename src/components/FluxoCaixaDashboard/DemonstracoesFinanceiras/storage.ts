@@ -30,13 +30,16 @@ export async function loadDadosDemonstracoes(
   principal: PeriodoDemonstracao,
   comparacoes: PeriodoDemonstracao | PeriodoDemonstracao[],
   escopo: 'dre' | 'patrimonial' | 'cadastros' = 'dre',
+  acumuladoDre = true,
 ): Promise<DadosDemonstracoes> {
   const periodos = new Map<string, PeriodoDemonstracao>();
   const periodosComparacao = Array.isArray(comparacoes) ? comparacoes : [comparacoes];
   const adicionais = escopo === 'dre'
     ? principal.mes === 0
       ? periodosComparacao
-      : Array.from({ length: principal.mes }, (_, index) => ({ ano: principal.ano, mes: index + 1 }))
+      : periodosComparacao.flatMap(periodo => acumuladoDre
+        ? Array.from({ length: periodo.mes }, (_, index) => ({ ano: periodo.ano, mes: index + 1 }))
+        : [periodo])
     : escopo === 'patrimonial' ? periodosComparacao : [];
   for (const periodo of [
     principal, ...adicionais,
