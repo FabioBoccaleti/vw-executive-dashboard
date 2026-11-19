@@ -46,6 +46,98 @@ async function adicionarGrupo(nome: string, conta: string) {
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 }
 
+it('expande em Cadastros os grupos e suas sublinhas, sem detalhar totalizações', async () => {
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'grupo', nome: 'Receita', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1', operacao: 1 }, { referencia: '9.9', operacao: 1 }] },
+    { id: 'principal', nome: 'Despesas', demonstracao: 'dre', tipo: 'total', itens: [{ referencia: 'sub', operacao: 1 }] },
+    { id: 'sub', nome: 'Custos', demonstracao: 'dre', tipo: 'contas', sublinhaDe: 'principal', itens: [{ referencia: '3.2', operacao: 1 }] },
+    { id: 'total', nome: 'Resultado', demonstracao: 'dre', tipo: 'total', itens: [{ referencia: 'grupo', operacao: 1 }, { referencia: 'principal', operacao: 1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  await screen.findByRole('button', { name: 'Exibir contas de Receita' });
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Receita' }));
+  expect(await screen.findByText('3.1 — Receita')).toBeInTheDocument();
+  expect(screen.getByText('9.9 — Descrição indisponível no balancete carregado')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Despesas' }));
+  expect(screen.getByText('Custos')).toBeInTheDocument();
+  expect(screen.getByText('3.2 — Custos')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Exibir contas de Resultado' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Ocultar contas de Receita' }));
+  expect(screen.queryByText('3.1 — Receita')).not.toBeInTheDocument();
+});
+
+it('detalha valores da DRE por conta para cada ano e no acumulado, preservando a indisponibilidade', async () => {
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'grupo', nome: 'Resultado operacional', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1', operacao: -1 }, { referencia: '3.2', operacao: 1 }, { referencia: '9.9', operacao: 1 }] },
+    { id: 'total', nome: 'Resultado final', demonstracao: 'dre', tipo: 'total', itens: [{ referencia: 'grupo', operacao: 1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await screen.findByRole('rowheader', { name: 'Resultado operacional' });
+  expect(screen.queryByRole('button', { name: 'Exibir contas de Resultado final' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Resultado operacional' }));
+  expect(within(await screen.findByRole('row', { name: /3\.1 — Receita/ })).getByRole('cell')).toHaveTextContent('500');
+  expect(within(screen.getByRole('row', { name: /3\.2 — Custos/ })).getByRole('cell')).toHaveTextContent('(100)');
+  expect(within(screen.getByRole('row', { name: /9\.9 — Descrição indisponível/ })).getByRole('cell')).toHaveTextContent('0');
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /3\.1 — Receita/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['500', '200']));
+  fireEvent.click(screen.getByRole('button', { name: 'Acumulado (Jan–Fev/26)' }));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /3\.2 — Custos/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(300)', '(90)']));
+  fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2023' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /3\.1 — Receita/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['1.500', '500', '—']));
+  expect(within(screen.getByRole('row', { name: /9\.9 — Descrição indisponível/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['0', '0', '—']);
+  fireEvent.click(screen.getByRole('button', { name: 'Ocultar contas de Resultado operacional' }));
+  expect(screen.queryByRole('row', { name: /3\.1 — Receita/ })).not.toBeInTheDocument();
+});
+
+it('marca como indisponível o detalhe de uma conta agrupadora vinculada em cadastro antigo', async () => {
+  mocks.raw.mockResolvedValue({ rawText: 'S;3.1;Conta agrupadora;0;0;100;0\nA;3.1.1;Conta analítica;0;0;100;0' });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'grupo', nome: 'Grupo antigo', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1', operacao: 1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await screen.findByText(/Existem contas incompletas\/agrupadoras vinculadas/);
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Grupo antigo' }));
+  expect(within(screen.getByRole('row', { name: /3\.1 — Conta agrupadora/ })).getByRole('cell')).toHaveTextContent('—');
+});
+
+it('usa o balancete anual no detalhamento das contas da DRE', async () => {
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => mes === 0 ? raw(ano === 2026 ? 1500 : 500, 300, 0) : null);
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'grupo', nome: 'Receitas', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1', operacao: 1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={0} />);
+  await screen.findByRole('rowheader', { name: 'Receitas' });
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Receitas' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Ano/2025' });
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /3\.1 — Receita/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['1.500', '500']));
+});
+
+it.each([
+  { demonstracao: 'ativo' as const, titulo: 'Ativo', vinculo: 'sublinhaDe' as const },
+  { demonstracao: 'passivo' as const, titulo: 'Passivo', vinculo: 'sublinhaDe' as const },
+  { demonstracao: 'endividamento' as const, titulo: 'Endividamento', vinculo: 'bancoDe' as const },
+])('detalha sublinhas de $titulo com os sinais configurados e saldos comparativos', async ({ demonstracao, titulo, vinculo }) => {
+  mocks.raw.mockImplementation(async (ano: number) => ({
+    rawText: `A;1.1;Conta detalhada;0;0;0;${ano === 2026 ? '-120' : '60'}`,
+  }));
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'principal', nome: 'Principal', demonstracao, tipo: 'total', itens: [{ referencia: 'sub', operacao: 1 }] },
+    { id: 'sub', nome: 'Grupo detalhado', demonstracao, tipo: 'contas', [vinculo]: 'principal', itens: [{ referencia: '1.1', operacao: -1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: titulo }));
+  await screen.findByRole('rowheader', { name: 'Grupo detalhado' });
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Grupo detalhado' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /1\.1 — Conta detalhada/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(120)', '(60)']));
+  expect(screen.getByRole('button', { name: 'Ocultar contas de Grupo detalhado' })).toHaveAttribute('aria-expanded', 'true');
+});
+
 it('permite transformar uma linha da DRE em sublinhas e voltar sem perder suas contas', async () => {
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
     { id: 'despesas', nome: 'Despesas Operacionais', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.2', operacao: 1 }] },

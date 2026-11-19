@@ -106,6 +106,11 @@ das sublinhas são reunidas na linha principal. Totalizações existentes precis
 ter suas referências removidas antes de serem convertidas em sublinhas.
 No Ativo e Passivo, os sinais Somar/Subtrair configurados em cada conta são
 mantidos na conversão e a linha principal soma as sublinhas com seus sinais.
+Em **Cadastros**, expanda um grupo para consultar os códigos e as descrições das
+contas, organizadas por sublinha quando houver. Na DRE, no Ativo, no Passivo e
+no Endividamento, expanda cada grupo de contas para ver seus valores por coluna,
+seguindo as mesmas regras de período e sinal do grupo. Totalizações não são
+expandidas; contas ausentes no balancete carregado aparecem sem descrição.
 
 Em **Endividamento**, ao adicionar uma linha principal, informe seu nome e
 cadastre os bancos ou dívidas, cada um com suas próprias contas. A linha

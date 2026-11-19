@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TIPOS, MESES, calcularLinhas, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai,
+  TIPOS, MESES, calcularConta, calcularLinhas, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
@@ -68,6 +69,8 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [erroEditor, setErroEditor] = useState('');
   const [busca, setBusca] = useState('');
   const [tipoCadastro, setTipoCadastro] = useState<TipoDemonstracao>('dre');
+  const [cadastrosExpandidos, setCadastrosExpandidos] = useState<Set<string>>(new Set());
+  const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(new Set());
   const escopoDados = aba === 'dre' || aba === 'cadastros' ? aba : 'patrimonial';
   const periodosComparados = useMemo(
     () => (anosComparados ?? [selectedYear]).map(ano => ({ ano, mes: selectedMonth })),
@@ -109,6 +112,20 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
       .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
   }, [dados]);
   const contasIncompletas = useMemo(() => identificarContasIncompletas(Object.values(dados ?? {})), [dados]);
+  const descricoes = useMemo(() => new Map(catalogo.map(conta => [conta.codigo, conta.descricao])), [catalogo]);
+
+  function alternarExpandido(id: string, atualizar: Dispatch<SetStateAction<Set<string>>>) {
+    atualizar(atuais => {
+      const novos = new Set(atuais);
+      if (novos.has(id)) novos.delete(id);
+      else novos.add(id);
+      return novos;
+    });
+  }
+
+  function descricaoConta(item: ItemDemonstracao) {
+    return `${item.referencia} — ${descricoes.get(item.referencia) ?? 'Descrição indisponível no balancete carregado'}`;
+  }
 
   function atualizar(novo: CadastroDemonstracoes) {
     setCadastro(novo);
@@ -348,6 +365,10 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const valores = aba !== 'cadastros' && cadastro && dados
     ? colunas.map(coluna => calcularLinhas(cadastro.linhas, aba, coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null)))
     : [];
+  const detalhesColunas = dados ? colunas.map(coluna => {
+    const periodos = coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null);
+    return { periodos, incompletas: identificarContasIncompletas(periodos) };
+  }) : [];
   const faltantes = [...new Map(colunas.flatMap(coluna => coluna.periodos).filter(periodo => dados && !dados[chavePeriodo(periodo)]).map(periodo => [chavePeriodo(periodo), periodo])).values()];
   const contasAusentes = aba !== 'cadastros' && dados
     ? [...new Set(linhas.filter(linha => linha.tipo === 'contas').flatMap(linha => linha.itens.map(item => item.referencia)))]
@@ -420,17 +441,31 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                   </div>
                   <p className="text-sm text-muted-foreground">Cadastre grupos de contas e totalizações das linhas desejadas. Use as setas para definir a posição de cada linha na demonstração; a posição não altera o cálculo.</p>
                   <div className="space-y-2">
-                    {cadastro.linhas.filter(item => item.demonstracao === tipoCadastro && !linhaPai(item)).map((linha, index, lista) => (
-                      <div key={linha.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3">
-                        <div><p className="font-medium">{linha.nome}</p><p className="text-xs text-muted-foreground">{cadastro.linhas.some(item => linhaPai(item) === linha.id) ? `${linha.itens.length} ${linha.demonstracao === 'endividamento' ? 'bancos ou dívidas' : 'sublinhas'}` : `${linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · ${linha.itens.length} itens`}</p></div>
-                        <div className="flex flex-wrap gap-1">
-                          <Button variant="outline" size="sm" aria-label={`Subir ${linha.nome}`} disabled={index === 0} onClick={() => moverLinha(linha.id, -1)}>↑</Button>
-                          <Button variant="outline" size="sm" aria-label={`Descer ${linha.nome}`} disabled={index === lista.length - 1} onClick={() => moverLinha(linha.id, 1)}>↓</Button>
-                          <Button variant="outline" size="sm" onClick={() => abrirEditor(linha)}>Editar {linha.nome}</Button>
-                          <Button variant="outline" size="sm" onClick={() => atualizarLinhas(cadastro.linhas.filter(item => item.id !== linha.id && linhaPai(item) !== linha.id))}>Excluir {linha.nome}</Button>
+                    {cadastro.linhas.filter(item => item.demonstracao === tipoCadastro && !linhaPai(item)).map((linha, index, lista) => {
+                      const filhas = cadastro.linhas.filter(item => linhaPai(item) === linha.id);
+                      const podeExpandir = linha.tipo === 'contas' || filhas.length > 0;
+                      const expandido = cadastrosExpandidos.has(linha.id);
+                      return <div key={linha.id} className="rounded border p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div><p className="font-medium">{linha.nome}</p><p className="text-xs text-muted-foreground">{filhas.length ? `${linha.itens.length} ${linha.demonstracao === 'endividamento' ? 'bancos ou dívidas' : 'sublinhas'}` : `${linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · ${linha.itens.length} itens`}</p></div>
+                          <div className="flex flex-wrap gap-1">
+                            {podeExpandir && <Button variant="outline" size="sm" aria-expanded={expandido} onClick={() => alternarExpandido(linha.id, setCadastrosExpandidos)}>{expandido ? 'Ocultar' : 'Exibir'} contas de {linha.nome}</Button>}
+                            <Button variant="outline" size="sm" aria-label={`Subir ${linha.nome}`} disabled={index === 0} onClick={() => moverLinha(linha.id, -1)}>↑</Button>
+                            <Button variant="outline" size="sm" aria-label={`Descer ${linha.nome}`} disabled={index === lista.length - 1} onClick={() => moverLinha(linha.id, 1)}>↓</Button>
+                            <Button variant="outline" size="sm" onClick={() => abrirEditor(linha)}>Editar {linha.nome}</Button>
+                            <Button variant="outline" size="sm" onClick={() => atualizarLinhas(cadastro.linhas.filter(item => item.id !== linha.id && linhaPai(item) !== linha.id))}>Excluir {linha.nome}</Button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                        {podeExpandir && expandido && <div className="mt-3 space-y-3 border-t pt-3 text-sm">
+                          {(filhas.length ? filhas : [linha]).map(grupo => <div key={grupo.id}>
+                            {filhas.length > 0 && <p className="font-medium">{grupo.nome}</p>}
+                            <ul className="space-y-1 pl-4 text-muted-foreground">
+                              {grupo.itens.map(item => <li key={item.referencia}>{descricaoConta(item)}</li>)}
+                            </ul>
+                          </div>)}
+                        </div>}
+                      </div>;
+                    })}
                     {!cadastro.linhas.some(item => item.demonstracao === tipoCadastro) && <p className="text-sm text-muted-foreground">Nenhuma linha cadastrada para {TIPOS[tipoCadastro]}.</p>}
                   </div>
                 </section>
@@ -498,8 +533,15 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                       <caption className="sr-only">{TIPOS[aba]} — {colunas.map(coluna => coluna.titulo).join(' e ')}</caption>
                       <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
                       <tbody>
-                        {linhasTabela.map(linha => <tr key={linha.id} className={linha.tipo === 'total' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
-                          <th scope="row" className={`p-3 text-left font-inherit ${linhaPai(linha) ? 'pl-8' : ''}`}>{linha.nome}</th>
+                        {linhasTabela.map(linha => <Fragment key={linha.id}><tr className={linha.tipo === 'total' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
+                          <th scope="row" aria-label={linha.nome} className={`p-3 text-left font-inherit ${linhaPai(linha) ? 'pl-8' : ''}`}>
+                            {linha.tipo === 'contas' && <button type="button" className="mr-2 inline-flex rounded p-1 hover:bg-muted focus-visible:outline focus-visible:outline-2"
+                              aria-label={`${gruposExpandidos.has(linha.id) ? 'Ocultar' : 'Exibir'} contas de ${linha.nome}`}
+                              aria-expanded={gruposExpandidos.has(linha.id)} onClick={() => alternarExpandido(linha.id, setGruposExpandidos)}>
+                              {gruposExpandidos.has(linha.id) ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+                            </button>}
+                            {linha.nome}
+                          </th>
                           {colunas.map((coluna, index) => {
                             const valor = valores[index]?.get(linha.id);
                             const periodo = coluna.periodos[0];
@@ -523,7 +565,16 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                               </>}
                             </td>;
                           })}
+                        </tr>
+                        {linha.tipo === 'contas' && gruposExpandidos.has(linha.id) && linha.itens.map(item => <tr key={item.referencia} className="border-b bg-muted/20">
+                          <th scope="row" className={`p-3 text-left font-normal text-muted-foreground ${linhaPai(linha) ? 'pl-16' : 'pl-12'}`}>{descricaoConta(item)}</th>
+                          {colunas.map((_, index) => {
+                            const detalhe = detalhesColunas[index];
+                            const valor = detalhe ? calcularConta(item, aba, detalhe.periodos, detalhe.incompletas) : null;
+                            return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>;
+                          })}
                         </tr>)}
+                        </Fragment>)}
                         {linhas.length === 0 && <tr><td colSpan={colunas.length + 1} className="p-6 text-center text-muted-foreground">Nenhum grupo cadastrado. Configure as linhas na aba Cadastros.</td></tr>}
                       </tbody>
                     </table>

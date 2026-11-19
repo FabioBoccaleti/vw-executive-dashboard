@@ -158,6 +158,24 @@ export function validarCadastro(cadastro: CadastroDemonstracoes): string | null 
   return validarLinhas(cadastro.linhas);
 }
 
+export function calcularConta(
+  item: ItemDemonstracao,
+  demonstracao: TipoDemonstracao,
+  periodos: Array<ContasBalancete | null>,
+  incompletas = identificarContasIncompletas(periodos),
+): number | null {
+  if (!periodos.length || periodos.some(periodo => periodo === null) || incompletas.has(item.referencia)) return null;
+  let valor = 0;
+  for (const periodo of periodos) {
+    const conta = periodo?.[item.referencia];
+    if (!conta) continue;
+    valor += demonstracao === 'dre' ? conta.valCred - conta.valDeb : conta.saldoAtual;
+  }
+  return demonstracao === 'dre'
+    ? Math.round(valor * 100) / 100
+    : Math.round(Math.abs(valor) * 100) * item.operacao / 100;
+}
+
 export function calcularLinhas(
   linhas: LinhaDemonstracao[],
   demonstracao: TipoDemonstracao,
@@ -180,16 +198,9 @@ export function calcularLinhas(
         if (valor === null || valor === undefined) disponivel = false;
         else total += Math.round(valor * 100) * (demonstracao === 'dre' ? 1 : item.operacao);
       } else {
-        if (incompletas.has(item.referencia)) { disponivel = false; continue; }
-        let valor = 0;
-        for (const periodo of periodos) {
-          const conta = periodo?.[item.referencia];
-          if (!conta) continue;
-          valor += demonstracao === 'dre' ? conta.valCred - conta.valDeb : conta.saldoAtual;
-        }
-        total += demonstracao === 'dre'
-          ? Math.round(valor * 100)
-          : Math.round(Math.abs(valor) * 100) * item.operacao;
+        const valor = calcularConta(item, demonstracao, periodos, incompletas);
+        if (valor === null) disponivel = false;
+        else total += Math.round(valor * 100);
       }
     }
     const valor = disponivel ? total / 100 : null;
