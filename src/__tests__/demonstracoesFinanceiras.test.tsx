@@ -115,6 +115,44 @@ it('permite escolher a data comparativa e mantém saldos separados dos movimento
   await waitFor(() => expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['-300,00', '-75,00']));
 });
 
+it('compara até três anos anuais em todas as demonstrações e permite reordenar as colunas', async () => {
+  const annualRaw = (receita: number, custo: number, caixa: number, passivo: number) => ({
+    rawText: `${raw(receita, custo, caixa).rawText}\nP;2.1;Fornecedores;0,00;0,00;0,00;${passivo},00`,
+  });
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+    if (mes !== 0) return null;
+    if (ano === 2025) return annualRaw(1000, 200, 150, 90);
+    if (ano === 2024) return annualRaw(800, 100, 100, 70);
+    if (ano === 2023) return annualRaw(600, 50, 80, 50);
+    return null;
+  });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'receita', nome: 'Receita líquida', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1', operacao: 1 }] },
+    { id: 'caixa', nome: 'Disponibilidades', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.1', operacao: 1 }] },
+    { id: 'fornecedores', nome: 'Fornecedores', demonstracao: 'passivo', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2025} selectedMonth={0} />);
+  await screen.findByRole('columnheader', { name: 'Ano/2025' });
+  fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2024' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Ano/2024' });
+  fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2023' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Ano/2023' });
+  fireEvent.click(screen.getByRole('button', { name: 'Subir Ano/2024' }));
+  const cabecalhosDre = within(screen.getByRole('table')).getAllByRole('columnheader').map(item => item.textContent);
+  expect(cabecalhosDre).toEqual(['Descrição', 'Ano/2024', 'Ano/2025', 'Ano/2023']);
+  expect(within(screen.getByRole('row', { name: /Receita líquida/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['800,00', '1.000,00', '600,00']);
+  expect(screen.getByRole('button', { name: 'Adicionar ano' })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Ativo' }));
+  await screen.findByRole('columnheader', { name: 'Ano/2023' });
+  expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['100,00', '150,00', '80,00']);
+  fireEvent.click(screen.getByRole('tab', { name: 'Passivo' }));
+  await screen.findByRole('columnheader', { name: 'Ano/2023' });
+  expect(within(screen.getByRole('row', { name: /Fornecedores/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['70,00', '90,00', '50,00']);
+});
+
 it('aplica os sinais automáticos da DRE a grupos e totalizações já salvos, sem recadastro', async () => {
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
     { id: 'receita', nome: 'Receita', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1', operacao: -1 }] },
@@ -164,7 +202,7 @@ it('não mascara falha de balancete como arquivo inexistente e usa o arquivo anu
   mocks.raw.mockRejectedValueOnce(new Error('Falha ao ler o período'));
   await expect(loadDadosDemonstracoes({ ano: 2026, mes: 2 }, { ano: 2024, mes: 1 })).rejects.toThrow('Falha ao ler o período');
   mocks.raw.mockReset().mockResolvedValue(raw(12000, 2000, 5000));
-  const dados = await loadDadosDemonstracoes({ ano: 2026, mes: 0 }, { ano: 2024, mes: 0 });
+  const dados = await loadDadosDemonstracoes({ ano: 2026, mes: 0 }, []);
   expect(Object.keys(dados)).toEqual(['2026_0']);
   expect(mocks.raw).toHaveBeenCalledTimes(1);
   expect(mocks.raw).toHaveBeenCalledWith(2026, 0, { throwOnError: true });

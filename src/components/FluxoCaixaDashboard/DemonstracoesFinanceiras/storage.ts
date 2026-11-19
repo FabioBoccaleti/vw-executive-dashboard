@@ -28,13 +28,16 @@ export async function saveCadastroDemonstracoes(cadastro: CadastroDemonstracoes)
 
 export async function loadDadosDemonstracoes(
   principal: PeriodoDemonstracao,
-  comparacao: PeriodoDemonstracao,
+  comparacoes: PeriodoDemonstracao | PeriodoDemonstracao[],
   escopo: 'dre' | 'patrimonial' | 'cadastros' = 'dre',
 ): Promise<DadosDemonstracoes> {
   const periodos = new Map<string, PeriodoDemonstracao>();
+  const periodosComparacao = Array.isArray(comparacoes) ? comparacoes : [comparacoes];
   const adicionais = escopo === 'dre'
-    ? Array.from({ length: principal.mes }, (_, index) => ({ ano: principal.ano, mes: index + 1 }))
-    : escopo === 'patrimonial' ? [comparacao] : [];
+    ? principal.mes === 0
+      ? periodosComparacao
+      : Array.from({ length: principal.mes }, (_, index) => ({ ano: principal.ano, mes: index + 1 }))
+    : escopo === 'patrimonial' ? periodosComparacao : [];
   for (const periodo of [
     principal, ...adicionais,
   ]) {
