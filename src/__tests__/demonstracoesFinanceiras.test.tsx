@@ -136,6 +136,28 @@ it('compara saldos pontuais no mesmo mês sem acumular os valores patrimoniais',
   await waitFor(() => expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['-300,00', '-75,00']));
 });
 
+it('considera conta ausente em um balancete importado como zero e mantém o saldo do grupo', async () => {
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+    if (mes !== 2) return null;
+    if (ano === 2026) return raw(500, 100, 300);
+    if (ano === 2025) return { rawText: 'A;1.2;Banco;0,00;0,00;0,00;50,00' };
+    return null;
+  });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'circulante', nome: 'Circulante', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.1', operacao: 1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await screen.findByText('Empresa exemplo');
+  fireEvent.click(screen.getByRole('tab', { name: 'Ativo' }));
+  fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2025' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+
+  const linha = await screen.findByRole('row', { name: /Circulante/ });
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  expect(within(linha).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['300,00', '0,00']);
+  expect(screen.getByText(/Contas cadastradas ausentes/)).toHaveTextContent('considerado 0,00');
+});
+
 it('compara até três anos anuais em todas as demonstrações e permite reordenar as colunas', async () => {
   const annualRaw = (receita: number, custo: number, caixa: number, passivo: number) => ({
     rawText: `${raw(receita, custo, caixa).rawText}\nP;2.1;Fornecedores;0,00;0,00;0,00;${passivo},00`,

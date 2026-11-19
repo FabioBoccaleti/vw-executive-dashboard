@@ -150,7 +150,7 @@ export function calcularLinhas(
         let valor = 0;
         for (const periodo of periodos) {
           const conta = periodo?.[item.referencia];
-          if (!conta) { disponivel = false; continue; }
+          if (!conta) continue;
           valor += demonstracao === 'dre' ? conta.valCred - conta.valDeb : conta.saldoAtual;
         }
         total += demonstracao === 'dre'

@@ -359,7 +359,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                   <p className="text-xs text-muted-foreground">Valores em R$</p>
                 </header>
                 {faltantes.length > 0 && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Balancetes não importados: {faltantes.map(rotuloPeriodo).join(', ')}. As colunas afetadas ficam indisponíveis.</p>}
-                {contasAusentes.length > 0 && <p role="alert" className="text-sm text-amber-800">Contas cadastradas ausentes em algum período: {contasAusentes.join(', ')}. Grupos e totalizações afetados são exibidos com —, não como zero.</p>}
+                {contasAusentes.length > 0 && <p role="alert" className="text-sm text-amber-800">Contas cadastradas ausentes em algum período: {contasAusentes.join(', ')}. O saldo dessas contas é considerado 0,00 nos períodos em que não constam.</p>}
                 {contasIncompletasVinculadas.length > 0 && <p role="alert" className="text-sm text-amber-800">Existem contas incompletas/agrupadoras vinculadas: {contasIncompletasVinculadas.map(item => item.referencia).join(', ')}. Substitua-as por contas completas em Cadastros. Os valores afetados ficam indisponíveis.</p>}
                 {!dados && !erroDados ? <p role="status">Carregando balancetes...</p> : !erroDados && (
                   <div className="overflow-x-auto">

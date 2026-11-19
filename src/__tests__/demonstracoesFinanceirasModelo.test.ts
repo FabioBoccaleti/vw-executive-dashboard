@@ -56,8 +56,22 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
   it('não transforma balancete ou conta ausente em zero nem em acumulado parcial', () => {
     const linhas = [grupo('Receita', '3.1'), total('Resultado', ['Receita'])];
     expect([...calcularLinhas(linhas, 'dre', [janeiro, null]).values()]).toEqual([null, null]);
-    expect([...calcularLinhas(linhas, 'dre', [{}]).values()]).toEqual([null, null]);
+    const semReceita = extractAccounts('A;1.1;Caixa;0;0;0;50', { strict: true });
+    expect([...calcularLinhas(linhas, 'dre', [semReceita]).values()]).toEqual([0, 0]);
     expect([...calcularLinhas(linhas, 'dre', []).values()]).toEqual([null, null]);
+  });
+
+  it('considera como zero a conta ausente em um período importado nas três demonstrações', () => {
+    const semConta = extractAccounts('A;9.9;Outra conta;0;0;0;10', { strict: true });
+    const casos = [
+      { demonstracao: 'dre' as const, linha: grupo('Receita', '3.1'), contas: janeiro, esperado: 1000 },
+      { demonstracao: 'ativo' as const, linha: { ...grupo('Caixa', '1.1'), demonstracao: 'ativo' as const }, contas: extractAccounts('A;1.1;Caixa;0;0;0;160', { strict: true }), esperado: 160 },
+      { demonstracao: 'passivo' as const, linha: { ...grupo('Fornecedores', '2.1'), demonstracao: 'passivo' as const }, contas: extractAccounts('P;2.1;Fornecedores;0;0;0;75', { strict: true }), esperado: 75 },
+    ];
+
+    for (const caso of casos) {
+      expect(calcularLinhas([caso.linha], caso.demonstracao, [caso.contas, semConta]).get(caso.linha.id)).toBe(caso.esperado);
+    }
   });
 
   it('impede duplicidade e sobreposição entre contas sintéticas e analíticas, inclusive em grupos distintos', () => {
