@@ -1,12 +1,18 @@
 import { z } from 'zod';
 import type { ContaBalancete } from '../balanceteParser';
 import { DFC_LINHAS_PADRAO, DFC_PREFIXOS_PADRAO, DFC_SECOES_PADRAO } from './dfcModeloPadrao';
+import {
+  DFC_INDIRETO_AJUSTES,
+  DFC_INDIRETO_CATEGORIAS_MAPEAVEIS,
+  DFC_INDIRETO_REGRAS_PADRAO,
+  DFC_INDIRETO_VARIACOES,
+} from './dfcMetodoIndireto';
 
 export const TIPOS = { dre: 'DRE', ativo: 'Ativo', passivo: 'Passivo', dfc: 'DFC', endividamento: 'Endividamento' } as const;
 export type TipoDemonstracao = keyof typeof TIPOS;
 export const DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO = ['1.1.1'] as const;
 export const MESES = ['Anual', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-const DFC_SUBTOTAIS_PADRAO = new Map(DFC_SECOES_PADRAO.map(secao => [
+const DFC_SUBTOTAIS_PADRAO = new Map<string, string>(DFC_SECOES_PADRAO.map(secao => [
   `dfc-${secao.id}`,
   `CAIXA LÍQUIDO DAS ${secao.nome.toLocaleUpperCase('pt-BR')}`,
 ] as const));
@@ -38,6 +44,10 @@ const linhaSchema = z.object({
   dfcSubtotalNome: z.string().trim().min(1).optional(),
   captacao: captacaoSchema.optional(),
 });
+const dfcIndiretoRegraSchema = z.object({
+  referencia: z.string().trim().regex(/^\d+(?:\.\d+)*$/),
+  linha: z.string().refine(linha => DFC_INDIRETO_CATEGORIAS_MAPEAVEIS.some(categoria => categoria.codigo === linha)),
+});
 export const cadastroSchema = z.object({
   version: z.string(),
   empresa: z.object({ nome: z.string(), cnpj: z.string(), nire: z.string() }),
@@ -45,8 +55,11 @@ export const cadastroSchema = z.object({
   assinantes: z.array(z.object({ id: z.string(), nome: z.string(), cargo: z.string(), registro: z.string() })),
   dfcModeloInicializado: z.boolean().optional(),
   dfcContasCaixaEquivalentes: z.array(z.string().trim().min(1)).min(1).optional(),
+  dfcIndiretoModeloInicializado: z.boolean().optional(),
+  dfcIndiretoRegras: z.array(dfcIndiretoRegraSchema).optional(),
 });
 export type CadastroDemonstracoes = z.infer<typeof cadastroSchema>;
+export type RegraDfcIndireto = z.infer<typeof dfcIndiretoRegraSchema>;
 export type LinhaDemonstracao = z.infer<typeof linhaSchema>;
 export type ItemDemonstracao = z.infer<typeof itemSchema>;
 export type ContasBalancete = Record<string, ContaBalancete>;
@@ -123,6 +136,7 @@ export function cadastroVazio(): CadastroDemonstracoes {
   return {
     version: '', empresa: { nome: '', cnpj: '', nire: '' }, linhas: [], assinantes: [],
     dfcModeloInicializado: false, dfcContasCaixaEquivalentes: [...DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO],
+    dfcIndiretoModeloInicializado: false,
   };
 }
 
@@ -197,18 +211,36 @@ export function aplicarModeloDfcPadrao(cadastro: CadastroDemonstracoes): Cadastr
     ?? [...DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO];
   const linhas = migrarNomesSubtotaisDfc(cadastro.linhas);
   const linhasAlteradas = linhas.some((linha, index) => linha !== cadastro.linhas[index]);
+  let atualizado = cadastro;
   if (cadastro.dfcModeloInicializado) {
-    return cadastro.dfcContasCaixaEquivalentes && !linhasAlteradas
-      ? cadastro
-      : { ...cadastro, linhas, dfcContasCaixaEquivalentes };
+    if (!cadastro.dfcContasCaixaEquivalentes || linhasAlteradas) {
+      atualizado = { ...cadastro, linhas, dfcContasCaixaEquivalentes };
+    }
+  } else {
+    const jaConfigurada = linhas.some(linha => linha.demonstracao === 'dfc');
+    atualizado = {
+      ...cadastro,
+      linhas: jaConfigurada ? linhas : [...linhas, ...criarLinhasDfcPadrao()],
+      dfcModeloInicializado: true,
+      dfcContasCaixaEquivalentes,
+    };
   }
-  const jaConfigurada = linhas.some(linha => linha.demonstracao === 'dfc');
+  if (atualizado.dfcIndiretoModeloInicializado) return atualizado;
   return {
-    ...cadastro,
-    linhas: jaConfigurada ? linhas : [...linhas, ...criarLinhasDfcPadrao()],
-    dfcModeloInicializado: true,
-    dfcContasCaixaEquivalentes,
+    ...atualizado,
+    dfcIndiretoModeloInicializado: true,
+    dfcIndiretoRegras: atualizado.dfcIndiretoRegras ?? [...DFC_INDIRETO_REGRAS_PADRAO],
   };
+}
+
+export function validarRegrasDfcIndireto(regras: RegraDfcIndireto[]): string | null {
+  const referencias = new Set<string>();
+  for (const regra of regras) {
+    if (!dfcIndiretoRegraSchema.safeParse(regra).success) return 'Selecione uma conta e uma linha válida para cada regra da DFC indireta.';
+    if (referencias.has(regra.referencia)) return `A conta ${regra.referencia} está repetida no mapeamento da DFC indireta.`;
+    referencias.add(regra.referencia);
+  }
+  return null;
 }
 
 export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
@@ -293,7 +325,176 @@ export function validarCadastro(cadastro: CadastroDemonstracoes): string | null 
   if (!cadastroSchema.safeParse(cadastro).success) return 'Cadastro de demonstrações inválido.';
   if (!cadastro.empresa.nome.trim() || !cadastro.empresa.cnpj.trim()) return 'Informe o nome da empresa e o CNPJ.';
   if (cadastro.assinantes.some(item => !item.nome.trim() || !item.cargo.trim())) return 'Informe nome e cargo de todos os assinantes.';
-  return validarLinhas(cadastro.linhas);
+  return validarLinhas(cadastro.linhas) ?? validarRegrasDfcIndireto(cadastro.dfcIndiretoRegras ?? []);
+}
+
+export interface ResultadoDfcIndireto {
+  valores: Map<string, number | null>;
+  contasPorLinha: Map<string, ContaBalancete[]>;
+  valoresContasPorLinha: Map<string, Map<string, number | null>>;
+  contasOperacionaisSemLinha: number | null;
+}
+
+const codigoDeResultado = (codigo: string) =>
+  /^(?:3|4|5)(?:\.|$)/.test(codigo) || /^6\.4(?:\.|$)/.test(codigo);
+
+const ordenarContas = (a: ContaBalancete, b: ContaBalancete) =>
+  a.conta.localeCompare(b.conta, undefined, { numeric: true });
+
+function somarValoresDfcIndireto(valores: Array<number | null>): number | null {
+  if (valores.some(valor => valor === null)) return null;
+  return Math.round(valores.reduce<number>((total, valor) => total + Math.round((valor ?? 0) * 100), 0)) / 100;
+}
+
+export function calcularDfcIndireto(
+  linhas: LinhaDemonstracao[],
+  regras: RegraDfcIndireto[],
+  periodos: Array<ContasBalancete | null>,
+): ResultadoDfcIndireto {
+  const valores = new Map<string, number | null>();
+  const contasPorLinha = new Map<string, ContaBalancete[]>();
+  const valoresContasPorLinha = new Map<string, Map<string, number | null>>();
+  const codigos = [
+    'RES',
+    ...DFC_INDIRETO_AJUSTES.map(({ codigo }) => codigo),
+    ...DFC_INDIRETO_VARIACOES.map(({ codigo }) => codigo),
+    'resultado-ajustado',
+    'variacoes-capital-giro',
+    'dfc-operacional',
+    'dfc-investimento',
+    'dfc-financiamento',
+    'dfc-total',
+    'diferenca-operacional',
+    'diferenca-total',
+    ...linhas.filter(linha => linha.demonstracao === 'dfc').map(linha => linha.id),
+  ];
+  const disponivel = periodos.length > 0 && periodos.every(periodo => periodo !== null);
+  if (!disponivel) {
+    for (const codigo of codigos) valores.set(codigo, null);
+    return { valores, contasPorLinha, valoresContasPorLinha, contasOperacionaisSemLinha: null };
+  }
+
+  const periodosValidos = periodos as ContasBalancete[];
+  const linhasDiretas = linhas.filter(linha => linha.demonstracao === 'dfc');
+  const calculosDiretos = calcularLinhas(linhasDiretas, 'dfc', periodos);
+  const distribuicaoDireta = distribuirContasDfc(linhasDiretas, periodos);
+  const incompletas = identificarContasIncompletas(periodos);
+  const contasBalancete = new Map<string, ContaBalancete>();
+  for (const periodo of periodosValidos) {
+    for (const conta of Object.values(periodo)) {
+      if (!incompletas.has(conta.conta)) contasBalancete.set(conta.conta, conta);
+    }
+  }
+  const contasResultado = [...contasBalancete.values()].filter(conta => codigoDeResultado(conta.conta)).sort(ordenarContas);
+  const linhasAjustes = new Map<string, ContaBalancete[]>();
+  const linhasVariacoes = new Map<string, ContaBalancete[]>();
+  for (const { codigo } of DFC_INDIRETO_AJUSTES) linhasAjustes.set(codigo, []);
+  for (const { codigo } of DFC_INDIRETO_VARIACOES) linhasVariacoes.set(codigo, []);
+  const regrasOrdenadas = [...regras].sort((a, b) => b.referencia.length - a.referencia.length);
+  const encontrarRegra = (codigo: string) => regrasOrdenadas.find(regra =>
+    codigo === regra.referencia || codigo.startsWith(`${regra.referencia}.`));
+  const linhaEstaNaSecao = (linha: LinhaDemonstracao, secao: string) =>
+    linhaPai(linha) === secao && !linha.foraDfc;
+
+  for (const linha of linhasDiretas.filter(item => item.tipo === 'contas' && !item.foraDfc)) {
+    const secaoPai = linhaPai(linha);
+    const contasDaLinha = distribuicaoDireta.porLinha.get(linha.id) ?? [];
+    if (secaoPai === 'dfc-operacional') {
+      for (const conta of contasDaLinha) {
+        if (!/^[12](?:\.|$)/.test(conta.conta)) continue;
+        const regra = encontrarRegra(conta.conta);
+        if (regra?.linha.startsWith('V')) linhasVariacoes.get(regra.linha)?.push(conta);
+      }
+    } else if (secaoPai === 'dfc-investimento' || secaoPai === 'dfc-financiamento') {
+      for (const conta of contasDaLinha.filter(item => codigoDeResultado(item.conta))) {
+        const regra = encontrarRegra(conta.conta);
+        const codigo = regra?.linha.startsWith('AJ') && regra.linha !== 'AJ06' ? regra.linha : 'AJ06';
+        linhasAjustes.get(codigo)?.push(conta);
+      }
+    }
+  }
+
+  const contasOperacionais = linhasDiretas
+    .filter(linha => linha.tipo === 'contas' && linhaEstaNaSecao(linha, 'dfc-operacional'))
+    .flatMap(linha => distribuicaoDireta.porLinha.get(linha.id) ?? [])
+    .filter(conta => /^[12](?:\.|$)/.test(conta.conta));
+  const linhasVariacoesMapeadas = new Set([...linhasVariacoes.values()].flat().map(conta => conta.conta));
+  const contasOperacionaisSemLinha = contasOperacionais.filter(conta => !linhasVariacoesMapeadas.has(conta.conta)).length;
+
+  const centavosMovimento = (conta: ContaBalancete) =>
+    periodosValidos.reduce((total, periodo) => {
+      const atual = periodo[conta.conta];
+      return total + Math.round(((atual?.valCred ?? 0) - (atual?.valDeb ?? 0)) * 100);
+    }, 0);
+  const centavosVariacao = (conta: ContaBalancete) => {
+    const primeiro = periodosValidos[0]![conta.conta]?.saldoAnt ?? 0;
+    const ultimo = periodosValidos[periodosValidos.length - 1]![conta.conta]?.saldoAtual ?? 0;
+    return -Math.round((ultimo - primeiro) * 100);
+  };
+  const guardarLinha = (codigo: string, contas: ContaBalancete[], calcularCentavos: (conta: ContaBalancete) => number) => {
+    const contasOrdenadas = [...new Map(contas.map(conta => [conta.conta, conta])).values()].sort(ordenarContas);
+    contasPorLinha.set(codigo, contasOrdenadas);
+    const porConta = new Map(contasOrdenadas.map(conta => [conta.conta, calcularCentavos(conta) / 100]));
+    valoresContasPorLinha.set(codigo, porConta);
+    valores.set(codigo, Math.round([...porConta.values()].reduce((total, valor) => total + Math.round(valor * 100), 0)) / 100);
+  };
+
+  guardarLinha('RES', contasResultado, conta => centavosMovimento(conta));
+  for (const { codigo } of DFC_INDIRETO_AJUSTES) {
+    if (codigo === 'AJ06') continue;
+    guardarLinha(codigo, linhasAjustes.get(codigo) ?? [], conta => -centavosMovimento(conta));
+  }
+  const contasAjusteManual = [...linhasAjustes.values()].flat();
+  const idsAjustesMapeados = new Set(contasAjusteManual.map(conta => conta.conta));
+  const contasAjusteResidual = linhasDiretas
+    .filter(linha => linha.tipo === 'contas' && !linha.foraDfc
+      && (linhaPai(linha) === 'dfc-investimento' || linhaPai(linha) === 'dfc-financiamento'))
+    .flatMap(linha => distribuicaoDireta.porLinha.get(linha.id) ?? [])
+    .filter(conta => codigoDeResultado(conta.conta) && !idsAjustesMapeados.has(conta.conta));
+  guardarLinha('AJ06', contasAjusteResidual, conta => -centavosMovimento(conta));
+
+  for (const { codigo } of DFC_INDIRETO_VARIACOES) {
+    guardarLinha(codigo, linhasVariacoes.get(codigo) ?? [], conta => centavosVariacao(conta));
+  }
+
+  for (const linha of linhasDiretas) {
+    valores.set(linha.id, calculosDiretos.get(linha.id) ?? null);
+    if (linha.tipo === 'contas' && !linha.foraDfc) {
+      const contas = distribuicaoDireta.porLinha.get(linha.id) ?? [];
+      contasPorLinha.set(linha.id, contas);
+      valoresContasPorLinha.set(linha.id, new Map(contas.map(conta => [
+        conta.conta,
+        calcularConta({ referencia: conta.conta, operacao: 1 }, 'dfc', periodos, incompletas),
+      ])));
+    }
+  }
+
+  const resultadoAjustado = somarValoresDfcIndireto([
+    valores.get('RES') ?? null,
+    ...DFC_INDIRETO_AJUSTES.map(({ codigo }) => valores.get(codigo) ?? null),
+  ]);
+  const variacoesCapitalGiro = somarValoresDfcIndireto(
+    DFC_INDIRETO_VARIACOES.map(({ codigo }) => valores.get(codigo) ?? null),
+  );
+  const operacional = somarValoresDfcIndireto([resultadoAjustado, variacoesCapitalGiro]);
+  const investimento = calculosDiretos.get('dfc-investimento') ?? null;
+  const financiamento = calculosDiretos.get('dfc-financiamento') ?? null;
+  const total = somarValoresDfcIndireto([operacional, investimento, financiamento]);
+  const diretoOperacional = calculosDiretos.get('dfc-operacional') ?? null;
+  const diretoTotal = somarValoresDfcIndireto([
+    diretoOperacional,
+    investimento,
+    financiamento,
+  ]);
+  valores.set('resultado-ajustado', resultadoAjustado);
+  valores.set('variacoes-capital-giro', variacoesCapitalGiro);
+  valores.set('dfc-operacional', operacional);
+  valores.set('dfc-investimento', investimento);
+  valores.set('dfc-financiamento', financiamento);
+  valores.set('dfc-total', total);
+  valores.set('diferenca-operacional', diretoOperacional === null || operacional === null ? null : Math.round((operacional - diretoOperacional) * 100) / 100);
+  valores.set('diferenca-total', diretoTotal === null || total === null ? null : Math.round((total - diretoTotal) * 100) / 100);
+  return { valores, contasPorLinha, valoresContasPorLinha, contasOperacionaisSemLinha };
 }
 
 export function calcularConta(

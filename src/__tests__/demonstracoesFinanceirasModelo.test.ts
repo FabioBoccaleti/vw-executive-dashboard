@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
-import { aplicarModeloDfcPadrao, calcularLinhas, calcularSaldosCaixaEquivalentes, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { aplicarModeloDfcPadrao, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 
 const grupo = (id: string, conta: string, operacao: 1 | -1 = 1): LinhaDemonstracao => ({
   id, nome: id, demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: conta, operacao }],
@@ -111,6 +111,8 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
       'CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO',
       'CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO',
     ]);
+    expect(inicial.dfcIndiretoRegras).toContainEqual({ referencia: '1.1.2', linha: 'V03' });
+    expect(inicial.dfcIndiretoRegras).toContainEqual({ referencia: '5.5.2.07.20', linha: 'AJ01' });
 
     const personalizada = {
       ...inicial,
@@ -200,6 +202,46 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     expect(calcularSaldosCaixaEquivalentes(prefixosPersonalizados, [janeiro, null])).toEqual({
       saldoInicial: null, saldoFinal: null, variacaoReal: null,
     });
+  });
+
+  it('calcula a DFC indireta com ajustes, variações de saldo e linhas de investimento/financiamento do método direto', () => {
+    const linhas: LinhaDemonstracao[] = [
+      { id: 'dfc-operacional', nome: 'Operacional', demonstracao: 'dfc', tipo: 'total', itens: [{ referencia: 'dfc-op01', operacao: 1 }] },
+      { id: 'dfc-op01', nome: 'Operacional', demonstracao: 'dfc', tipo: 'contas', sublinhaDe: 'dfc-operacional', itens: [
+        { referencia: '3.1', operacao: 1 }, { referencia: '4.1', operacao: 1 }, { referencia: '2.1.1.01.01', operacao: 1 },
+      ] },
+      { id: 'dfc-investimento', nome: 'Investimento', demonstracao: 'dfc', tipo: 'total', itens: [{ referencia: 'dfc-inv01', operacao: 1 }] },
+      { id: 'dfc-inv01', nome: 'Imobilizado', demonstracao: 'dfc', tipo: 'contas', sublinhaDe: 'dfc-investimento', itens: [
+        { referencia: '3.6.1.01', operacao: 1 }, { referencia: '5.1.3.04', operacao: 1 },
+      ] },
+      { id: 'dfc-financiamento', nome: 'Financiamento', demonstracao: 'dfc', tipo: 'total', itens: [{ referencia: 'dfc-fin01', operacao: 1 }] },
+      { id: 'dfc-fin01', nome: 'Juros', demonstracao: 'dfc', tipo: 'contas', sublinhaDe: 'dfc-financiamento', itens: [
+        { referencia: '5.5.7.01.01.001', operacao: 1 },
+      ] },
+    ];
+    const contas = extractAccounts([
+      'A;3.1;Receita;0;0;100;0',
+      'A;4.1;Custo;0;40;0;0',
+      'P;2.1.1.01.01;Fornecedores;-10;0;10;-20',
+      'A;3.6.1.01;Ganho na venda;0;0;30;0',
+      'A;5.1.3.04;Depreciação;0;5;0;0',
+      'A;5.5.7.01.01.001;Juros;0;20;0;0',
+    ].join('\n'), { strict: true });
+
+    expect(validarLinhas(linhas)).toBeNull();
+    const resultado = calcularDfcIndireto(linhas, aplicarModeloDfcPadrao(cadastroVazio()).dfcIndiretoRegras ?? [], [contas]);
+    expect(resultado.valores.get('RES')).toBe(65);
+    expect(resultado.valores.get('AJ01')).toBe(5);
+    expect(resultado.valores.get('AJ02')).toBe(-30);
+    expect(resultado.valores.get('AJ04')).toBe(20);
+    expect(resultado.valores.get('V08')).toBe(10);
+    expect(resultado.valores.get('dfc-operacional')).toBe(70);
+    expect(resultado.valores.get('dfc-investimento')).toBe(25);
+    expect(resultado.valores.get('dfc-financiamento')).toBe(-20);
+    expect(resultado.valores.get('dfc-total')).toBe(75);
+    expect(resultado.valores.get('diferenca-operacional')).toBe(0);
+    expect(resultado.valores.get('diferenca-total')).toBe(0);
+    expect(resultado.contasOperacionaisSemLinha).toBe(0);
   });
 
   it('preserva centavos e ignora operações manuais antigas tanto nas contas quanto nas totalizações da DRE', () => {

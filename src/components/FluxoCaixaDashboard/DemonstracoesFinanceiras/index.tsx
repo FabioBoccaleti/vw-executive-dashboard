@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TIPOS, MESES, calcularConta, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcNaoMapeadas,
+  TIPOS, MESES, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcNaoMapeadas,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
-  type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
+  type LinhaDemonstracao, type PeriodoDemonstracao, type RegraDfcIndireto, type TipoDemonstracao,
 } from './modelo';
+import { DFC_INDIRETO_AJUSTES, DFC_INDIRETO_CATEGORIAS_MAPEAVEIS, DFC_INDIRETO_VARIACOES } from './dfcMetodoIndireto';
 import { loadCadastroDemonstracoes, loadDadosDemonstracoes, saveCadastroDemonstracoes } from './storage';
 
 const moeda = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
@@ -48,6 +49,12 @@ type EditorCaptacao = {
   periodo: PeriodoDemonstracao;
   campos: Record<(typeof camposCaptacao)[number]['campo'], string>;
 };
+type LinhaDfcIndiretoTabela = {
+  id: string;
+  nome: string;
+  codigo?: string;
+  tipo: 'titulo' | 'grupo' | 'conta' | 'subtotal' | 'total';
+};
 
 export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { selectedYear: number; selectedMonth: number }) {
   const [aba, setAba] = useState<TipoDemonstracao | 'cadastros'>('dre');
@@ -65,6 +72,11 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [anoAdicionar, setAnoAdicionar] = useState(String(selectedYear - 1));
   const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
   const [periodoDfc, setPeriodoDfc] = useState<'mes' | 'acumulado'>('mes');
+  const [metodoDfc, setMetodoDfc] = useState<'direto' | 'indireto'>('direto');
+  const [modoCadastroDfc, setModoCadastroDfc] = useState<'direto' | 'indireto'>('direto');
+  const [editorDfcIndireto, setEditorDfcIndireto] = useState<{ linha: string; referencias: string[] } | null>(null);
+  const [buscaDfcIndireto, setBuscaDfcIndireto] = useState('');
+  const [erroDfcIndireto, setErroDfcIndireto] = useState('');
   const [naoClassificadasAberto, setNaoClassificadasAberto] = useState(false);
   const [dfcNaoMapeadasAberto, setDfcNaoMapeadasAberto] = useState(false);
   const [contasCaixaEditor, setContasCaixaEditor] = useState<string[] | null>(null);
@@ -328,6 +340,39 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     });
   }
 
+  function editarRegrasDfcIndireto(linha: string) {
+    setEditorDfcIndireto({
+      linha,
+      referencias: (cadastro?.dfcIndiretoRegras ?? []).filter(regra => regra.linha === linha).map(regra => regra.referencia),
+    });
+    setBuscaDfcIndireto('');
+    setErroDfcIndireto('');
+  }
+
+  function selecionarRegraDfcIndireto(referencia: string, marcada: boolean) {
+    setEditorDfcIndireto(atual => {
+      if (!atual) return atual;
+      return {
+        ...atual,
+        referencias: marcada
+          ? [...new Set([...atual.referencias, referencia])]
+          : atual.referencias.filter(item => item !== referencia),
+      };
+    });
+  }
+
+  function aplicarRegrasDfcIndireto() {
+    if (!cadastro || !editorDfcIndireto || salvando) return;
+    const regras: RegraDfcIndireto[] = [
+      ...(cadastro.dfcIndiretoRegras ?? []).filter(regra => regra.linha !== editorDfcIndireto.linha),
+      ...editorDfcIndireto.referencias.map(referencia => ({ referencia, linha: editorDfcIndireto.linha })),
+    ];
+    const erro = validarRegrasDfcIndireto(regras);
+    if (erro) { setErroDfcIndireto(erro); return; }
+    atualizar({ ...cadastro, dfcIndiretoRegras: regras });
+    setEditorDfcIndireto(null);
+  }
+
   function adicionarAnoComparacao() {
     const ano = Number(anoAdicionar);
     if (!Number.isInteger(ano) || ano < 1900 || ano > 9999) {
@@ -438,6 +483,13 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const contasDfcNaoMapeadas = aba === 'dfc' && cadastro && dados
     ? identificarContasDfcNaoMapeadas(cadastro.linhas, detalhesColunas.map(detalhe => detalhe.periodos))
     : [];
+  const resultadosDfcIndireto = aba === 'dfc' && metodoDfc === 'indireto' && cadastro && dados
+    ? colunas.map(coluna => calcularDfcIndireto(
+      cadastro.linhas,
+      cadastro.dfcIndiretoRegras ?? [],
+      coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null),
+    ))
+    : [];
   const periodosDetalhamento = detalhesColunas.flatMap(detalhe => detalhe.periodos);
   const contasDfcPorLinha = aba === 'dfc'
     ? new Map(linhas.filter(linha => linha.tipo === 'contas')
@@ -446,12 +498,16 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const conciliacoesCaixa = aba === 'dfc' && cadastro && dados
     ? detalhesColunas.map(detalhe => calcularSaldosCaixaEquivalentes(cadastro.dfcContasCaixaEquivalentes ?? [], detalhe.periodos))
     : [];
-  const variacoesDfc = aba === 'dfc' ? valores.map(resultado => {
-    const atividades = linhasAtividadesDfc.map(linha => resultado.get(linha.id) ?? null);
-    return !atividades.length || atividades.some(valor => valor === null)
-      ? null
-      : Math.round(atividades.reduce<number>((total, valor) => total + Math.round((valor ?? 0) * 100), 0)) / 100;
-  }) : [];
+  const variacoesDfc = aba === 'dfc'
+    ? metodoDfc === 'indireto'
+      ? resultadosDfcIndireto.map(resultado => resultado.valores.get('dfc-total') ?? null)
+      : valores.map(resultado => {
+        const atividades = linhasAtividadesDfc.map(linha => resultado.get(linha.id) ?? null);
+        return !atividades.length || atividades.some(valor => valor === null)
+          ? null
+          : Math.round(atividades.reduce<number>((total, valor) => total + Math.round((valor ?? 0) * 100), 0)) / 100;
+      })
+    : [];
   const contasIncompletasVinculadas = linhas.filter(linha => aba !== 'dfc' && linha.tipo === 'contas')
     .flatMap(linha => linha.itens).filter(item => contasIncompletas.has(item.referencia));
   const linhasDisponiveisEditor = editor && cadastro
@@ -462,6 +518,28 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     { nome: 'Saldo de caixa — início', valores: conciliacoesCaixa.map(item => item.saldoInicial) },
     { nome: 'Saldo de caixa — fim', valores: conciliacoesCaixa.map(item => item.saldoFinal) },
     { nome: 'Variação real de caixa (balancete)', valores: conciliacoesCaixa.map(item => item.variacaoReal) },
+  ];
+  const linhasDfcIndiretoTabela: LinhaDfcIndiretoTabela[] = [
+    { id: 'titulo-operacional', nome: 'ATIVIDADES OPERACIONAIS', tipo: 'titulo' },
+    { id: 'RES', nome: 'Resultado líquido do período (lucro + / prejuízo –)', codigo: 'RES', tipo: 'conta' },
+    { id: 'grupo-ajustes', nome: 'Ajustes ao resultado', tipo: 'grupo' },
+    ...DFC_INDIRETO_AJUSTES.map(({ codigo, nome }) => ({ id: codigo, nome, codigo, tipo: 'conta' as const })),
+    { id: 'resultado-ajustado', nome: 'Resultado ajustado', tipo: 'subtotal' },
+    { id: 'grupo-variacoes', nome: 'Variações de ativos e passivos operacionais', tipo: 'grupo' },
+    ...DFC_INDIRETO_VARIACOES.map(({ codigo, nome }) => ({ id: codigo, nome, codigo, tipo: 'conta' as const })),
+    { id: 'variacoes-capital-giro', nome: 'Variações do capital de giro', tipo: 'subtotal' },
+    { id: 'dfc-operacional', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS', tipo: 'total' },
+    { id: 'titulo-investimento', nome: 'ATIVIDADES DE INVESTIMENTO', tipo: 'titulo' },
+    ...linhas.filter(linha => linhaPai(linha) === 'dfc-investimento').map(linha => ({
+      id: linha.id, nome: linha.nome, codigo: linha.id.replace(/^dfc-/, '').toUpperCase(), tipo: 'conta' as const,
+    })),
+    { id: 'dfc-investimento', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO', tipo: 'total' },
+    { id: 'titulo-financiamento', nome: 'ATIVIDADES DE FINANCIAMENTO', tipo: 'titulo' },
+    ...linhas.filter(linha => linhaPai(linha) === 'dfc-financiamento').map(linha => ({
+      id: linha.id, nome: linha.nome, codigo: linha.id.replace(/^dfc-/, '').toUpperCase(), tipo: 'conta' as const,
+    })),
+    { id: 'dfc-financiamento', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO', tipo: 'total' },
+    { id: 'dfc-total', nome: 'VARIAÇÃO DE CAIXA PELA DFC', tipo: 'total' },
   ];
 
   function grupoDaConta(referencia: string) {
@@ -523,12 +601,41 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                         {Object.entries(TIPOS).map(([key, titulo]) => <option key={key} value={key}>{titulo}</option>)}
                       </select>
                     </label>
-                    <Button onClick={() => abrirEditor()}>Adicionar linha</Button>
+                    {tipoCadastro === 'dfc' && <div role="group" aria-label="Método da DFC nos cadastros" className="flex gap-2">
+                      <Button type="button" variant={modoCadastroDfc === 'direto' ? 'default' : 'outline'} aria-pressed={modoCadastroDfc === 'direto'} onClick={() => setModoCadastroDfc('direto')}>Método Direto</Button>
+                      <Button type="button" variant={modoCadastroDfc === 'indireto' ? 'default' : 'outline'} aria-pressed={modoCadastroDfc === 'indireto'} onClick={() => setModoCadastroDfc('indireto')}>Método Indireto</Button>
+                    </div>}
+                    {!(tipoCadastro === 'dfc' && modoCadastroDfc === 'indireto') && <Button onClick={() => abrirEditor()}>Adicionar linha</Button>}
                   </div>
-                  <p className="text-sm text-muted-foreground">{tipoCadastro === 'dfc'
+                  <p className="text-sm text-muted-foreground">{tipoCadastro === 'dfc' && modoCadastroDfc === 'indireto'
+                    ? 'A DFC indireta usa o de-para da planilha. Variações de ativos e passivos consideram somente contas operacionais do método direto; o prefixo mais longo prevalece. AJ06 reúne automaticamente resultados de investimento/financiamento não classificados nos ajustes AJ01–AJ05.'
+                    : tipoCadastro === 'dfc'
                     ? 'A DFC usa prefixos: o mais longo cadastrado prevalece. O efeito de cada conta é Crédito − Débito. Edite as linhas para reclassificar prefixos; use “Contas fora da DFC” para guardar contas de apoio.'
                     : 'Cadastre grupos de contas e totalizações das linhas desejadas. Use as setas para definir a posição de cada linha na demonstração; a posição não altera o cálculo.'}</p>
                   <div className="space-y-2">
+                    {tipoCadastro === 'dfc' && modoCadastroDfc === 'indireto' ? (
+                      <div className="space-y-3">
+                        {DFC_INDIRETO_CATEGORIAS_MAPEAVEIS.map(({ codigo, nome }) => {
+                          const regras = (cadastro.dfcIndiretoRegras ?? []).filter(regra => regra.linha === codigo);
+                          return <div key={codigo} className="rounded border p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div><p className="font-medium">{codigo} · {nome}</p><p className="text-xs text-muted-foreground">{regras.length} {regras.length === 1 ? 'prefixo cadastrado' : 'prefixos cadastrados'}</p></div>
+                              <Button variant="outline" size="sm" onClick={() => editarRegrasDfcIndireto(codigo)}>Editar regras {codigo}</Button>
+                            </div>
+                            {regras.length > 0 && <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                              {regras.map(regra => <li key={regra.referencia} className="flex items-center justify-between gap-2">
+                                <span>{descricaoConta({ referencia: regra.referencia, operacao: 1 })}</span>
+                                <Button variant="ghost" size="sm" aria-label={`Remover regra ${regra.referencia} de ${codigo}`}
+                                  onClick={() => atualizar({ ...cadastro, dfcIndiretoRegras: (cadastro.dfcIndiretoRegras ?? []).filter(item => item.referencia !== regra.referencia) })}>Remover</Button>
+                              </li>)}
+                            </ul>}
+                          </div>;
+                        })}
+                        <div className="rounded border border-dashed p-3 text-sm text-muted-foreground">
+                          AJ06 é calculado automaticamente para neutralizar os demais resultados classificados em investimento ou financiamento no método direto.
+                        </div>
+                      </div>
+                    ) : <>
                     {cadastro.linhas.filter(item => item.demonstracao === tipoCadastro && !linhaPai(item)).map((linha, index, lista) => {
                       const filhas = cadastro.linhas.filter(item => linhaPai(item) === linha.id);
                       const podeExpandir = linha.tipo === 'contas' || filhas.length > 0;
@@ -555,6 +662,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                       </div>;
                     })}
                     {!cadastro.linhas.some(item => item.demonstracao === tipoCadastro) && <p className="text-sm text-muted-foreground">Nenhuma linha cadastrada para {TIPOS[tipoCadastro]}.</p>}
+                    </>}
                   </div>
                 </section>
                 <section className="space-y-3">
@@ -575,6 +683,11 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
               </fieldset>
             ) : (
               <section className="space-y-4" aria-label={`Demonstração ${TIPOS[aba]}`}>
+                {aba === 'dfc' && <div role="group" aria-label="Método da DFC" className="flex flex-wrap items-center gap-2 rounded border bg-muted/30 p-3">
+                  <span className="mr-2 text-sm font-medium">Método:</span>
+                  <Button variant={metodoDfc === 'direto' ? 'default' : 'outline'} aria-pressed={metodoDfc === 'direto'} onClick={() => setMetodoDfc('direto')}>Direto</Button>
+                  <Button variant={metodoDfc === 'indireto' ? 'default' : 'outline'} aria-pressed={metodoDfc === 'indireto'} onClick={() => setMetodoDfc('indireto')}>Indireto</Button>
+                </div>}
                 {aba === 'dre' && selectedMonth !== 0 && <div role="group" aria-label="Período da DRE" className="flex flex-wrap items-center gap-2 rounded border bg-muted/30 p-3">
                   <span className="mr-2 text-sm font-medium">Período da DRE:</span>
                   <Button variant={periodoDre === 'mes' ? 'default' : 'outline'} aria-pressed={periodoDre === 'mes'} onClick={() => setPeriodoDre('mes')}>
@@ -618,7 +731,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 <header className="space-y-1 py-3 text-center">
                   <h3 className="text-lg font-semibold">{cadastro.empresa.nome || 'Cadastre o nome da empresa'}</h3>
                   {cadastro.empresa.cnpj && <p className="text-sm">CNPJ: {cadastro.empresa.cnpj}{cadastro.empresa.nire && ` · NIRE: ${cadastro.empresa.nire}`}</p>}
-                  <p className="font-medium">{titulosDemonstracoes[aba]}</p>
+                  <p className="font-medium">{aba === 'dfc' && metodoDfc === 'indireto'
+                    ? 'Demonstração dos Fluxos de Caixa — Método Indireto'
+                    : titulosDemonstracoes[aba]}</p>
                   <p className="text-xs text-muted-foreground">Valores em R$</p>
                 </header>
                 {faltantes.length > 0 && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Balancetes não importados: {faltantes.map(rotuloPeriodo).join(', ')}. As colunas afetadas ficam indisponíveis.</p>}
@@ -627,13 +742,63 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 {contasNaoClassificadas.length > 0 && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                   {contasNaoClassificadas.length === 1 ? 'Existe 1 conta de resultado' : `Existem ${contasNaoClassificadas.length} contas de resultado`} com movimento que não {contasNaoClassificadas.length === 1 ? 'está' : 'estão'} em nenhum grupo da DRE. Veja o quadro "Contas com movimento não classificadas" abaixo da tabela.
                 </p>}
-                {aba === 'dfc' && dados && !erroDados && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                {aba === 'dfc' && metodoDfc === 'direto' && dados && !erroDados && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                   {contasDfcNaoMapeadas.length === 0
                     ? 'Nenhuma conta analítica sem prefixo de classificação no balancete carregado.'
                     : `${contasDfcNaoMapeadas.length} ${contasDfcNaoMapeadas.length === 1 ? 'conta analítica' : 'contas analíticas'} sem prefixo de classificação. Veja “Contas não mapeadas” abaixo.`}
                 </p>}
+                {aba === 'dfc' && metodoDfc === 'indireto' && resultadosDfcIndireto.some(resultado => (resultado.contasOperacionaisSemLinha ?? 0) > 0) && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  Existem contas patrimoniais classificadas como operacionais no método direto sem linha de variação na DFC indireta. Confira a conferência e os mapeamentos em Cadastros.
+                </p>}
                 {!dados && !erroDados ? <p role="status">Carregando balancetes...</p> : !erroDados && (
-                  <div className="overflow-x-auto">
+                  aba === 'dfc' && metodoDfc === 'indireto' ? <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <caption className="sr-only">DFC Indireto — {colunas.map(coluna => coluna.titulo).join(' e ')}</caption>
+                      <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
+                      <tbody>
+                        {linhasDfcIndiretoTabela.map(linha => {
+                          const tipoLinha = linha.tipo === 'titulo' || linha.tipo === 'grupo';
+                          const contas = linha.tipo === 'conta'
+                            ? [...new Map(resultadosDfcIndireto.flatMap(resultado => resultado.contasPorLinha.get(linha.id) ?? [])
+                              .map(conta => [conta.conta, conta])).values()].sort((a, b) => a.conta.localeCompare(b.conta, 'pt-BR', { numeric: true }))
+                            : [];
+                          const expandido = gruposExpandidos.has(linha.id);
+                          return <Fragment key={linha.id}>
+                            <tr className={linha.tipo === 'total' || linha.tipo === 'subtotal'
+                              ? 'border-y bg-muted/60 font-bold'
+                              : linha.tipo === 'titulo' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
+                              <th scope="row" className={`p-3 text-left ${linha.tipo === 'conta' ? 'font-normal' : ''}`}>
+                                {linha.tipo === 'conta' && contas.length > 0 && <button type="button" className="mr-2 inline-flex rounded p-1 hover:bg-muted focus-visible:outline focus-visible:outline-2"
+                                  aria-label={`${expandido ? 'Ocultar' : 'Exibir'} contas de ${linha.nome}`}
+                                  aria-expanded={expandido} onClick={() => alternarExpandido(linha.id, setGruposExpandidos)}>
+                                  {expandido ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+                                </button>}
+                                {linha.codigo && <span className="mr-2 font-mono text-xs text-muted-foreground">{linha.codigo}</span>}
+                                {linha.nome}
+                              </th>
+                              {colunas.map((_, index) => {
+                                const valor = tipoLinha ? null : resultadosDfcIndireto[index]?.valores.get(linha.id) ?? null;
+                                return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>
+                                  {tipoLinha || valor === null ? '' : formatarMoeda(valor)}
+                                </td>;
+                              })}
+                            </tr>
+                            {linha.tipo === 'conta' && expandido && contas.map(conta => (
+                              <tr key={`${linha.id}-${conta.conta}`} className="border-b bg-muted/20">
+                                <th scope="row" className="p-3 pl-12 text-left font-normal text-muted-foreground">{conta.conta} — {conta.desc}</th>
+                                {colunas.map((_, colunaIndex) => {
+                                  const contaDaColuna = resultadosDfcIndireto[colunaIndex]?.valoresContasPorLinha.get(linha.id)?.get(conta.conta) ?? null;
+                                  return <td key={colunaIndex} className={`whitespace-nowrap p-3 text-right tabular-nums ${contaDaColuna !== null && contaDaColuna < 0 ? 'text-red-700' : ''}`}>
+                                    {contaDaColuna === null ? '—' : formatarMoeda(contaDaColuna)}
+                                  </td>;
+                                })}
+                              </tr>
+                            ))}
+                          </Fragment>;
+                        })}
+                      </tbody>
+                    </table>
+                  </div> : <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <caption className="sr-only">{TIPOS[aba]} — {colunas.map(coluna => coluna.titulo).join(' e ')}</caption>
                       <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
@@ -713,6 +878,48 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </table>
                   </div>
                 </section>}
+                {aba === 'dfc' && metodoDfc === 'indireto' && resultadosDfcIndireto.length > 0 && <section aria-label="Conferência da DFC indireta" className="space-y-3 rounded border p-3">
+                  <div>
+                    <h3 className="font-semibold">Conferência com o método direto</h3>
+                    <p className="text-sm text-muted-foreground">As diferenças entre os métodos devem ser zero. Contas operacionais sem linha no indireto precisam ser classificadas para fechar a ponte entre o resultado e o caixa.</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
+                      <tbody>
+                        {[
+                          { nome: 'Caixa operacional: indireto − direto', chave: 'diferenca-operacional', tipo: 'valor' },
+                          { nome: 'Variação de caixa: indireto − direto', chave: 'diferenca-total', tipo: 'valor' },
+                          { nome: 'Contas operacionais sem linha no indireto', chave: 'contas-sem-linha', tipo: 'quantidade' },
+                        ].map(linha => <tr key={linha.chave} className="border-b">
+                          <th scope="row" className="p-3 text-left">{linha.nome}</th>
+                          {colunas.map((_, index) => {
+                            const resultado = resultadosDfcIndireto[index];
+                            const valor = linha.tipo === 'quantidade'
+                              ? resultado?.contasOperacionaisSemLinha ?? null
+                              : resultado?.valores.get(linha.chave) ?? null;
+                            return <td key={index} className="whitespace-nowrap p-3 text-right tabular-nums">
+                              {valor === null ? '—' : linha.tipo === 'quantidade' ? valor : formatarMoedaComCentavos(valor)}
+                            </td>;
+                          })}
+                        </tr>)}
+                        <tr className="border-y bg-muted/40 font-semibold">
+                          <th scope="row" className="p-3 text-left">Status</th>
+                          {colunas.map((_, index) => {
+                            const resultado = resultadosDfcIndireto[index];
+                            const operacional = resultado?.valores.get('diferenca-operacional');
+                            const total = resultado?.valores.get('diferenca-total');
+                            return <td key={index} className="p-3 text-right">
+                              {operacional === null || operacional === undefined || total === null || total === undefined
+                                ? '—'
+                                : operacional === 0 && total === 0 ? 'OK — métodos convergem' : 'Verificar mapeamento'}
+                            </td>;
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>}
                 {contasNaoClassificadas.length > 0 && <section aria-label="Contas com movimento não classificadas" className="rounded border border-amber-300">
                   <button type="button" aria-expanded={naoClassificadasAberto} onClick={() => setNaoClassificadasAberto(value => !value)}
                     className="flex w-full items-center gap-2 bg-amber-50 p-3 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
@@ -774,7 +981,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </div>
                   ))}
                 </section>}
-                {aba === 'dfc' && contasDfcNaoMapeadas.length > 0 && <section aria-label="Contas não mapeadas" className="rounded border border-amber-300">
+                {aba === 'dfc' && metodoDfc === 'direto' && contasDfcNaoMapeadas.length > 0 && <section aria-label="Contas não mapeadas" className="rounded border border-amber-300">
                   <button type="button" aria-expanded={dfcNaoMapeadasAberto} onClick={() => setDfcNaoMapeadasAberto(value => !value)}
                     className="flex w-full items-center gap-2 bg-amber-50 p-3 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
                     {dfcNaoMapeadasAberto ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
@@ -794,7 +1001,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 <p className="text-xs text-muted-foreground">{aba === 'dre'
                   ? `DRE: movimento líquido (créditos − débitos), preservando o sinal contábil e os estornos; ${selectedMonth === 0 || periodoDre === 'acumulado' ? 'acumulado de janeiro até o mês selecionado' : 'somente o mês selecionado'}. Grupos e totalizações somam os valores com seus sinais automaticamente.`
                   : aba === 'dfc'
-                    ? `DFC Direto: cada conta analítica usa Crédito − Débito; ${selectedMonth === 0 || periodoDfc === 'acumulado' ? 'acumulado de janeiro até o mês selecionado' : 'somente o mês selecionado'}. A linha é definida pelo prefixo cadastrado mais longo.`
+                    ? metodoDfc === 'indireto'
+                      ? `DFC Indireto: resultado líquido mais ajustes e variações do balanço; investimento e financiamento acompanham as linhas do método direto. ${selectedMonth === 0 || periodoDfc === 'acumulado' ? 'Acumulado de janeiro até o mês selecionado.' : 'Somente o mês selecionado.'}`
+                      : `DFC Direto: cada conta analítica usa Crédito − Débito; ${selectedMonth === 0 || periodoDfc === 'acumulado' ? 'acumulado de janeiro até o mês selecionado' : 'somente o mês selecionado'}. A linha é definida pelo prefixo cadastrado mais longo.`
                     : 'Patrimonial: valor absoluto do saldo atual de cada conta em cada data, sem somar saldos mensais. O sinal de cada conta é definido por Somar/Subtrair no cadastro.'}</p>
                 {cadastro.assinantes.length > 0 && <div className="grid gap-8 pt-12 sm:grid-cols-2">
                   {cadastro.assinantes.map(assinante => <div key={assinante.id} className="border-t pt-2 text-center text-sm">
@@ -966,6 +1175,43 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
             <DialogFooter>
               <Button variant="outline" disabled={salvando} onClick={() => setContasCaixaEditor(null)}>Cancelar</Button>
               <Button disabled={salvando || contasCaixaEditor === null} onClick={salvarContasCaixaEquivalentes}>Salvar contas</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={editorDfcIndireto !== null} onOpenChange={open => { if (!open) setEditorDfcIndireto(null); }}>
+          <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto sm:max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Mapear contas — {DFC_INDIRETO_CATEGORIAS_MAPEAVEIS.find(item => item.codigo === editorDfcIndireto?.linha)?.nome}</DialogTitle>
+              <DialogDescription>Selecione contas ou prefixos para esta linha da DFC indireta. O prefixo mais longo prevalece quando houver regras sobrepostas; depois, salve o cadastro para aplicar as alterações.</DialogDescription>
+            </DialogHeader>
+            {editorDfcIndireto && <>
+              <Input aria-label="Pesquisar contas da DFC indireta" placeholder="Pesquisar por código ou descrição" value={buscaDfcIndireto} onChange={event => setBuscaDfcIndireto(event.target.value)} />
+              <div className="max-h-64 space-y-1 overflow-y-auto rounded border p-2">
+                {catalogo.filter(conta => `${conta.codigo} ${conta.descricao}`.toLocaleLowerCase().includes(buscaDfcIndireto.toLocaleLowerCase())).map(conta => {
+                  const regraExistente = (cadastro?.dfcIndiretoRegras ?? []).find(regra =>
+                    regra.referencia === conta.codigo && regra.linha !== editorDfcIndireto.linha);
+                  const selecionada = editorDfcIndireto.referencias.includes(conta.codigo);
+                  return <label key={conta.codigo} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm hover:bg-muted">
+                    <input type="checkbox" className="size-5 shrink-0" disabled={Boolean(regraExistente)} checked={selecionada}
+                      onChange={event => selecionarRegraDfcIndireto(conta.codigo, event.target.checked)} />
+                    <span>{conta.codigo} — {conta.descricao}{regraExistente ? ` (já mapeada em ${regraExistente.linha})` : ''}</span>
+                  </label>;
+                })}
+                {catalogo.length === 0 && <p className="p-2 text-sm text-muted-foreground">Importe um balancete para selecionar contas ou prefixos.</p>}
+              </div>
+              <section className="space-y-2 rounded border p-3">
+                <h3 className="text-sm font-semibold">Prefixos selecionados ({editorDfcIndireto.referencias.length})</h3>
+                {editorDfcIndireto.referencias.map(referencia => <div key={referencia} className="flex items-center justify-between gap-2 text-sm">
+                  <span>{descricaoConta({ referencia, operacao: 1 })}</span>
+                  <Button variant="outline" size="sm" aria-label={`Remover prefixo ${referencia}`}
+                    onClick={() => selecionarRegraDfcIndireto(referencia, false)}>Remover</Button>
+                </div>)}
+              </section>
+            </>}
+            {erroDfcIndireto && <p role="alert" className="text-sm text-red-700">{erroDfcIndireto}</p>}
+            <DialogFooter>
+              <Button variant="outline" disabled={salvando} onClick={() => setEditorDfcIndireto(null)}>Cancelar</Button>
+              <Button disabled={salvando || editorDfcIndireto === null} onClick={aplicarRegrasDfcIndireto}>Aplicar mapeamento</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -131,6 +131,24 @@ it('exibe DFC Direto por mês e no acumulado de janeiro até o mês selecionado'
   });
 });
 
+it('permite alternar para o DFC Indireto e confere o subtotal operacional com o método direto', async () => {
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  await screen.findByRole('rowheader', { name: 'Atividades Operacionais' });
+  fireEvent.click(screen.getByRole('button', { name: 'Indireto' }));
+
+  const resultado = await screen.findByRole('row', { name: /Resultado líquido do período/ });
+  expect(within(resultado).getByRole('cell')).toHaveTextContent('400');
+  expect(screen.getByRole('rowheader', { name: /AJ06/ })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Conferência da DFC indireta' })).toHaveTextContent('OK — métodos convergem');
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Cadastros' }));
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'dfc' } });
+  await screen.findByRole('button', { name: 'Método Indireto' });
+  fireEvent.click(screen.getByRole('button', { name: 'Método Indireto' }));
+  expect(await screen.findByRole('button', { name: 'Editar regras V03' })).toBeInTheDocument();
+});
+
 it('pré-carrega o mapeamento DFC, mostra contas fora da DFC e destaca contas sem prefixo', async () => {
   mocks.raw.mockResolvedValue({ rawText: [
     'A;3.1.1;Receita detalhada;0;0;100;0',
