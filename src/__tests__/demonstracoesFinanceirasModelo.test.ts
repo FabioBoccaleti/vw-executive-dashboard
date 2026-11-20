@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
-import { aplicarModeloDfcPadrao, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { aplicarModeloDfcPadrao, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasDfcPendentes, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 
 const grupo = (id: string, conta: string, operacao: 1 | -1 = 1): LinhaDemonstracao => ({
   id, nome: id, demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: conta, operacao }],
@@ -242,6 +242,59 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     expect(resultado.valores.get('diferenca-operacional')).toBe(0);
     expect(resultado.valores.get('diferenca-total')).toBe(0);
     expect(resultado.contasOperacionaisSemLinha).toBe(0);
+  });
+
+  it('identifica contas com movimento pendentes e sugere mapeamentos somente com contas próximas consistentes', () => {
+    const linhas: LinhaDemonstracao[] = [
+      { id: 'dfc-operacional', nome: 'Operacional', demonstracao: 'dfc', tipo: 'total', itens: [{ referencia: 'dfc-op01', operacao: 1 }] },
+      { id: 'dfc-op01', nome: 'Ativos operacionais', demonstracao: 'dfc', tipo: 'contas', sublinhaDe: 'dfc-operacional', itens: [
+        { referencia: '1.1.2.01', operacao: 1 }, { referencia: '1.1.2.02', operacao: 1 },
+      ] },
+    ];
+    const contas = extractAccounts([
+      'A;1.1.2.01;Clientes diversos A;0;0;0;0',
+      'A;1.1.2.02;Clientes diversos B;0;0;0;0',
+      'A;1.1.2.03;Clientes diversos C;0;20;0;20',
+      'A;1.1.2.04;Clientes diversos D;0;0;0;0',
+    ].join('\n'), { strict: true });
+    const regras = [
+      { referencia: '1.1.2.01', linha: 'V03' },
+      { referencia: '1.1.2.02', linha: 'V03' },
+    ];
+
+    const pendencias = identificarContasDfcPendentes(linhas, regras, [[contas]]);
+    expect(pendencias.map(conta => conta.conta)).toEqual(['1.1.2.03']);
+    expect(pendencias[0]).toMatchObject({
+      statusDireto: 'Sem classificação',
+      statusIndireto: 'Sem linha de variação do capital de giro.',
+      sugestaoDireta: {
+        codigo: 'dfc-op01',
+        contasSemelhantes: [
+          { conta: '1.1.2.01', desc: 'Clientes diversos A' },
+          { conta: '1.1.2.02', desc: 'Clientes diversos B' },
+        ],
+      },
+      sugestaoIndireta: {
+        codigo: 'V03',
+        nome: 'V03 · Estoques',
+      },
+    });
+
+    const linhasAmbiguas: LinhaDemonstracao[] = [
+      { id: 'dfc-operacional', nome: 'Operacional', demonstracao: 'dfc', tipo: 'total', itens: [
+        { referencia: 'dfc-op01', operacao: 1 }, { referencia: 'dfc-op02', operacao: 1 },
+      ] },
+      { id: 'dfc-op01', nome: 'Clientes', demonstracao: 'dfc', tipo: 'contas', sublinhaDe: 'dfc-operacional', itens: [{ referencia: '1.1.2.01', operacao: 1 }] },
+      { id: 'dfc-op02', nome: 'Outros ativos', demonstracao: 'dfc', tipo: 'contas', sublinhaDe: 'dfc-operacional', itens: [{ referencia: '1.1.2.02', operacao: 1 }] },
+    ];
+    const regrasAmbiguas = [
+      { referencia: '1.1.2.01', linha: 'V01' },
+      { referencia: '1.1.2.02', linha: 'V03' },
+    ];
+    const ambigua = identificarContasDfcPendentes(linhasAmbiguas, regrasAmbiguas, [[contas]])
+      .find(conta => conta.conta === '1.1.2.03');
+    expect(ambigua?.sugestaoDireta).toBeNull();
+    expect(ambigua?.sugestaoIndireta).toBeNull();
   });
 
   it('preserva centavos e ignora operações manuais antigas tanto nas contas quanto nas totalizações da DRE', () => {

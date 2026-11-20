@@ -172,8 +172,51 @@ it('pré-carrega o mapeamento DFC, mostra contas fora da DFC e destaca contas se
   const foraDfc = screen.getByRole('region', { name: 'Contas fora da DFC' });
   fireEvent.click(within(foraDfc).getByText('Caixa (1 conta)'));
   expect(await screen.findByRole('row', { name: /1\.1\.1\.01\.01\.001 — Caixa/ })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Contas não mapeadas (1)' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Contas com movimento sem classificação na DFC (1)' }));
   expect(screen.getByRole('row', { name: /9\.9\.9 — Conta sem regra/ })).toBeInTheDocument();
+});
+
+it('mostra sugestões para contas pendentes nos dois métodos e só as salva após confirmação', async () => {
+  mocks.raw.mockResolvedValue({ rawText: [
+    'A;1.1.2.01;Clientes diversos A;0;0;0;0',
+    'A;1.1.2.02;Clientes diversos B;0;0;0;0',
+    'A;1.1.2.03;Clientes diversos C;0;20;0;20',
+  ].join('\n') });
+  persistido = {
+    ...cadastroVazio(),
+    version: 'v1',
+    empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+    dfcModeloInicializado: true,
+    dfcIndiretoModeloInicializado: true,
+    dfcIndiretoRegras: [
+      { referencia: '1.1.2.01', linha: 'V03' },
+      { referencia: '1.1.2.02', linha: 'V03' },
+    ],
+    linhas: [
+      { id: 'dfc-operacional', nome: 'Operacional', demonstracao: 'dfc', tipo: 'total', itens: [{ referencia: 'dfc-op01', operacao: 1 }] },
+      { id: 'dfc-op01', nome: 'Ativos operacionais', demonstracao: 'dfc', tipo: 'contas', sublinhaDe: 'dfc-operacional', itens: [
+        { referencia: '1.1.2.01', operacao: 1 }, { referencia: '1.1.2.02', operacao: 1 },
+      ] },
+    ],
+  };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  const pendencias = await screen.findByRole('button', { name: 'Contas com movimento sem classificação na DFC (1)' });
+  fireEvent.click(pendencias);
+  const contaPendente = await screen.findByRole('row', { name: /1\.1\.2\.03 — Clientes diversos C/ });
+  expect(contaPendente).toHaveTextContent('Sem classificação');
+  expect(contaPendente).toHaveTextContent('Direto: Ativos operacionais — Operacional');
+  expect(contaPendente).toHaveTextContent('Indireto: V03 · Estoques');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Indireto' }));
+  expect(await screen.findByRole('row', { name: /1\.1\.2\.03 — Clientes diversos C/ })).toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole('row', { name: /1\.1\.2\.03 — Clientes diversos C/ }))
+    .getByRole('button', { name: 'Aceitar e salvar' }));
+  expect(await screen.findByText('Cadastro salvo com sucesso.')).toBeInTheDocument();
+  expect(persistido?.linhas.find(linha => linha.id === 'dfc-op01')?.itens)
+    .toContainEqual({ referencia: '1.1.2.03', operacao: 1 });
+  expect(persistido?.dfcIndiretoRegras).toContainEqual({ referencia: '1.1.2.03', linha: 'V03' });
+  await waitFor(() => expect(screen.queryByRole('row', { name: /1\.1\.2\.03 — Clientes diversos C/ })).not.toBeInTheDocument());
 });
 
 it('permite editar o nome do subtotal da seção da DFC', async () => {

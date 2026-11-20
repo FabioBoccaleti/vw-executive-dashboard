@@ -624,6 +624,199 @@ export function identificarContasDfcNaoMapeadas(
   }));
 }
 
+export interface SugestaoClassificacaoDfc {
+  codigo: string;
+  nome: string;
+  contasSemelhantes: Array<{ conta: string; desc: string }>;
+}
+
+export interface ContaDfcPendente extends ContaNaoClassificada {
+  statusDireto: string;
+  statusIndireto: string;
+  sugestaoDireta: SugestaoClassificacaoDfc | null;
+  sugestaoIndireta: SugestaoClassificacaoDfc | null;
+}
+
+export function identificarContasDfcPendentes(
+  linhas: LinhaDemonstracao[],
+  regrasIndiretas: RegraDfcIndireto[],
+  colunas: Array<Array<ContasBalancete | null>>,
+): ContaDfcPendente[] {
+  const periodos = colunas.flat();
+  const incompletas = identificarContasIncompletas(periodos);
+  const contas = new Map<string, ContaBalancete>();
+  for (const periodo of periodos) {
+    for (const conta of Object.values(periodo ?? {})) {
+      if (!incompletas.has(conta.conta)) contas.set(conta.conta, conta);
+    }
+  }
+  const distribuicao = distribuirContasDfc(linhas, periodos);
+  const linhasPorId = new Map(linhas.map(linha => [linha.id, linha]));
+  const linhaDiretaPorConta = new Map<string, LinhaDemonstracao>();
+  for (const [linhaId, contasDaLinha] of distribuicao.porLinha) {
+    const linha = linhasPorId.get(linhaId);
+    if (linha) for (const conta of contasDaLinha) linhaDiretaPorConta.set(conta.conta, linha);
+  }
+  const raizDfc = (linha?: LinhaDemonstracao) => {
+    let atual = linha;
+    let foraDfc = false;
+    while (atual) {
+      foraDfc ||= Boolean(atual.foraDfc);
+      const pai = linhaPai(atual);
+      if (!pai) return { linha: atual, foraDfc };
+      atual = linhasPorId.get(pai);
+    }
+    return { linha: undefined, foraDfc };
+  };
+  const nomeLinhaDireta = (linha: LinhaDemonstracao) => {
+    const raiz = raizDfc(linha);
+    const caminho = raiz.linha && raiz.linha.id !== linha.id ? `${linha.nome} — ${raiz.linha.nome}` : linha.nome;
+    return raiz.foraDfc ? `${caminho} (Fora da DFC)` : caminho;
+  };
+  const regrasOrdenadas = [...regrasIndiretas].sort((a, b) => b.referencia.length - a.referencia.length);
+  const encontrarRegraIndireta = (codigo: string) => regrasOrdenadas.find(regra =>
+    codigo === regra.referencia || codigo.startsWith(`${regra.referencia}.`));
+  const codigoBalance = (codigo: string) => /^[12](?:\.|$)/.test(codigo);
+  const codigoResultadoIncluido = (codigo: string) => codigoDeResultado(codigo);
+  const codigoResultado = (codigo: string) =>
+    /^(?:3|4|5|6)(?:\.|$)/.test(codigo);
+  const valoresDaConta = (codigo: string) => colunas.map(periodosDaColuna => {
+    if (!periodosDaColuna.length || periodosDaColuna.some(periodo => periodo === null)) return null;
+    const centavos = periodosDaColuna.reduce((total, periodo) => {
+      const conta = periodo?.[codigo];
+      return total + Math.round(((conta?.valCred ?? 0) - (conta?.valDeb ?? 0)) * 100);
+    }, 0);
+    return centavos / 100;
+  });
+  const temMovimento = (codigo: string) =>
+    valoresDaConta(codigo).some(valor => valor !== null && valor !== 0);
+  const pendencias = new Set(distribuicao.naoMapeadas
+    .filter(conta => temMovimento(conta.conta))
+    .map(conta => conta.conta));
+  for (const linha of linhas.filter(item => item.demonstracao === 'dfc'
+    && item.tipo === 'contas' && !item.foraDfc && raizDfc(item).linha?.id === 'dfc-operacional')) {
+    for (const conta of distribuicao.porLinha.get(linha.id) ?? []) {
+      if (!codigoBalance(conta.conta) || encontrarRegraIndireta(conta.conta)?.linha.startsWith('V')) continue;
+      if (temMovimento(conta.conta)) pendencias.add(conta.conta);
+    }
+  }
+
+  const sugerir = (
+    codigo: string,
+    candidatos: Array<{ referencia: string; codigo: string; nome: string; desc: string }>,
+  ): SugestaoClassificacaoDfc | null => {
+    const partes = codigo.split('.');
+    const proximos = candidatos
+      .filter(candidato => candidato.referencia !== codigo)
+      .map(candidato => {
+        const partesCandidato = candidato.referencia.split('.');
+        let profundidade = 0;
+        while (profundidade < partes.length && profundidade < partesCandidato.length
+          && partes[profundidade] === partesCandidato[profundidade]) profundidade++;
+        return { candidato, profundidade };
+      });
+    const maiorProfundidade = Math.max(0, ...proximos.map(item => item.profundidade));
+    if (maiorProfundidade < 3) return null;
+    const semelhantes = proximos.filter(item => item.profundidade === maiorProfundidade);
+    const destinos = new Set(semelhantes.map(item => item.candidato.codigo));
+    if (destinos.size !== 1 || (semelhantes.length < 2 && maiorProfundidade < 4)) return null;
+    const primeiro = semelhantes[0]!.candidato;
+    return {
+      codigo: primeiro.codigo,
+      nome: primeiro.nome,
+      contasSemelhantes: semelhantes.slice(0, 3).map(({ candidato }) => ({
+        conta: candidato.referencia,
+        desc: candidato.desc,
+      })),
+    };
+  };
+
+  const candidatosDiretos = [...contas.values()].flatMap(conta => {
+    const linha = linhaDiretaPorConta.get(conta.conta);
+    return linha ? [{
+      referencia: conta.conta,
+      codigo: linha.id,
+      nome: nomeLinhaDireta(linha),
+      desc: conta.desc,
+    }] : [];
+  });
+  const candidatosIndiretos = [...contas.values()].flatMap(conta => {
+    const regra = encontrarRegraIndireta(conta.conta);
+    const linhaDireta = linhaDiretaPorConta.get(conta.conta);
+    const secaoDireta = raizDfc(linhaDireta).linha?.id;
+    const elegivel = codigoBalance(conta.conta)
+      ? secaoDireta === 'dfc-operacional' && regra?.linha.startsWith('V')
+      : codigoResultadoIncluido(conta.conta)
+        && (secaoDireta === 'dfc-investimento' || secaoDireta === 'dfc-financiamento')
+        && regra?.linha.startsWith('AJ');
+    const categoria = DFC_INDIRETO_CATEGORIAS_MAPEAVEIS.find(item => item.codigo === regra?.linha);
+    return elegivel && regra && categoria ? [{
+      referencia: conta.conta,
+      codigo: regra.linha,
+      nome: `${regra.linha} · ${categoria.nome}`,
+      desc: conta.desc,
+    }] : [];
+  });
+  const porCodigo = new Map([...contas.values()].map(conta => [conta.conta, conta]));
+
+  return [...pendencias].flatMap(codigo => {
+    const conta = porCodigo.get(codigo);
+    if (!conta) return [];
+    const linhaDireta = linhaDiretaPorConta.get(codigo);
+    const raizDireta = raizDfc(linhaDireta);
+    const sugestaoDireta = linhaDireta ? null : sugerir(codigo, candidatosDiretos);
+    const linhaDiretaSugerida = sugestaoDireta ? linhasPorId.get(sugestaoDireta.codigo) : undefined;
+    const secaoEfetiva = raizDireta.linha?.id ?? raizDfc(linhaDiretaSugerida).linha?.id;
+    const regraIndireta = encontrarRegraIndireta(codigo);
+    const isBalanco = codigoBalance(codigo);
+    const isResultadoDfc = codigoResultadoIncluido(codigo);
+    let statusIndireto: string;
+    let sugestaoIndireta: SugestaoClassificacaoDfc | null = null;
+    if (isBalanco) {
+      if (secaoEfetiva === 'dfc-investimento' || secaoEfetiva === 'dfc-financiamento') {
+        statusIndireto = 'Variação operacional não aplicável a esta classificação direta.';
+      } else {
+        const regraVariacao = regraIndireta?.linha.startsWith('V') ? regraIndireta : undefined;
+        if (regraVariacao) {
+          const categoria = DFC_INDIRETO_VARIACOES.find(item => item.codigo === regraVariacao.linha);
+          statusIndireto = `${regraVariacao.linha} · ${categoria?.nome ?? 'Regra cadastrada'} (depende de classificação no Direto operacional)`;
+        } else {
+          statusIndireto = regraIndireta
+            ? `Regra ${regraIndireta.linha} cadastrada, mas esta conta patrimonial precisa de uma linha V.`
+            : 'Sem linha de variação do capital de giro.';
+          sugestaoIndireta = sugerir(codigo, candidatosIndiretos.filter(item => item.codigo.startsWith('V')));
+        }
+      }
+    } else if (isResultadoDfc) {
+      if (secaoEfetiva === 'dfc-investimento' || secaoEfetiva === 'dfc-financiamento') {
+        const regraAjuste = regraIndireta?.linha.startsWith('AJ') ? regraIndireta : undefined;
+        if (regraAjuste) {
+          const categoria = DFC_INDIRETO_AJUSTES.find(item => item.codigo === regraAjuste.linha);
+          statusIndireto = `${regraAjuste.linha} · ${categoria?.nome ?? 'Ajuste cadastrado'}`;
+        } else {
+          statusIndireto = 'AJ06 · Ajuste residual automático.';
+        }
+        sugestaoIndireta = regraAjuste ? null : sugerir(codigo, candidatosIndiretos.filter(item => item.codigo.startsWith('AJ')));
+      } else {
+        statusIndireto = 'Incluída automaticamente em RES; ajustes dependem de classificação direta em Investimento ou Financiamento.';
+      }
+    } else if (codigoResultado(codigo)) {
+      statusIndireto = 'Não entra automaticamente em RES; o método considera os grupos 3, 4, 5 e 6.4.';
+    } else {
+      statusIndireto = 'Sem tratamento automático no método indireto.';
+    }
+    return [{
+      conta: conta.conta,
+      desc: conta.desc,
+      valores: valoresDaConta(conta.conta),
+      statusDireto: linhaDireta ? nomeLinhaDireta(linhaDireta) : 'Sem classificação',
+      statusIndireto,
+      sugestaoDireta,
+      sugestaoIndireta,
+    }];
+  }).sort((a, b) => a.conta.localeCompare(b.conta, undefined, { numeric: true }));
+}
+
 export function calcularLinhas(
   linhas: LinhaDemonstracao[],
   demonstracao: TipoDemonstracao,

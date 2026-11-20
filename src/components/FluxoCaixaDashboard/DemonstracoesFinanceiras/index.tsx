@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TIPOS, MESES, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcNaoMapeadas,
+  TIPOS, MESES, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcPendentes,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
-  type LinhaDemonstracao, type PeriodoDemonstracao, type RegraDfcIndireto, type TipoDemonstracao,
+  type ContaDfcPendente, type LinhaDemonstracao, type PeriodoDemonstracao, type RegraDfcIndireto, type TipoDemonstracao,
 } from './modelo';
 import { DFC_INDIRETO_AJUSTES, DFC_INDIRETO_CATEGORIAS_MAPEAVEIS, DFC_INDIRETO_VARIACOES } from './dfcMetodoIndireto';
 import { loadCadastroDemonstracoes, loadDadosDemonstracoes, saveCadastroDemonstracoes } from './storage';
@@ -77,7 +77,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [buscaDfcIndireto, setBuscaDfcIndireto] = useState('');
   const [erroDfcIndireto, setErroDfcIndireto] = useState('');
   const [naoClassificadasAberto, setNaoClassificadasAberto] = useState(false);
-  const [dfcNaoMapeadasAberto, setDfcNaoMapeadasAberto] = useState(false);
+  const [contasDfcPendentesAberto, setContasDfcPendentesAberto] = useState(false);
   const [contasCaixaEditor, setContasCaixaEditor] = useState<string[] | null>(null);
   const [buscaCaixa, setBuscaCaixa] = useState('');
   const [erroCaixaEditor, setErroCaixaEditor] = useState('');
@@ -372,6 +372,35 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     setEditorDfcIndireto(null);
   }
 
+  async function aceitarSugestaoDfc(conta: ContaDfcPendente) {
+    if (!cadastro || salvando) return;
+    let linhas = cadastro.linhas;
+    if (conta.sugestaoDireta) {
+      const destino = linhas.find(linha => linha.id === conta.sugestaoDireta?.codigo
+        && linha.demonstracao === 'dfc' && linha.tipo === 'contas');
+      if (!destino) {
+        setErroAcao('A linha indicada pela sugestão direta não está mais disponível.');
+        return;
+      }
+      linhas = linhas.map(linha => linha.id === destino.id
+        ? { ...linha, itens: [...linha.itens.filter(item => item.referencia !== conta.conta), { referencia: conta.conta, operacao: 1 }] }
+        : linha);
+      const erro = validarLinhas(linhas);
+      if (erro) { setErroAcao(erro); return; }
+    }
+
+    let regras = cadastro.dfcIndiretoRegras ?? [];
+    if (conta.sugestaoIndireta) {
+      regras = [
+        ...regras.filter(regra => regra.referencia !== conta.conta),
+        { referencia: conta.conta, linha: conta.sugestaoIndireta.codigo },
+      ];
+      const erro = validarRegrasDfcIndireto(regras);
+      if (erro) { setErroAcao(erro); return; }
+    }
+    await salvar({ ...cadastro, linhas, dfcIndiretoRegras: regras });
+  }
+
   function adicionarAnoComparacao() {
     const ano = Number(anoAdicionar);
     if (!Number.isInteger(ano) || ano < 1900 || ano > 9999) {
@@ -479,8 +508,8 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const contasNaoClassificadas = aba === 'dre' && cadastro && dados
     ? identificarContasNaoClassificadas(cadastro.linhas, detalhesColunas.map(detalhe => detalhe.periodos))
     : [];
-  const contasDfcNaoMapeadas = aba === 'dfc' && cadastro && dados
-    ? identificarContasDfcNaoMapeadas(cadastro.linhas, detalhesColunas.map(detalhe => detalhe.periodos))
+  const contasDfcPendentes = aba === 'dfc' && cadastro && dados
+    ? identificarContasDfcPendentes(cadastro.linhas, cadastro.dfcIndiretoRegras ?? [], detalhesColunas.map(detalhe => detalhe.periodos))
     : [];
   const resultadosDfcIndireto = aba === 'dfc' && metodoDfc === 'indireto' && cadastro && dados
     ? colunas.map(coluna => calcularDfcIndireto(
@@ -741,13 +770,12 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 {contasNaoClassificadas.length > 0 && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                   {contasNaoClassificadas.length === 1 ? 'Existe 1 conta de resultado' : `Existem ${contasNaoClassificadas.length} contas de resultado`} com movimento que não {contasNaoClassificadas.length === 1 ? 'está' : 'estão'} em nenhum grupo da DRE. Veja o quadro "Contas com movimento não classificadas" abaixo da tabela.
                 </p>}
-                {aba === 'dfc' && metodoDfc === 'direto' && dados && !erroDados && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                  {contasDfcNaoMapeadas.length === 0
-                    ? 'Nenhuma conta analítica sem prefixo de classificação no balancete carregado.'
-                    : `${contasDfcNaoMapeadas.length} ${contasDfcNaoMapeadas.length === 1 ? 'conta analítica' : 'contas analíticas'} sem prefixo de classificação. Veja “Contas não mapeadas” abaixo.`}
-                </p>}
-                {aba === 'dfc' && metodoDfc === 'indireto' && resultadosDfcIndireto.some(resultado => (resultado.contasOperacionaisSemLinha ?? 0) > 0) && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                  Existem contas patrimoniais classificadas como operacionais no método direto sem linha de variação na DFC indireta. Confira a conferência e os mapeamentos em Cadastros.
+                {aba === 'dfc' && cadastro && dados && !erroDados && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  {contasDfcPendentes.length === 0
+                    ? faltantes.length > 0
+                      ? 'Importe os balancetes pendentes para confirmar se há contas sem classificação na DFC.'
+                      : 'Nenhuma conta com movimento pendente de classificação na DFC.'
+                    : `${contasDfcPendentes.length} ${contasDfcPendentes.length === 1 ? 'conta com movimento' : 'contas com movimento'} precisam de revisão. Veja o quadro de classificação abaixo da demonstração.`}
                 </p>}
                 {!dados && !erroDados ? <p role="status">Carregando balancetes...</p> : !erroDados && (
                   aba === 'dfc' && metodoDfc === 'indireto' ? <div className="overflow-x-auto">
@@ -979,20 +1007,46 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </div>
                   ))}
                 </section>}
-                {aba === 'dfc' && metodoDfc === 'direto' && contasDfcNaoMapeadas.length > 0 && <section aria-label="Contas não mapeadas" className="rounded border border-amber-300">
-                  <button type="button" aria-expanded={dfcNaoMapeadasAberto} onClick={() => setDfcNaoMapeadasAberto(value => !value)}
+                {aba === 'dfc' && contasDfcPendentes.length > 0 && <section aria-label="Contas com movimento sem classificação na DFC" className="rounded border border-amber-300">
+                  <button type="button" aria-expanded={contasDfcPendentesAberto} onClick={() => setContasDfcPendentesAberto(value => !value)}
                     className="flex w-full items-center gap-2 bg-amber-50 p-3 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
-                    {dfcNaoMapeadasAberto ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
-                    Contas não mapeadas ({contasDfcNaoMapeadas.length})
+                    {contasDfcPendentesAberto ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+                    Contas com movimento sem classificação na DFC ({contasDfcPendentes.length})
                   </button>
-                  {dfcNaoMapeadasAberto && <div className="overflow-x-auto">
-                    <p className="p-3 text-xs text-muted-foreground">Contas analíticas sem nenhum prefixo correspondente. Elas não entram nos totais da DFC; classifique-as em Cadastros → DFC, seja em uma linha da demonstração ou em “Contas fora da DFC”.</p>
+                  {contasDfcPendentesAberto && <div className="overflow-x-auto">
+                    <p className="p-3 text-xs text-muted-foreground">
+                      A lista inclui contas com movimento que não têm classificação no método direto ou contas operacionais sem linha de variação no indireto. As sugestões usam contas próximas no plano de contas; confira a evidência antes de aceitar. Para excluir uma conta intencionalmente, classifique-a como “Fora da DFC”.
+                    </p>
                     <table className="w-full text-sm">
-                      <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Conta</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
-                      <tbody>{contasDfcNaoMapeadas.map(conta => <tr key={conta.conta} className="border-b">
-                        <th scope="row" className="p-3 text-left font-normal">{conta.conta} — {conta.desc}</th>
-                        {conta.valores.map((valor, index) => <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>)}
-                      </tr>)}</tbody>
+                      <thead><tr className="border-y bg-muted/50">
+                        <th scope="col" className="p-3 text-left">Conta</th>
+                        <th scope="col" className="min-w-52 p-3 text-left">DFC Direto</th>
+                        <th scope="col" className="min-w-64 p-3 text-left">DFC Indireto</th>
+                        <th scope="col" className="min-w-72 p-3 text-left">Sugestão de classificação</th>
+                        {colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}
+                      </tr></thead>
+                      <tbody>{contasDfcPendentes.map(conta => {
+                        const temSugestao = Boolean(conta.sugestaoDireta || conta.sugestaoIndireta);
+                        return <tr key={conta.conta} className="border-b align-top">
+                          <th scope="row" className="min-w-56 p-3 text-left font-normal">{conta.conta} — {conta.desc}</th>
+                          <td className="min-w-52 p-3">{conta.statusDireto}</td>
+                          <td className="min-w-64 p-3">{conta.statusIndireto}</td>
+                          <td className="min-w-72 space-y-2 p-3">
+                            {conta.sugestaoDireta && <div>
+                              <p><span className="font-medium">Direto:</span> {conta.sugestaoDireta.nome}</p>
+                              <p className="text-xs text-muted-foreground">Semelhante a: {conta.sugestaoDireta.contasSemelhantes.map(item => `${item.conta} — ${item.desc}`).join('; ')}</p>
+                            </div>}
+                            {conta.sugestaoIndireta && <div>
+                              <p><span className="font-medium">Indireto:</span> {conta.sugestaoIndireta.nome}</p>
+                              <p className="text-xs text-muted-foreground">Semelhante a: {conta.sugestaoIndireta.contasSemelhantes.map(item => `${item.conta} — ${item.desc}`).join('; ')}</p>
+                            </div>}
+                            {temSugestao
+                              ? <Button size="sm" disabled={salvando} onClick={() => { void aceitarSugestaoDfc(conta); }}>Aceitar e salvar</Button>
+                              : <p className="text-xs text-muted-foreground">Sem sugestão confiável; classifique manualmente em Cadastros → DFC.</p>}
+                          </td>
+                          {conta.valores.map((valor, index) => <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>)}
+                        </tr>;
+                      })}</tbody>
                     </table>
                   </div>}
                 </section>}
