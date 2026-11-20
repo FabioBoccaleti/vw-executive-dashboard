@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download, Sparkles, FileText } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download, Sparkles, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData, loadFluxoCaixaIndex } from "./fluxoCaixaStorage";
@@ -403,9 +403,95 @@ const TableRow2 = ({ label, ant, atu, highlight, indent = 0 }: any) => {
   );
 };
 
-const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total }: any) => {
+type DFCDetail = { label: string; value: number; value2?: number };
+
+function getDFCAnalyticalAccounts(
+  accounts: Record<string, any>,
+  prefixes: string[],
+  excludedPrefixes: string[] = [],
+): Array<{ id: string; description: string }> {
+  const matchesPrefix = (id: string, prefix: string) => prefix.endsWith('.')
+    ? id.startsWith(prefix)
+    : id === prefix || id.startsWith(`${prefix}.`);
+  const isIncluded = (id: string) => prefixes.some(prefix => matchesPrefix(id, prefix));
+  const isExcluded = (id: string) => excludedPrefixes.some(prefix => matchesPrefix(id, prefix));
+  const candidates = Object.keys(accounts).filter(id => isIncluded(id) && !isExcluded(id));
+  const candidateSet = new Set(candidates);
+  const parents = new Set<string>();
+
+  for (const id of candidates) {
+    const parts = id.split('.');
+    while (parts.length > 1) {
+      parts.pop();
+      const parent = parts.join('.');
+      if (candidateSet.has(parent)) parents.add(parent);
+    }
+  }
+
+  return candidates
+    .filter(id => !parents.has(id))
+    .map(id => ({ id, description: accounts[id]?.desc || id }));
+}
+
+function reconcileDFCDetails(details: DFCDetail[], value: number, value2?: number): DFCDetail[] {
+  const difference = value - details.reduce((sum, detail) => sum + detail.value, 0);
+  const difference2 = value2 === undefined
+    ? undefined
+    : value2 - details.reduce((sum, detail) => sum + (detail.value2 ?? 0), 0);
+
+  if (Math.abs(difference) > 0.005 || (difference2 !== undefined && Math.abs(difference2) > 0.005)) {
+    details.push({
+      label: 'Ajuste residual / diferença não atribuída às contas analíticas',
+      value: difference,
+      value2: difference2,
+    });
+  }
+
+  return details;
+}
+
+function getDFCAccountDetails(
+  accounts: Record<string, any>,
+  prefixes: string[],
+  monthlyValue: (id: string, account: any) => number,
+  accumulatedValue?: (id: string, account: any) => number,
+  excludedPrefixes: string[] = [],
+): DFCDetail[] {
+  return getDFCAnalyticalAccounts(accounts, prefixes, excludedPrefixes)
+    .map(({ id, description }) => ({
+      label: `${id} — ${description}`,
+      value: monthlyValue(id, accounts[id]),
+      ...(accumulatedValue
+        ? { value2: accumulatedValue(id, accounts[id]) }
+        : {}),
+    }))
+    .filter(detail => Math.abs(detail.value) > 0.005 || Math.abs(detail.value2 ?? 0) > 0.005);
+}
+
+function buildDFCAccountDetails(
+  accounts: Record<string, any>,
+  prefixes: string[],
+  monthlyValue: (id: string, account: any) => number,
+  target: number,
+  accumulatedValue?: (id: string, account: any) => number,
+  target2?: number,
+  excludedPrefixes: string[] = [],
+): DFCDetail[] {
+  return reconcileDFCDetails(
+    getDFCAccountDetails(accounts, prefixes, monthlyValue, target2 !== undefined ? accumulatedValue : undefined, excludedPrefixes),
+    target,
+    target2,
+  );
+}
+
+const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total, details = [] }: any) => {
+  const [expanded, setExpanded] = useState(false);
   const isPos = value >= 0;
   const isPos2 = (value2 ?? 0) >= 0;
+  const expandable = typeof details === 'function' || details.length > 0;
+  const detailRows: DFCDetail[] = expanded
+    ? typeof details === 'function' ? details() : details
+    : [];
   const renderVal = (v: number, pos: boolean) => (
     <td className={cn('py-2.5 px-3 text-right font-mono text-sm', total || highlight ? 'font-bold' : '', hasAcum && 'w-[20%]')}>
       {total ? '' : (v >= 0 ? '' : '(')}
@@ -418,11 +504,27 @@ const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total }:
   );
   const emptyCell = (key?: string) => <td key={key} className={cn('py-2.5 px-3 w-[20%]')} />;
   return (
-    <tr className={cn(highlight && 'bg-emerald-50 dark:bg-emerald-950/20', total && 'bg-muted/50')}>
-      <td className={cn('py-2.5 px-3 text-sm', total || highlight ? 'font-bold text-foreground' : 'text-muted-foreground')} style={{ paddingLeft: 12 + indent * 20 }}>{label}</td>
-      {highlight && !total ? emptyCell('v1') : renderVal(value, isPos)}
-      {hasAcum && highlight && !total ? emptyCell('v2') : hasAcum && value2 !== undefined ? renderVal(value2, isPos2) : hasAcum && value2 === undefined ? <td className="py-2.5 px-3 text-right text-muted-foreground/40 w-[20%] border-l border-border/20">—</td> : null}
-    </tr>
+    <>
+      <tr className={cn(highlight && 'bg-emerald-50 dark:bg-emerald-950/20', total && 'bg-muted/50')}>
+        <td className={cn('py-2.5 px-3 text-sm', total || highlight ? 'font-bold text-foreground' : 'text-muted-foreground')} style={{ paddingLeft: 12 + indent * 20 }}>
+          {expandable && <button type="button" className="mr-1 inline-flex rounded p-1 align-middle hover:bg-muted focus-visible:outline focus-visible:outline-2" aria-label={`${expanded ? 'Ocultar' : 'Exibir'} contas de ${label}`} aria-expanded={expanded} onClick={() => setExpanded(open => !open)}>
+            {expanded ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+          </button>}
+          {label}
+        </td>
+        {highlight && !total ? emptyCell('v1') : renderVal(value, isPos)}
+        {hasAcum && highlight && !total ? emptyCell('v2') : hasAcum && value2 !== undefined ? renderVal(value2, isPos2) : hasAcum && value2 === undefined ? <td className="py-2.5 px-3 text-right text-muted-foreground/40 w-[20%] border-l border-border/20">—</td> : null}
+      </tr>
+      {detailRows.map((detail, index) => (
+        <tr key={`${detail.label}-${index}`} className="border-b border-border/50 bg-muted/20">
+          <td className="py-2 px-3 text-xs text-muted-foreground" style={{ paddingLeft: 28 + indent * 20 }}>{detail.label}</td>
+          {renderVal(detail.value, detail.value >= 0)}
+          {hasAcum && (detail.value2 === undefined
+            ? <td className="py-2 px-3 text-right text-xs text-muted-foreground/40 w-[20%] border-l border-border/20">—</td>
+            : renderVal(detail.value2, detail.value2 >= 0))}
+        </tr>
+      ))}
+    </>
   );
 };
 
@@ -3510,6 +3612,52 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
   const shortYear = String(selectedYear).slice(2);
   const headerMes = colAtual;
   const headerAcu = hasAcum ? `Jan – ${MONTH_SHORT[selectedMonth]}/${shortYear}` : '';
+  const monthAccounts = data.accounts as Record<string, any>;
+  const previousAccounts = janAccounts as Record<string, any> | null;
+  const accountDetails = (
+    prefixes: string[],
+    monthlyValue: (id: string, account: any) => number,
+    target: number,
+    target2?: number,
+    accumulatedValue?: (id: string, account: any) => number,
+    excludedPrefixes: string[] = [],
+  ) => () => buildDFCAccountDetails(
+    monthAccounts,
+    prefixes,
+    monthlyValue,
+    target,
+    target2 !== undefined ? accumulatedValue : undefined,
+    target2,
+    excludedPrefixes,
+  );
+  const balanceImpactDetails = (prefixes: string[], factor: number, target: number, target2?: number, excludedPrefixes: string[] = []) =>
+    accountDetails(
+      prefixes,
+      (_id, account) => factor * (Math.abs(account?.saldoAtual || 0) - Math.abs(account?.saldoAnt || 0)),
+      target,
+      target2,
+      (id) => factor * (Math.abs(monthAccounts[id]?.saldoAtual || 0) - Math.abs(previousAccounts?.[id]?.saldoAnt || 0)),
+      excludedPrefixes,
+    );
+  const rawAccountDetails = (
+    prefixes: string[],
+    monthlyValue: (id: string, account: any) => number,
+    accumulatedValue?: (id: string, account: any) => number,
+    excludedPrefixes: string[] = [],
+  ) => getDFCAccountDetails(
+    monthAccounts,
+    prefixes,
+    monthlyValue,
+    hasAcum ? accumulatedValue : undefined,
+    excludedPrefixes,
+  );
+  const netResultDetails = (target: number, target2?: number) => reconcileDFCDetails([
+    ...rawAccountDetails(['3.1'], (_id, a) => Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => Math.abs(a?.saldoAtual || 0)),
+    ...rawAccountDetails(['3.2', '3.3', '4'], (_id, a) => -Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
+    ...rawAccountDetails(['5.'], (_id, a) => -((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
+    ...rawAccountDetails(['3.4', '3.5', '3.6'], (_id, a) => Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => Math.abs(a?.saldoAtual || 0)),
+    ...rawAccountDetails(['6'], (_id, a) => -((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
+  ], target, target2);
 
   // ── Cálculo acumulado YTD (Jan–Mês selecionado) ───────────────────────
   let dAcum: any = null;
@@ -3815,66 +3963,66 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
           </thead>
           <tbody>
             <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} value2={0} hasAcum={hasAcum} highlight />
-            <DFCRow label={`${d.resLiq >= 0 ? '(+)' : '(–)'} Resultado Líquido do Exercício (base NBC TG 03)`} value={d.resLiq} value2={dAcum?.resLiq} hasAcum={hasAcum} indent={1} />
-            <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques VW + Audi ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'} (1.1.2 + 1.1.7.02)`} value={d.ajusteEstoque} value2={dAcum?.ajusteEstoque} hasAcum={hasAcum} indent={1} />
-            <DFCRow label={`    ↳ Estoques VW (1.1.2): ${fmtBRL(data.estoques.ant, true)} → ${fmtBRL(data.estoques.atu, true)}`} value={-(data.estoques.atu - data.estoques.ant)} value2={dAcum ? -(dAcum.estoques.atu - dAcum.estoques.ant) : undefined} hasAcum={hasAcum} indent={2} />
-            <DFCRow label={`    ↳ Estoques Audi (1.1.7.02): ${fmtBRL(data.estAudi.ant, true)} → ${fmtBRL(data.estAudi.atu, true)}`} value={-(data.estAudi.atu - data.estAudi.ant)} value2={dAcum ? -(dAcum.estAudi.atu - dAcum.estAudi.ant) : undefined} hasAcum={hasAcum} indent={2} />
-            <DFCRow label={`${d.ajusteCred >= 0 ? '(+)' : '(–)'} Variação de Créditos de Vendas (1.1.3) ${d.dCred < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteCred} value2={dAcum?.ajusteCred} hasAcum={hasAcum} indent={1} />
-            {(d.dContasCorr !== 0 || (dAcum && dAcum.dContasCorr !== 0)) && <DFCRow label={`${d.ajusteContasCorr >= 0 ? '(+)' : '(–)'} Variação de Contas Correntes (1.1.4) ${d.dContasCorr > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteContasCorr} value2={dAcum?.ajusteContasCorr} hasAcum={hasAcum} indent={1} />}
-            {(d.dValDiv !== 0 || (dAcum && dAcum.dValDiv !== 0)) && <DFCRow label={`${d.ajusteValDiv >= 0 ? '(+)' : '(–)'} Variação de Valores Diversos (1.1.5) ${d.dValDiv > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteValDiv} value2={dAcum?.ajusteValDiv} hasAcum={hasAcum} indent={1} />}
-            <DFCRow label={`${d.ajusteDespAntec >= 0 ? '(+)' : '(–)'} Variação de Despesas Antecipadas (1.1.6) ${d.dDespAntec > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteDespAntec} value2={dAcum?.ajusteDespAntec} hasAcum={hasAcum} indent={1} />
+            <DFCRow label={`${d.resLiq >= 0 ? '(+)' : '(–)'} Resultado Líquido do Exercício (base NBC TG 03)`} value={d.resLiq} value2={dAcum?.resLiq} hasAcum={hasAcum} indent={1} details={() => netResultDetails(d.resLiq, dAcum?.resLiq)} />
+            <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques VW + Audi ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'} (1.1.2 + 1.1.7.02)`} value={d.ajusteEstoque} value2={dAcum?.ajusteEstoque} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.2', '1.1.7.02'], -1, d.ajusteEstoque, dAcum?.ajusteEstoque)} />
+            <DFCRow label={`    ↳ Estoques VW (1.1.2): ${fmtBRL(data.estoques.ant, true)} → ${fmtBRL(data.estoques.atu, true)}`} value={-(data.estoques.atu - data.estoques.ant)} value2={dAcum ? -(dAcum.estoques.atu - dAcum.estoques.ant) : undefined} hasAcum={hasAcum} indent={2} details={balanceImpactDetails(['1.1.2'], -1, -(data.estoques.atu - data.estoques.ant), dAcum ? -(dAcum.estoques.atu - dAcum.estoques.ant) : undefined)} />
+            <DFCRow label={`    ↳ Estoques Audi (1.1.7.02): ${fmtBRL(data.estAudi.ant, true)} → ${fmtBRL(data.estAudi.atu, true)}`} value={-(data.estAudi.atu - data.estAudi.ant)} value2={dAcum ? -(dAcum.estAudi.atu - dAcum.estAudi.ant) : undefined} hasAcum={hasAcum} indent={2} details={balanceImpactDetails(['1.1.7.02'], -1, -(data.estAudi.atu - data.estAudi.ant), dAcum ? -(dAcum.estAudi.atu - dAcum.estAudi.ant) : undefined)} />
+            <DFCRow label={`${d.ajusteCred >= 0 ? '(+)' : '(–)'} Variação de Créditos de Vendas (1.1.3) ${d.dCred < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteCred} value2={dAcum?.ajusteCred} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.3'], -1, d.ajusteCred, dAcum?.ajusteCred)} />
+            {(d.dContasCorr !== 0 || (dAcum && dAcum.dContasCorr !== 0)) && <DFCRow label={`${d.ajusteContasCorr >= 0 ? '(+)' : '(–)'} Variação de Contas Correntes (1.1.4) ${d.dContasCorr > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteContasCorr} value2={dAcum?.ajusteContasCorr} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.4'], -1, d.ajusteContasCorr, dAcum?.ajusteContasCorr)} />}
+            {(d.dValDiv !== 0 || (dAcum && dAcum.dValDiv !== 0)) && <DFCRow label={`${d.ajusteValDiv >= 0 ? '(+)' : '(–)'} Variação de Valores Diversos (1.1.5) ${d.dValDiv > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteValDiv} value2={dAcum?.ajusteValDiv} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.5'], -1, d.ajusteValDiv, dAcum?.ajusteValDiv)} />}
+            <DFCRow label={`${d.ajusteDespAntec >= 0 ? '(+)' : '(–)'} Variação de Despesas Antecipadas (1.1.6) ${d.dDespAntec > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteDespAntec} value2={dAcum?.ajusteDespAntec} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.6'], -1, d.ajusteDespAntec, dAcum?.ajusteDespAntec)} />
             {(d.outrasAtivAudiResiduo !== 0 || (dAcum && dAcum.outrasAtivAudiResiduo !== 0)) && (
-              <DFCRow label={`${d.ajusteOutrasAtivAudi >= 0 ? '(+)' : '(–)'} Variação Outros Ativos Audi excl. estoque (1.1.7 − 1.1.7.02) ${d.outrasAtivAudiResiduo > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteOutrasAtivAudi} value2={dAcum?.ajusteOutrasAtivAudi} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.ajusteOutrasAtivAudi >= 0 ? '(+)' : '(–)'} Variação Outros Ativos Audi excl. estoque (1.1.7 − 1.1.7.02) ${d.outrasAtivAudiResiduo > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteOutrasAtivAudi} value2={dAcum?.ajusteOutrasAtivAudi} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.7'], -1, d.ajusteOutrasAtivAudi, dAcum?.ajusteOutrasAtivAudi, ['1.1.7.02'])} />
             )}
-            <DFCRow label={`${d.ajusteFornec >= 0 ? '(+)' : '(–)'} Variação de Fornecedores (2.1.3 + 2.1.4) ${d.dFornec < 0 ? '— redução (uso de caixa)' : '— aumento (fonte)'}`} value={d.ajusteFornec} value2={dAcum?.ajusteFornec} hasAcum={hasAcum} indent={1} />
-            <DFCRow label={`${d.ajusteTrib >= 0 ? '(+)' : '(–)'} Variação de Obrigações Tributárias (2.1.2.02)`} value={d.ajusteTrib} value2={dAcum?.ajusteTrib} hasAcum={hasAcum} indent={1} />
-            <DFCRow label={`${d.ajusteTrab >= 0 ? '(+)' : '(–)'} Variação de Obrigações Trabalhistas (2.1.2.01)`} value={d.ajusteTrab} value2={dAcum?.ajusteTrab} hasAcum={hasAcum} indent={1} />
-            <DFCRow label={`${d.ajusteContasPag >= 0 ? '(+)' : '(–)'} Variação de Contas a Pagar (2.1.2.03)`} value={d.ajusteContasPag} value2={dAcum?.ajusteContasPag} hasAcum={hasAcum} indent={1} />
-            <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={dAcum ? -dAcum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} />
+            <DFCRow label={`${d.ajusteFornec >= 0 ? '(+)' : '(–)'} Variação de Fornecedores (2.1.3 + 2.1.4) ${d.dFornec < 0 ? '— redução (uso de caixa)' : '— aumento (fonte)'}`} value={d.ajusteFornec} value2={dAcum?.ajusteFornec} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.3', '2.1.4'], 1, d.ajusteFornec, dAcum?.ajusteFornec, ['2.1.4.01.01.007'])} />
+            <DFCRow label={`${d.ajusteTrib >= 0 ? '(+)' : '(–)'} Variação de Obrigações Tributárias (2.1.2.02)`} value={d.ajusteTrib} value2={dAcum?.ajusteTrib} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.2.02'], 1, d.ajusteTrib, dAcum?.ajusteTrib)} />
+            <DFCRow label={`${d.ajusteTrab >= 0 ? '(+)' : '(–)'} Variação de Obrigações Trabalhistas (2.1.2.01)`} value={d.ajusteTrab} value2={dAcum?.ajusteTrab} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.2.01'], 1, d.ajusteTrab, dAcum?.ajusteTrab)} />
+            <DFCRow label={`${d.ajusteContasPag >= 0 ? '(+)' : '(–)'} Variação de Contas a Pagar (2.1.2.03)`} value={d.ajusteContasPag} value2={dAcum?.ajusteContasPag} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.2.03'], 1, d.ajusteContasPag, dAcum?.ajusteContasPag)} />
+            <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={dAcum ? -dAcum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.1.01.52'], -1, -d.dRealizLPCred, dAcum ? -dAcum.dRealizLPCred : undefined)} />
             {(d.emprestCP_01Ant > 0 || d.emprestCP_01Atu > 0 || (d.dEmprestCP_01 !== undefined && d.dEmprestCP_01 !== 0)) && (
-              <DFCRow label={`${d.dEmprestCP_01 >= 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.1.01) ${d.dEmprestCP_01 >= 0 ? '— aumento (fonte de caixa)' : '— redução (uso de caixa)'} (${fmtBRL(d.emprestCP_01Ant, true)} → ${fmtBRL(d.emprestCP_01Atu, true)})`} value={d.dEmprestCP_01} value2={dAcum?.dEmprestCP_01} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dEmprestCP_01 >= 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.1.01) ${d.dEmprestCP_01 >= 0 ? '— aumento (fonte de caixa)' : '— redução (uso de caixa)'} (${fmtBRL(d.emprestCP_01Ant, true)} → ${fmtBRL(d.emprestCP_01Atu, true)})`} value={d.dEmprestCP_01} value2={dAcum?.dEmprestCP_01} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.1.01'], 1, d.dEmprestCP_01, dAcum?.dEmprestCP_01)} />
             )}
             {(Math.abs(d.dOutros2_2_1) > 0.01) && (
-              <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos L.P. não mapeados (2.2.1 — demais) (${fmtBRL(d.outros2_2_1Ant, true)} → ${fmtBRL(d.outros2_2_1Atu, true)})`} value={d.dOutros2_2_1} value2={dAcum?.dOutros2_2_1} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos L.P. não mapeados (2.2.1 — demais) (${fmtBRL(d.outros2_2_1Ant, true)} → ${fmtBRL(d.outros2_2_1Atu, true)})`} value={d.dOutros2_2_1} value2={dAcum?.dOutros2_2_1} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1'], 1, d.dOutros2_2_1, dAcum?.dOutros2_2_1, ['2.2.1.07', '2.2.1.01', '2.2.1.02', '2.2.1.15'])} />
             )}
             {(Math.abs(d.dRecDiferidas) > 0.01 || (dAcum && Math.abs(dAcum.dRecDiferidas) > 0.01)) && (
-              <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={dAcum?.dRecDiferidas} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={dAcum?.dRecDiferidas} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.2'], 1, d.dRecDiferidas, dAcum?.dRecDiferidas)} />
             )}
             {(Math.abs(d.ajusteResidualBP + d.dPL_extra) > 0.01 || (dAcum && Math.abs((dAcum.ajusteResidualBP ?? 0) + (dAcum.dPL_extra ?? 0)) > 0.01)) && (
-              <DFCRow label={`${(d.ajusteResidualBP + d.dPL_extra) >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP + d.dPL_extra} value2={dAcum ? (dAcum.ajusteResidualBP + dAcum.dPL_extra) : undefined} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${(d.ajusteResidualBP + d.dPL_extra) >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP + d.dPL_extra} value2={dAcum ? (dAcum.ajusteResidualBP + dAcum.dPL_extra) : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails([], 1, d.ajusteResidualBP + d.dPL_extra, dAcum ? dAcum.ajusteResidualBP + dAcum.dPL_extra : undefined)} />
             )}
-            <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} value2={dAcum ? -dAcum.dIntangivel : undefined} hasAcum={hasAcum} indent={1} />
+            <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} value2={dAcum ? -dAcum.dIntangivel : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.7'], -1, -d.dIntangivel, dAcum ? -dAcum.dIntangivel : undefined)} />
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper + d.dPL_extra - d.dIntangivel} value2={dAcum ? (dAcum.fluxoOper + dAcum.dPL_extra - dAcum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
 
             <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
-            <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={dAcum ? -(dAcum.imobiliz.atu - dAcum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} />
-            {(d.dInvestimentos !== 0 || (dAcum && dAcum.dInvestimentos !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={dAcum ? -dAcum.dInvestimentos : undefined} hasAcum={hasAcum} indent={1} />}
+            <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={dAcum ? -(dAcum.imobiliz.atu - dAcum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.5'], -1, -(data.imobiliz.atu - data.imobiliz.ant), dAcum ? -(dAcum.imobiliz.atu - dAcum.imobiliz.ant) : undefined)} />
+            {(d.dInvestimentos !== 0 || (dAcum && dAcum.dInvestimentos !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={dAcum ? -dAcum.dInvestimentos : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.3'], -1, -d.dInvestimentos, dAcum ? -dAcum.dInvestimentos : undefined)} />}
             {(d.dRealizLPOutros !== 0 || (dAcum && dAcum.dRealizLPOutros !== 0)) && (
-              <DFCRow label={`${-d.dRealizLPOutros >= 0 ? '(+)' : '(–)'} Variação Realizável LP excl. cred. ligadas (1.5.1 − 1.5.1.01.52) ${d.dRealizLPOutros > 0 ? '— aumento ativo (uso de caixa)' : '— redução ativo (fonte de caixa)'} (${fmtBRL(d.realizLPAnt, true)} → ${fmtBRL(d.realizLPAtu, true)})`} value={-d.dRealizLPOutros} value2={dAcum ? -dAcum.dRealizLPOutros : undefined} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${-d.dRealizLPOutros >= 0 ? '(+)' : '(–)'} Variação Realizável LP excl. cred. ligadas (1.5.1 − 1.5.1.01.52) ${d.dRealizLPOutros > 0 ? '— aumento ativo (uso de caixa)' : '— redução ativo (fonte de caixa)'} (${fmtBRL(d.realizLPAnt, true)} → ${fmtBRL(d.realizLPAtu, true)})`} value={-d.dRealizLPOutros} value2={dAcum ? -dAcum.dRealizLPOutros : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.1'], -1, -d.dRealizLPOutros, dAcum ? -dAcum.dRealizLPOutros : undefined, ['1.5.1.01.52'])} />
             )}
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={d.fluxoInvest + d.dIntangivel} value2={dAcum ? (dAcum.fluxoInvest + dAcum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
 
             <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
             {(d.emprestCP_02Ant > 0 || d.emprestCP_02Atu > 0) && (
-              <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02)  (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={dAcum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02)  (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={dAcum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.1.02'], 1, d.dEmprestCP_02, dAcum?.dEmprestCP_02)} />
             )}
             {(d.fpFloorAudiAnt > 0 || d.fpFloorAudiAtu > 0) && (
-              <DFCRow label={`${d.dFpFloorAudi >= 0 ? '(+) Captação' : '(–) Amortização'} Floor Plan Novos Audi (2.1.4.01.01.007)  (${fmtBRL(d.fpFloorAudiAnt, true)} → ${fmtBRL(d.fpFloorAudiAtu, true)})`} value={d.dFpFloorAudi} value2={dAcum?.dFpFloorAudi} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dFpFloorAudi >= 0 ? '(+) Captação' : '(–) Amortização'} Floor Plan Novos Audi (2.1.4.01.01.007)  (${fmtBRL(d.fpFloorAudiAnt, true)} → ${fmtBRL(d.fpFloorAudiAtu, true)})`} value={d.dFpFloorAudi} value2={dAcum?.dFpFloorAudi} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.4.01.01.007'], 1, d.dFpFloorAudi, dAcum?.dFpFloorAudi)} />
             )}
             {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && (
-              <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP  (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={dAcum?.dEmprestLP} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP  (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={dAcum?.dEmprestLP} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1.07'], 1, d.dEmprestLP, dAcum?.dEmprestLP)} />
             )}
             {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && (
-              <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas  (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} value2={dAcum?.dPessoasLig} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas  (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} value2={dAcum?.dPessoasLig} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1.01'], 1, d.dPessoasLig, dAcum?.dPessoasLig)} />
             )}
             {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && (
-              <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP  (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={dAcum?.dDebitosLig} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP  (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={dAcum?.dDebitosLig} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1.02'], 1, d.dDebitosLig, dAcum?.dDebitosLig)} />
             )}
             {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && (
-              <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'}  (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} value2={dAcum?.dArrendLP} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'}  (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} value2={dAcum?.dArrendLP} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1.15'], 1, d.dArrendLP, dAcum?.dArrendLP)} />
             )}
             {(d.dOutrosPassLP !== 0) && (
-              <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={dAcum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={dAcum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.3'], 1, d.dOutrosPassLP, dAcum?.dOutrosPassLP)} />
             )}
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc - d.dPL_extra} value2={dAcum ? (dAcum.fluxoFinanc - dAcum.dPL_extra) : undefined} hasAcum={hasAcum} total highlight />
           </tbody>
@@ -3951,6 +4099,79 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   const shortYear = String(selectedYear).slice(2);
   const headerMes = colAtual;
   const headerAcu = hasAcum ? `Jan – ${MONTH_SHORT[selectedMonth]}/${shortYear}` : '';
+  const directAccounts = data.accounts as Record<string, any>;
+  const janAccountMap = janAccounts as Record<string, any> | null;
+  const directAccountDetails = (
+    prefixes: string[],
+    monthlyValue: (id: string, account: any) => number,
+    target: number,
+    target2?: number,
+    accumulatedValue?: (id: string, account: any) => number,
+    excludedPrefixes: string[] = [],
+  ) => () => buildDFCAccountDetails(
+    directAccounts,
+    prefixes,
+    monthlyValue,
+    target,
+    target2 !== undefined ? accumulatedValue : undefined,
+    target2,
+    excludedPrefixes,
+  );
+  const directBalanceDetails = (prefixes: string[], factor: number, target: number, target2?: number, excludedPrefixes: string[] = []) =>
+    directAccountDetails(
+      prefixes,
+      (_id, account) => factor * (Math.abs(account?.saldoAtual || 0) - Math.abs(account?.saldoAnt || 0)),
+      target,
+      target2,
+      (id) => factor * (Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0)),
+      excludedPrefixes,
+    );
+  const directResultDetails = (
+    prefixes: string[],
+    factor: number,
+    target: number,
+    target2?: number,
+    monthlyMode: 'absolute' | 'signed' = 'absolute',
+    accumulatedMode: 'absolute' | 'signed' = 'absolute',
+  ) => directAccountDetails(
+    prefixes,
+    (_id, account) => factor * (monthlyMode === 'absolute'
+      ? Math.abs((account?.valDeb || 0) - (account?.valCred || 0))
+      : (account?.valDeb || 0) - (account?.valCred || 0)),
+    target,
+    target2,
+    (_id, account) => factor * (accumulatedMode === 'absolute'
+      ? Math.abs(account?.saldoAtual || 0)
+      : (account?.saldoAtual || 0)),
+  );
+  const rawDirectAccountDetails = (
+    prefixes: string[],
+    monthlyValue: (id: string, account: any) => number,
+    accumulatedValue?: (id: string, account: any) => number,
+    excludedPrefixes: string[] = [],
+  ) => getDFCAccountDetails(
+    directAccounts,
+    prefixes,
+    monthlyValue,
+    hasAcum ? accumulatedValue : undefined,
+    excludedPrefixes,
+  );
+  const customerReceiptDetails = (target: number, target2?: number) => reconcileDFCDetails([
+    ...rawDirectAccountDetails(['3.1'], (_id, a) => Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => Math.abs(a?.saldoAtual || 0)),
+    ...rawDirectAccountDetails(['3.3'], (_id, a) => -Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
+    ...rawDirectAccountDetails(['1.1.3', '1.1.4'], (_id, a) => -(Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0)), (id) => -(Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0))),
+  ], target, target2);
+  const supplierPaymentDetails = (target: number, target2?: number) => reconcileDFCDetails([
+    ...rawDirectAccountDetails(['4'], (_id, a) => -Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
+    ...rawDirectAccountDetails(['1.1.2', '1.1.7.02'], (_id, a) => -(Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0)), (id) => -(Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0))),
+    ...rawDirectAccountDetails(['2.1.3', '2.1.4'], (_id, a) => Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0), (id) => Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0), ['2.1.4.01.01.007']),
+  ], target, target2);
+  const operatingPaymentDetails = (target: number, target2?: number) => reconcileDFCDetails([
+    ...rawDirectAccountDetails(['5.'], (_id, a) => -((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
+    ...rawDirectAccountDetails(['2.1.2.03', '2.1.2.01'], (_id, a) => Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0), (id) => Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0)),
+    ...rawDirectAccountDetails(['1.1.6', '1.1.5'], (_id, a) => -(Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0)), (id) => -(Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0))),
+    ...rawDirectAccountDetails(['1.1.7'], (_id, a) => -(Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0)), (id) => -(Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0)), ['1.1.7.02']),
+  ], target, target2);
 
   // ── Mês: contas de resultado via valDeb/valCred; patrimonial via saldoAtual–saldoAnt ──
   const mAccounts = data.accounts as Record<string, any>;
@@ -4266,69 +4487,72 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
             <tbody>
               {/* ── Operacional ── */}
               <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} value2={0} hasAcum={hasAcum} highlight />
-              <DFCRow label="(+) Recebimentos de Clientes" value={recebClientes} value2={acum?.recebClientes} hasAcum={hasAcum} indent={1} />
-              <DFCRow label={`    ↳ Receita Bruta: ${fmtBRL(recBrutaMes, true)}`} value={recBrutaMes} value2={acum?.recBruta} hasAcum={hasAcum} indent={2} />
-              {(devolucoesMes !== 0 || (acum && acum.devolucoes !== 0)) && <DFCRow label="    ↳ (–) Devoluções devolvidas a clientes" value={-devolucoesMes} value2={acum ? -acum.devolucoes : undefined} hasAcum={hasAcum} indent={2} />}
-              {(d.dCred !== 0 || (acum && acum.dCred !== 0)) && <DFCRow label={`    ↳ ${d.dCred > 0 ? '(–)' : '(+)'} Variação Créditos de Vendas (1.1.3)`} value={-d.dCred} value2={acum ? -acum.dCred : undefined} hasAcum={hasAcum} indent={2} />}
-              {(d.dContasCorr !== 0 || (acum && acum.dContasCorr !== 0)) && <DFCRow label={`    ↳ ${d.dContasCorr > 0 ? '(–)' : '(+)'} Variação Contas Correntes (1.1.4)`} value={-d.dContasCorr} value2={acum ? -acum.dContasCorr : undefined} hasAcum={hasAcum} indent={2} />}
+              <DFCRow label="(+) Recebimentos de Clientes" value={recebClientes} value2={acum?.recebClientes} hasAcum={hasAcum} indent={1} details={() => customerReceiptDetails(recebClientes, acum?.recebClientes)} />
+              <DFCRow label={`    ↳ Receita Bruta: ${fmtBRL(recBrutaMes, true)}`} value={recBrutaMes} value2={acum?.recBruta} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.1'], 1, recBrutaMes, acum?.recBruta)} />
+              {(devolucoesMes !== 0 || (acum && acum.devolucoes !== 0)) && <DFCRow label="    ↳ (–) Devoluções devolvidas a clientes" value={-devolucoesMes} value2={acum ? -acum.devolucoes : undefined} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.3'], -1, -devolucoesMes, acum ? -acum.devolucoes : undefined)} />}
+              {(d.dCred !== 0 || (acum && acum.dCred !== 0)) && <DFCRow label={`    ↳ ${d.dCred > 0 ? '(–)' : '(+)'} Variação Créditos de Vendas (1.1.3)`} value={-d.dCred} value2={acum ? -acum.dCred : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.3'], -1, -d.dCred, acum ? -acum.dCred : undefined)} />}
+              {(d.dContasCorr !== 0 || (acum && acum.dContasCorr !== 0)) && <DFCRow label={`    ↳ ${d.dContasCorr > 0 ? '(–)' : '(+)'} Variação Contas Correntes (1.1.4)`} value={-d.dContasCorr} value2={acum ? -acum.dContasCorr : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.4'], -1, -d.dContasCorr, acum ? -acum.dContasCorr : undefined)} />}
 
-              <DFCRow label="(–) Pagamentos a Fornecedores" value={pagFornec} value2={acum?.pagFornec} hasAcum={hasAcum} indent={1} />
-              <DFCRow label={`    ↳ CMV do período: ${fmtBRL(CMVMes, true)}`} value={-CMVMes} value2={acum ? -acum.CMV : undefined} hasAcum={hasAcum} indent={2} />
-              {(d.dEstoque !== 0 || (acum && acum.dEstoque !== 0)) && <DFCRow label={`    ↳ ${d.dEstoque > 0 ? '(–)' : '(+)'} Variação Estoques (1.1.2 + 1.1.7.02)`} value={-d.dEstoque} value2={acum ? -acum.dEstoque : undefined} hasAcum={hasAcum} indent={2} />}
-              {(d.dFornec !== 0 || (acum && acum.dFornec !== 0)) && <DFCRow label={`    ↳ ${d.dFornec > 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.3 + 2.1.4)`} value={d.dFornec} value2={acum?.dFornec} hasAcum={hasAcum} indent={2} />}
+              <DFCRow label="(–) Pagamentos a Fornecedores" value={pagFornec} value2={acum?.pagFornec} hasAcum={hasAcum} indent={1} details={() => supplierPaymentDetails(pagFornec, acum?.pagFornec)} />
+              <DFCRow label={`    ↳ CMV do período: ${fmtBRL(CMVMes, true)}`} value={-CMVMes} value2={acum ? -acum.CMV : undefined} hasAcum={hasAcum} indent={2} details={directResultDetails(['4'], -1, -CMVMes, acum ? -acum.CMV : undefined)} />
+              {(d.dEstoque !== 0 || (acum && acum.dEstoque !== 0)) && <DFCRow label={`    ↳ ${d.dEstoque > 0 ? '(–)' : '(+)'} Variação Estoques (1.1.2 + 1.1.7.02)`} value={-d.dEstoque} value2={acum ? -acum.dEstoque : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.2', '1.1.7.02'], -1, -d.dEstoque, acum ? -acum.dEstoque : undefined)} />}
+              {(d.dFornec !== 0 || (acum && acum.dFornec !== 0)) && <DFCRow label={`    ↳ ${d.dFornec > 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.3 + 2.1.4)`} value={d.dFornec} value2={acum?.dFornec} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['2.1.3', '2.1.4'], 1, d.dFornec, acum?.dFornec, ['2.1.4.01.01.007'])} />}
 
-              <DFCRow label="(–) Pagamentos de Despesas Operacionais" value={despOperCaixa} value2={acum?.despOperCaixa} hasAcum={hasAcum} indent={1} />
-              <DFCRow label={`    ↳ Despesas operacionais do período (conta 5, líquido): ${fmtBRL(d.despOper5Net, true)}`} value={-d.despOper5Net} value2={acum ? -acum.despOper5Net : undefined} hasAcum={hasAcum} indent={2} />
-              {(d.dContasPag !== 0 || (acum && acum.dContasPag !== 0)) && <DFCRow label={`    ↳ ${d.dContasPag > 0 ? '(+)' : '(–)'} Variação Contas a Pagar (2.1.2.03)`} value={d.dContasPag} value2={acum?.dContasPag} hasAcum={hasAcum} indent={2} />}
-              {(d.dObrigTrab !== 0 || (acum && acum.dObrigTrab !== 0)) && <DFCRow label={`    ↳ ${d.dObrigTrab > 0 ? '(+)' : '(–)'} Variação Obrig. Trabalhistas (2.1.2.01)`} value={d.dObrigTrab} value2={acum?.dObrigTrab} hasAcum={hasAcum} indent={2} />}
-              {(d.dDespAntec !== 0 || (acum && acum.dDespAntec !== 0)) && <DFCRow label={`    ↳ ${d.dDespAntec > 0 ? '(–)' : '(+)'} Variação Despesas Antecipadas (1.1.6)`} value={-d.dDespAntec} value2={acum ? -acum.dDespAntec : undefined} hasAcum={hasAcum} indent={2} />}
-              {(d.dValDiv !== 0 || (acum && acum.dValDiv !== 0)) && <DFCRow label={`    ↳ ${d.dValDiv > 0 ? '(–)' : '(+)'} Variação Valores Diversos (1.1.5)`} value={-d.dValDiv} value2={acum ? -acum.dValDiv : undefined} hasAcum={hasAcum} indent={2} />}
+              <DFCRow label="(–) Pagamentos de Despesas Operacionais" value={despOperCaixa} value2={acum?.despOperCaixa} hasAcum={hasAcum} indent={1} details={() => operatingPaymentDetails(despOperCaixa, acum?.despOperCaixa)} />
+              <DFCRow label={`    ↳ Despesas operacionais do período (conta 5, líquido): ${fmtBRL(d.despOper5Net, true)}`} value={-d.despOper5Net} value2={acum ? -acum.despOper5Net : undefined} hasAcum={hasAcum} indent={2} details={directResultDetails(['5.'], -1, -d.despOper5Net, acum ? -acum.despOper5Net : undefined, 'signed')} />
+              {(d.dContasPag !== 0 || (acum && acum.dContasPag !== 0)) && <DFCRow label={`    ↳ ${d.dContasPag > 0 ? '(+)' : '(–)'} Variação Contas a Pagar (2.1.2.03)`} value={d.dContasPag} value2={acum?.dContasPag} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['2.1.2.03'], 1, d.dContasPag, acum?.dContasPag)} />}
+              {(d.dObrigTrab !== 0 || (acum && acum.dObrigTrab !== 0)) && <DFCRow label={`    ↳ ${d.dObrigTrab > 0 ? '(+)' : '(–)'} Variação Obrig. Trabalhistas (2.1.2.01)`} value={d.dObrigTrab} value2={acum?.dObrigTrab} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['2.1.2.01'], 1, d.dObrigTrab, acum?.dObrigTrab)} />}
+              {(d.dDespAntec !== 0 || (acum && acum.dDespAntec !== 0)) && <DFCRow label={`    ↳ ${d.dDespAntec > 0 ? '(–)' : '(+)'} Variação Despesas Antecipadas (1.1.6)`} value={-d.dDespAntec} value2={acum ? -acum.dDespAntec : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.6'], -1, -d.dDespAntec, acum ? -acum.dDespAntec : undefined)} />}
+              {(d.dValDiv !== 0 || (acum && acum.dValDiv !== 0)) && <DFCRow label={`    ↳ ${d.dValDiv > 0 ? '(–)' : '(+)'} Variação Valores Diversos (1.1.5)`} value={-d.dValDiv} value2={acum ? -acum.dValDiv : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.5'], -1, -d.dValDiv, acum ? -acum.dValDiv : undefined)} />}
 
-              <DFCRow label="(–) Pagamentos de Impostos sobre Vendas" value={pagImpostos} value2={acum?.pagImpostos} hasAcum={hasAcum} indent={1} />
-              <DFCRow label={`    ↳ Impostos sobre Vendas do período: ${fmtBRL(impostosVMes, true)}`} value={-impostosVMes} value2={acum ? -acum.impostosV : undefined} hasAcum={hasAcum} indent={2} />
-              {(d.dObrigTrib !== 0 || (acum && acum.dObrigTrib !== 0)) && <DFCRow label={`    ↳ ${d.dObrigTrib > 0 ? '(+)' : '(–)'} Variação Obrig. Tributárias (2.1.2.02)`} value={d.dObrigTrib} value2={acum?.dObrigTrib} hasAcum={hasAcum} indent={2} />}
+              <DFCRow label="(–) Pagamentos de Impostos sobre Vendas" value={pagImpostos} value2={acum?.pagImpostos} hasAcum={hasAcum} indent={1} details={() => reconcileDFCDetails([
+                ...rawDirectAccountDetails(['3.2'], (_id, a) => -Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
+                ...rawDirectAccountDetails(['2.1.2.02'], (_id, a) => Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0), (id) => Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0)),
+              ], pagImpostos, acum?.pagImpostos)} />
+              <DFCRow label={`    ↳ Impostos sobre Vendas do período: ${fmtBRL(impostosVMes, true)}`} value={-impostosVMes} value2={acum ? -acum.impostosV : undefined} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.2'], -1, -impostosVMes, acum ? -acum.impostosV : undefined)} />
+              {(d.dObrigTrib !== 0 || (acum && acum.dObrigTrib !== 0)) && <DFCRow label={`    ↳ ${d.dObrigTrib > 0 ? '(+)' : '(–)'} Variação Obrig. Tributárias (2.1.2.02)`} value={d.dObrigTrib} value2={acum?.dObrigTrib} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['2.1.2.02'], 1, d.dObrigTrib, acum?.dObrigTrib)} />}
 
-              {(pagIR !== 0 || (acum && acum.pagIR !== 0)) && <DFCRow label="(–) IR + CSLL pago (conta 6)" value={pagIR} value2={acum?.pagIR} hasAcum={hasAcum} indent={1} />}
+              {(pagIR !== 0 || (acum && acum.pagIR !== 0)) && <DFCRow label="(–) IR + CSLL pago (conta 6)" value={pagIR} value2={acum?.pagIR} hasAcum={hasAcum} indent={1} details={directResultDetails(['6'], -1, pagIR, acum?.pagIR, 'signed', 'signed')} />}
 
-              {(rendasRecebidas !== 0 || (acum && acum.rendasRecebidas !== 0)) && <DFCRow label="(+) Rendas Recebidas (Oper. + Financ. + Não Oper.)" value={rendasRecebidas} value2={acum?.rendasRecebidas} hasAcum={hasAcum} indent={1} />}
-              {(rendOperMes !== 0 || (acum && acum.rendOper !== 0)) && <DFCRow label={`    ↳ Rendas Operacionais (3.4): ${fmtBRL(rendOperMes, true)}`} value={rendOperMes} value2={acum?.rendOper} hasAcum={hasAcum} indent={2} />}
-              {(rendFinancMes !== 0 || (acum && acum.rendFinanc !== 0)) && <DFCRow label={`    ↳ Rendas Financeiras (3.5): ${fmtBRL(rendFinancMes, true)}`} value={rendFinancMes} value2={acum?.rendFinanc} hasAcum={hasAcum} indent={2} />}
-              {(rendNaoOperMes !== 0 || (acum && acum.rendNaoOper !== 0)) && <DFCRow label={`    ↳ Rendas Não Operacionais (3.6): ${fmtBRL(rendNaoOperMes, true)}`} value={rendNaoOperMes} value2={acum?.rendNaoOper} hasAcum={hasAcum} indent={2} />}
-              <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(\u2013)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={acum ? -acum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} />
+              {(rendasRecebidas !== 0 || (acum && acum.rendasRecebidas !== 0)) && <DFCRow label="(+) Rendas Recebidas (Oper. + Financ. + Não Oper.)" value={rendasRecebidas} value2={acum?.rendasRecebidas} hasAcum={hasAcum} indent={1} details={directResultDetails(['3.4', '3.5', '3.6'], 1, rendasRecebidas, acum?.rendasRecebidas)} />}
+              {(rendOperMes !== 0 || (acum && acum.rendOper !== 0)) && <DFCRow label={`    ↳ Rendas Operacionais (3.4): ${fmtBRL(rendOperMes, true)}`} value={rendOperMes} value2={acum?.rendOper} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.4'], 1, rendOperMes, acum?.rendOper)} />}
+              {(rendFinancMes !== 0 || (acum && acum.rendFinanc !== 0)) && <DFCRow label={`    ↳ Rendas Financeiras (3.5): ${fmtBRL(rendFinancMes, true)}`} value={rendFinancMes} value2={acum?.rendFinanc} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.5'], 1, rendFinancMes, acum?.rendFinanc)} />}
+              {(rendNaoOperMes !== 0 || (acum && acum.rendNaoOper !== 0)) && <DFCRow label={`    ↳ Rendas Não Operacionais (3.6): ${fmtBRL(rendNaoOperMes, true)}`} value={rendNaoOperMes} value2={acum?.rendNaoOper} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.6'], 1, rendNaoOperMes, acum?.rendNaoOper)} />}
+              <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(\u2013)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={acum ? -acum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.1.01.52'], -1, -d.dRealizLPCred, acum ? -acum.dRealizLPCred : undefined)} />
               {(d.emprestCP_01Ant > 0 || d.emprestCP_01Atu > 0 || (d.dEmprestCP_01 !== undefined && d.dEmprestCP_01 !== 0)) && (
-                <DFCRow label={`${d.dEmprestCP_01 >= 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.1.01) ${d.dEmprestCP_01 >= 0 ? '— aumento (fonte de caixa)' : '— redução (uso de caixa)'} (${fmtBRL(d.emprestCP_01Ant, true)} → ${fmtBRL(d.emprestCP_01Atu, true)})`} value={d.dEmprestCP_01} value2={acum?.dEmprestCP_01} hasAcum={hasAcum} indent={1} />
+                <DFCRow label={`${d.dEmprestCP_01 >= 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.1.01) ${d.dEmprestCP_01 >= 0 ? '— aumento (fonte de caixa)' : '— redução (uso de caixa)'} (${fmtBRL(d.emprestCP_01Ant, true)} → ${fmtBRL(d.emprestCP_01Atu, true)})`} value={d.dEmprestCP_01} value2={acum?.dEmprestCP_01} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.1.1.01'], 1, d.dEmprestCP_01, acum?.dEmprestCP_01)} />
               )}
               {(Math.abs(d.dOutros2_2_1) > 0.01 || (acum && Math.abs(acum.dOutros221) > 0.01)) && (
-                <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos LP não mapeados (2.2.1 — demais)`} value={d.dOutros2_2_1} value2={acum?.dOutros221} hasAcum={hasAcum} indent={1} />
+                <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos LP não mapeados (2.2.1 — demais)`} value={d.dOutros2_2_1} value2={acum?.dOutros221} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1'], 1, d.dOutros2_2_1, acum?.dOutros221, ['2.2.1.07', '2.2.1.01', '2.2.1.02', '2.2.1.15'])} />
               )}
               {(Math.abs(d.dRecDiferidas) > 0.01 || (acum && Math.abs(acum.dRecDiferidas) > 0.01)) && (
-                <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={acum?.dRecDiferidas} hasAcum={hasAcum} indent={1} />
+                <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={acum?.dRecDiferidas} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.2'], 1, d.dRecDiferidas, acum?.dRecDiferidas)} />
               )}
               {(Math.abs(d.ajusteResidualBP + d.dPL_extra) > 0.01 || (acum && Math.abs((acum.ajusteResidualBP ?? 0) + (acum.dPL_extra ?? 0)) > 0.01)) && (
-                <DFCRow label={`${(d.ajusteResidualBP + d.dPL_extra) >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP + d.dPL_extra} value2={acum ? (acum.ajusteResidualBP + acum.dPL_extra) : undefined} hasAcum={hasAcum} indent={1} />
+                <DFCRow label={`${(d.ajusteResidualBP + d.dPL_extra) >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP + d.dPL_extra} value2={acum ? (acum.ajusteResidualBP + acum.dPL_extra) : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails([], 1, d.ajusteResidualBP + d.dPL_extra, acum ? acum.ajusteResidualBP + acum.dPL_extra : undefined)} />
               )}
-              <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} value2={acum ? -acum.dIntangivel : undefined} hasAcum={hasAcum} indent={1} />
+              <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} value2={acum ? -acum.dIntangivel : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.7'], -1, -d.dIntangivel, acum ? -acum.dIntangivel : undefined)} />
 
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto + d.dPL_extra - d.dIntangivel} value2={acum ? (acum.fluxoOperDireto + acum.dPL_extra - acum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
 
               {/* ── Investimento ── */}
               <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
-              <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={acum ? -(acum.imobiliz.atu - acum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} />
-              {(d.dInvestimentos !== 0 || (acum && acum.dInvest !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={acum ? -acum.dInvest : undefined} hasAcum={hasAcum} indent={1} />}
+              <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={acum ? -(acum.imobiliz.atu - acum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.5'], -1, -(data.imobiliz.atu - data.imobiliz.ant), acum ? -(acum.imobiliz.atu - acum.imobiliz.ant) : undefined)} />
+              {(d.dInvestimentos !== 0 || (acum && acum.dInvest !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={acum ? -acum.dInvest : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.3'], -1, -d.dInvestimentos, acum ? -acum.dInvest : undefined)} />}
               {(d.dRealizLPOutros !== 0 || (acum && acum.dRealizLPOutros !== 0)) && (
-                <DFCRow label={`${-d.dRealizLPOutros >= 0 ? '(+)' : '(–)'} Variação Realizável LP excl. cred. ligadas (1.5.1 − 1.5.1.01.52) ${d.dRealizLPOutros > 0 ? '— aumento (uso)' : '— redução (fonte)'} (${fmtBRL(d.realizLPAnt, true)} → ${fmtBRL(d.realizLPAtu, true)})`} value={-d.dRealizLPOutros} value2={acum ? -acum.dRealizLPOutros : undefined} hasAcum={hasAcum} indent={1} />
+                <DFCRow label={`${-d.dRealizLPOutros >= 0 ? '(+)' : '(–)'} Variação Realizável LP excl. cred. ligadas (1.5.1 − 1.5.1.01.52) ${d.dRealizLPOutros > 0 ? '— aumento (uso)' : '— redução (fonte)'} (${fmtBRL(d.realizLPAnt, true)} → ${fmtBRL(d.realizLPAtu, true)})`} value={-d.dRealizLPOutros} value2={acum ? -acum.dRealizLPOutros : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.1'], -1, -d.dRealizLPOutros, acum ? -acum.dRealizLPOutros : undefined, ['1.5.1.01.52'])} />
               )}
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={fluxoInvestDireto + d.dIntangivel} value2={acum ? (acum.fluxoInvest + acum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
 
               {/* ── Financiamento ── */}
               <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
-              {(d.emprestCP_02Ant > 0 || d.emprestCP_02Atu > 0) && <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02) (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={acum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} />}
-              {(d.fpFloorAudiAnt > 0 || d.fpFloorAudiAtu > 0) && <DFCRow label={`${d.dFpFloorAudi >= 0 ? '(+) Captação' : '(–) Amortização'} Floor Plan Novos Audi (2.1.4.01.01.007) (${fmtBRL(d.fpFloorAudiAnt, true)} → ${fmtBRL(d.fpFloorAudiAtu, true)})`} value={d.dFpFloorAudi} value2={acum?.dFpFloorAudi} hasAcum={hasAcum} indent={1} />}
-              {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={acum?.dEmprestLP} hasAcum={hasAcum} indent={1} />}
-              {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} value2={acum?.dPessoasLig} hasAcum={hasAcum} indent={1} />}
-              {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={acum?.dDebitosLig} hasAcum={hasAcum} indent={1} />}
-              {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'} (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} value2={acum?.dArrendLP} hasAcum={hasAcum} indent={1} />}
-              {(d.dOutrosPassLP !== 0 || (acum && acum.dOutrosPassLP !== 0)) && <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={acum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} />}
+              {(d.emprestCP_02Ant > 0 || d.emprestCP_02Atu > 0) && <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02) (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={acum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.1.1.02'], 1, d.dEmprestCP_02, acum?.dEmprestCP_02)} />}
+              {(d.fpFloorAudiAnt > 0 || d.fpFloorAudiAtu > 0) && <DFCRow label={`${d.dFpFloorAudi >= 0 ? '(+) Captação' : '(–) Amortização'} Floor Plan Novos Audi (2.1.4.01.01.007) (${fmtBRL(d.fpFloorAudiAnt, true)} → ${fmtBRL(d.fpFloorAudiAtu, true)})`} value={d.dFpFloorAudi} value2={acum?.dFpFloorAudi} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.1.4.01.01.007'], 1, d.dFpFloorAudi, acum?.dFpFloorAudi)} />}
+              {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={acum?.dEmprestLP} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1.07'], 1, d.dEmprestLP, acum?.dEmprestLP)} />}
+              {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} value2={acum?.dPessoasLig} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1.01'], 1, d.dPessoasLig, acum?.dPessoasLig)} />}
+              {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={acum?.dDebitosLig} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1.02'], 1, d.dDebitosLig, acum?.dDebitosLig)} />}
+              {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'} (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} value2={acum?.dArrendLP} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1.15'], 1, d.dArrendLP, acum?.dArrendLP)} />}
+              {(d.dOutrosPassLP !== 0 || (acum && acum.dOutrosPassLP !== 0)) && <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={acum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.3'], 1, d.dOutrosPassLP, acum?.dOutrosPassLP)} />}
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={fluxoFinancDireto - d.dPL_extra} value2={acum ? (acum.fluxoFinanc - acum.dPL_extra) : undefined} hasAcum={hasAcum} total highlight />
             </tbody>
             <tfoot>
