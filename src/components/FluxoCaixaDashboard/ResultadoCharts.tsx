@@ -1,38 +1,22 @@
 /**
- * Gráficos de Evolução — Resultado (DRE)
- * 7 gráficos com comparativo mensal ano atual vs ano anterior:
- *  1. Receita Líquida
- *  2. Lucro (Prejuízo) Bruto
- *  3. Rendas Operacionais
- *  4. Rendas Não Operacionais
- *  5. Despesas Operacionais (soma de todas folhas 5.*)
- *  6. Resultado Antes do IR/CSLL
- *  7. Resultado Líquido do Exercício
- *
- * Carrega os balancetes brutos de cada mês via loadMultipleMonthsRaw
- * e calcula as métricas com a mesma lógica da ResultadoTab.
+ * Evolução mensal das linhas cadastradas para a DRE.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from 'recharts';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { loadMultipleMonthsRaw, loadFluxoCaixaIndex } from './fluxoCaixaStorage';
+import { loadFluxoCaixaIndex } from './fluxoCaixaStorage';
+import {
+  calcularLinhas, chavePeriodo, listarLinhasDre,
+  type LinhaDemonstracao,
+} from './DemonstracoesFinanceiras/modelo';
+import { loadCadastroDemonstracoes, loadDadosDemonstracoes } from './DemonstracoesFinanceiras/storage';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
-
-interface DREValues {
-  receitaLiquida: number;
-  lucroBruto: number;
-  rendasOperacionais: number;
-  rendasNaoOperacionais: number;
-  despesasOperacionais: number;
-  resultadoAntesIR: number;
-  resultadoLiquido: number;
-}
 
 interface Props {
   selectedYear: number;
@@ -42,94 +26,15 @@ interface Props {
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-// ─── Parser: extrai métricas DRE do balancete bruto ──────────────────────────
-
-function parseDRE(rawText: string): DREValues {
-  const accounts: Record<string, any> = {};
-  const lines = rawText.split('\n');
-  for (const line of lines) {
-    const parts = line.split(';');
-    if (parts.length < 7) continue;
-    const [nivel, conta, desc, saldoAnt, valDeb, valCred, saldoAtual] = parts;
-    if (nivel?.trim() === 'T') continue;
-    const id = conta?.trim();
-    if (!id) continue;
-    const p = (v: string) =>
-      parseFloat((v || '0').trim().replace(/\./g, '').replace(',', '.')) || 0;
-    accounts[id] = {
-      desc: desc?.trim(),
-      saldoAnt: p(saldoAnt),
-      valDeb: p(valDeb),
-      valCred: p(valCred),
-      saldoAtual: p(saldoAtual),
-    };
+async function carregarValoresMensais(linhas: LinhaDemonstracao[], ano: number, ateMes: number) {
+  const principal = { ano, mes: ateMes };
+  const dados = await loadDadosDemonstracoes(principal, principal, 'dre', true);
+  const meses: Record<number, Map<string, number | null>> = {};
+  for (let mes = 1; mes <= ateMes; mes++) {
+    meses[mes] = calcularLinhas(linhas, 'dre', [dados[chavePeriodo({ ano, mes })] ?? null]);
   }
-
-  const get = (id: string) =>
-    accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0 };
-
-  // Movimento do mês (débito − crédito em valor absoluto)
-  const absMov = (id: string) => {
-    const a = get(id);
-    return Math.abs((a.valCred || 0) - (a.valDeb || 0));
-  };
-
-  // Receita Líquida = Receita Bruta − Impostos − Devoluções
-  const recBruta   = absMov('3.1');
-  const impostos   = absMov('3.2');
-  const devolucoes = absMov('3.3');
-  const receitaLiquida = recBruta - impostos - devolucoes;
-
-  // CMV
-  const cmv = absMov('4');
-
-  // Lucro Bruto
-  const lucroBruto = receitaLiquida - cmv;
-
-  // Rendas
-  const rendasOperacionais    = absMov('3.4');
-  const rendasFinanceiras     = absMov('3.5');
-  const rendasNaoOperacionais = absMov('3.6');
-
-  // Despesas Operacionais — soma de todas folhas de 5.*
-  const allKeys5 = Object.keys(accounts).filter(k => k.startsWith('5.'));
-  const leaves5  = allKeys5.filter(k => !allKeys5.some(o => o !== k && o.startsWith(k + '.')));
-  const despesasOperacionais = leaves5.reduce(
-    (s, k) => s + ((get(k).valDeb || 0) - (get(k).valCred || 0)), 0,
-  );
-
-  // Resultado Antes do IR/CSLL
-  const resultadoAntesIR =
-    lucroBruto - despesasOperacionais + rendasOperacionais + rendasFinanceiras + rendasNaoOperacionais;
-
-  // Provisão IR + CSLL com sinal: devedor → positivo (deduz), credor → negativo (adiciona)
-  const provisaoIR = (get('6').valDeb || 0) - (get('6').valCred || 0);
-
-  // Resultado Líquido
-  const resultadoLiquido = resultadoAntesIR - provisaoIR;
-
-  return {
-    receitaLiquida,
-    lucroBruto,
-    rendasOperacionais,
-    rendasNaoOperacionais,
-    despesasOperacionais,
-    resultadoAntesIR,
-    resultadoLiquido,
-  };
+  return meses;
 }
-
-// ─── Definição dos 7 gráficos ────────────────────────────────────────────────
-
-const CHART_DEFS: Array<{ key: keyof DREValues; label: string }> = [
-  { key: 'receitaLiquida',        label: 'Receita Líquida' },
-  { key: 'lucroBruto',            label: 'Lucro (Prejuízo) Bruto' },
-  { key: 'rendasOperacionais',    label: 'Rendas Operacionais' },
-  { key: 'rendasNaoOperacionais', label: 'Rendas Não Operacionais' },
-  { key: 'despesasOperacionais',  label: 'Despesas Operacionais' },
-  { key: 'resultadoAntesIR',      label: 'Resultado Antes do IR/CSLL' },
-  { key: 'resultadoLiquido',      label: 'Resultado Líquido do Exercício' },
-];
 
 // ─── Formatação ───────────────────────────────────────────────────────────────
 
@@ -163,7 +68,9 @@ function CustomTooltip({ active, payload, label }: any) {
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: entry.color }} />
               <span className="text-muted-foreground">{entry.name}:</span>
-              <span className="font-mono font-semibold text-foreground">{fmtBRLFull(entry.value)}</span>
+              <span className="font-mono font-semibold text-foreground">
+                {entry.value === null || entry.value === undefined ? '—' : fmtBRLFull(entry.value)}
+              </span>
             </div>
             <div className="ml-5 text-xs">
               {varPct === null || varPct === undefined
@@ -184,81 +91,86 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export function ResultadoCharts({ selectedYear, selectedMonth, onClose }: Props) {
   const [loading, setLoading] = useState(true);
-  const [monthlyDRE, setMonthlyDRE] = useState<Record<number, DREValues>>({});
-
+  const [cadastroDre, setCadastroDre] = useState<LinhaDemonstracao[] | null>(null);
+  const [dadosDre, setDadosDre] = useState<Record<number, Map<string, number | null>>>({});
   const [compareYear, setCompareYear] = useState<number | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [compareMonthlyDRE, setCompareMonthlyDRE] = useState<Record<number, DREValues>>({});
+  const [compareMonthlyDRE, setCompareMonthlyDRE] = useState<Record<number, Map<string, number | null>>>({});
+  const [erro, setErro] = useState('');
 
   useEffect(() => {
-    (async () => {
-      const idx = await loadFluxoCaixaIndex();
-      const years = new Set<number>();
-      for (const key of Object.keys(idx)) {
-        const y = parseInt(key.split('_')[0]);
-        if (!isNaN(y) && y !== selectedYear) years.add(y);
-      }
-      setAvailableYears(Array.from(years).sort((a, b) => b - a));
-    })();
+    let ativo = true;
+    setLoading(true);
+    setErro('');
+    Promise.all([loadCadastroDemonstracoes(), loadFluxoCaixaIndex()])
+      .then(([cadastro, indice]) => {
+        if (!ativo) return;
+        setCadastroDre(cadastro.linhas.filter(linha => linha.demonstracao === 'dre'));
+        const anos = new Set<number>();
+        for (const key of Object.keys(indice)) {
+          const ano = Number(key.split('_')[0]);
+          if (Number.isInteger(ano) && ano !== selectedYear) anos.add(ano);
+        }
+        setAvailableYears(Array.from(anos).sort((a, b) => b - a));
+      })
+      .catch(error => {
+        if (ativo) setErro(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (ativo) setLoading(false);
+      });
+    return () => { ativo = false; };
   }, [selectedYear]);
 
-  const loadYearDRE = useCallback(async (year: number, upToMonth: number): Promise<Record<number, DREValues>> => {
-    const months = Array.from({ length: upToMonth }, (_, i) => i + 1);
-    const rawMap = await loadMultipleMonthsRaw(year, months);
-    const result: Record<number, DREValues> = {};
-    for (const month of months) {
-      const raw = rawMap[month];
-      if (!raw) continue;
-      result[month] = parseDRE(raw);
-    }
-    return result;
-  }, []);
-
-  // Carregar ano principal
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const upTo = selectedMonth === 0 ? 12 : selectedMonth;
-      setMonthlyDRE(await loadYearDRE(selectedYear, upTo));
-      setLoading(false);
-    })();
-  }, [selectedYear, selectedMonth, loadYearDRE]);
+    if (!cadastroDre) return;
+    let ativo = true;
+    setLoading(true);
+    setErro('');
+    setDadosDre({});
+    carregarValoresMensais(cadastroDre, selectedYear, selectedMonth === 0 ? 12 : selectedMonth)
+      .then(valores => { if (ativo) setDadosDre(valores); })
+      .catch(error => { if (ativo) setErro(error instanceof Error ? error.message : String(error)); })
+      .finally(() => { if (ativo) setLoading(false); });
+    return () => { ativo = false; };
+  }, [cadastroDre, selectedYear, selectedMonth]);
 
-  // Carregar ano de comparação
   useEffect(() => {
-    if (!compareYear) {
+    if (!cadastroDre || !compareYear) {
       setCompareMonthlyDRE({});
       return;
     }
-    (async () => {
-      const upTo = selectedMonth === 0 ? 12 : selectedMonth;
-      setCompareMonthlyDRE(await loadYearDRE(compareYear, upTo));
-    })();
-  }, [compareYear, selectedMonth, loadYearDRE]);
+    let ativo = true;
+    carregarValoresMensais(cadastroDre, compareYear, selectedMonth === 0 ? 12 : selectedMonth)
+      .then(valores => { if (ativo) setCompareMonthlyDRE(valores); })
+      .catch(error => { if (ativo) setErro(error instanceof Error ? error.message : String(error)); });
+    return () => { ativo = false; };
+  }, [cadastroDre, compareYear, selectedMonth]);
 
   const upToMonth = selectedMonth === 0 ? 12 : selectedMonth;
   const months = Array.from({ length: upToMonth }, (_, i) => i + 1);
+  const linhas = cadastroDre ? listarLinhasDre(cadastroDre) : [];
 
-  const buildChartData = (dreKey: keyof DREValues) => {
+  const buildChartData = (linhaId: string) => {
     const curKey = String(selectedYear);
     const cmpKey = compareYear ? String(compareYear) : null;
     return months.map((m, idx) => {
-      const curVal = monthlyDRE[m]?.[dreKey] || 0;
-      const prevCurVal = idx > 0 ? (monthlyDRE[months[idx - 1]]?.[dreKey] || 0) : null;
-      const varCur = prevCurVal !== null && prevCurVal !== 0
+      const curVal = dadosDre[m]?.get(linhaId) ?? null;
+      const prevCurVal = idx > 0 ? dadosDre[months[idx - 1]]?.get(linhaId) ?? null : null;
+      const varCur = curVal !== null && prevCurVal !== null && prevCurVal !== 0
         ? ((curVal - prevCurVal) / Math.abs(prevCurVal)) * 100
         : null;
 
-      const row: Record<string, any> = {
+      const row: Record<string, string | number | null> = {
         name: MONTH_LABELS[m - 1],
         [curKey]: curVal,
         [`var_${curKey}`]: varCur,
       };
 
       if (cmpKey) {
-        const cmpVal = compareMonthlyDRE[m]?.[dreKey] || 0;
-        const prevCmpVal = idx > 0 ? (compareMonthlyDRE[months[idx - 1]]?.[dreKey] || 0) : null;
-        const varCmp = prevCmpVal !== null && prevCmpVal !== 0
+        const cmpVal = compareMonthlyDRE[m]?.get(linhaId) ?? null;
+        const prevCmpVal = idx > 0 ? compareMonthlyDRE[months[idx - 1]]?.get(linhaId) ?? null : null;
+        const varCmp = cmpVal !== null && prevCmpVal !== null && prevCmpVal !== 0
           ? ((cmpVal - prevCmpVal) / Math.abs(prevCmpVal)) * 100
           : null;
         row[cmpKey] = cmpVal;
@@ -267,6 +179,13 @@ export function ResultadoCharts({ selectedYear, selectedMonth, onClose }: Props)
 
       return row;
     });
+  };
+
+  const totalPeriodo = (valores: Record<number, Map<string, number | null>>, linhaId: string) => {
+    const valoresMeses = months.map(mes => valores[mes]?.get(linhaId) ?? null);
+    return valoresMeses.some(valor => valor === null)
+      ? null
+      : valoresMeses.reduce<number>((total, valor) => total + (valor ?? 0), 0);
   };
 
   if (loading) {
@@ -279,6 +198,18 @@ export function ResultadoCharts({ selectedYear, selectedMonth, onClose }: Props)
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
         </div>
+      </div>
+    );
+  }
+
+  if (erro) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-foreground">Evolução Mensal — Resultado (DRE)</h3>
+          <Button variant="outline" size="sm" onClick={onClose}>Voltar</Button>
+        </div>
+        <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</p>
       </div>
     );
   }
@@ -317,29 +248,33 @@ export function ResultadoCharts({ selectedYear, selectedMonth, onClose }: Props)
 
       {/* Charts grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {CHART_DEFS.map((def) => {
-          const chartData = buildChartData(def.key);
-          const periodTotal = months.reduce((s, m) => s + (monthlyDRE[m]?.[def.key] || 0), 0);
+        {linhas.map(({ linha }) => {
+          const chartData = buildChartData(linha.id);
+          const periodTotal = totalPeriodo(dadosDre, linha.id);
           const comparePeriodTotal = compareYear
-            ? months.reduce((s, m) => s + (compareMonthlyDRE[m]?.[def.key] || 0), 0)
+            ? totalPeriodo(compareMonthlyDRE, linha.id)
             : null;
-
-          // Ocultar gráficos com todos os valores zerados
-          const allZeroCur = months.every(m => (monthlyDRE[m]?.[def.key] || 0) === 0);
-          const allZeroCmp = !compareYear || months.every(m => (compareMonthlyDRE[m]?.[def.key] || 0) === 0);
-          if (allZeroCur && allZeroCmp) return null;
+          const hasCurrentValue = months.some(mes => {
+            const valor = dadosDre[mes]?.get(linha.id);
+            return valor !== null && valor !== undefined && valor !== 0;
+          });
+          const hasCompareValue = compareYear && months.some(mes => {
+            const valor = compareMonthlyDRE[mes]?.get(linha.id);
+            return valor !== null && valor !== undefined && valor !== 0;
+          });
+          if (!hasCurrentValue && !hasCompareValue) return null;
 
           return (
-            <Card key={def.key}>
+            <Card key={linha.id}>
               <CardContent className="pt-5 pb-4">
                 <div className="mb-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-foreground">{def.label}</h4>
+                    <h4 className="text-sm font-semibold text-foreground">{linha.nome}</h4>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                        Total: {fmtBRLFull(periodTotal)}
+                        Total: {periodTotal === null ? '—' : fmtBRLFull(periodTotal)}
                       </span>
-                      {comparePeriodTotal !== null && (
+                      {compareYear && comparePeriodTotal !== null && (
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                           {compareYear}: {fmtBRLFull(comparePeriodTotal)}
                         </span>
@@ -375,6 +310,11 @@ export function ResultadoCharts({ selectedYear, selectedMonth, onClose }: Props)
           );
         })}
       </div>
+      {linhas.length === 0 && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Nenhuma linha DRE cadastrada na Emissão de Demonstrações Financeiras.
+        </p>
+      )}
     </div>
   );
 }

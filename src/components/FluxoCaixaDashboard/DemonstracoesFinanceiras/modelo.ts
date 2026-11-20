@@ -67,14 +67,29 @@ export interface PeriodoDemonstracao { ano: number; mes: number }
 export type DadosDemonstracoes = Record<string, ContasBalancete | null>;
 export const linhaPai = (linha: LinhaDemonstracao) => linha.bancoDe ?? linha.sublinhaDe;
 
-export function encontrarLinhaBasePercentualDre(linhas: LinhaDemonstracao[]): LinhaDemonstracao | undefined {
-  const nomesPrioritarios = ['receita liquida de vendas', 'receita operacional liquida', 'receita liquida'];
-  for (const nome of nomesPrioritarios) {
+const normalizarNomeLinhaDre = (nome: string) =>
+  nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
+
+export function encontrarLinhaDrePorNomes(linhas: LinhaDemonstracao[], nomes: string[]): LinhaDemonstracao | undefined {
+  for (const nome of nomes) {
+    const nomeNormalizado = normalizarNomeLinhaDre(nome);
     const correspondencias = linhas.filter(linha => linha.demonstracao === 'dre' && !linhaPai(linha)
-      && linha.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR') === nome);
+      && normalizarNomeLinhaDre(linha.nome) === nomeNormalizado);
     if (correspondencias.length > 0) return correspondencias.length === 1 ? correspondencias[0] : undefined;
   }
   return undefined;
+}
+
+export function encontrarLinhaBasePercentualDre(linhas: LinhaDemonstracao[]): LinhaDemonstracao | undefined {
+  return encontrarLinhaDrePorNomes(linhas, ['Receita Líquida de Vendas', 'Receita Operacional Líquida', 'Receita Líquida']);
+}
+
+export function listarLinhasDre(linhas: LinhaDemonstracao[]): Array<{ linha: LinhaDemonstracao; recuo: boolean }> {
+  const linhasDre = linhas.filter(linha => linha.demonstracao === 'dre');
+  return linhasDre.filter(linha => !linhaPai(linha)).flatMap(raiz => [
+    { linha: raiz, recuo: false },
+    ...linhasDre.filter(linha => linhaPai(linha) === raiz.id).map(linha => ({ linha, recuo: true })),
+  ]);
 }
 
 export const chavePeriodo = ({ ano, mes }: PeriodoDemonstracao) => `${ano}_${mes}`;

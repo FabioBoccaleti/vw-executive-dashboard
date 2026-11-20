@@ -18,7 +18,7 @@ import { AtivoCharts } from "./AtivoCharts";
 import { PassivoCharts } from "./PassivoCharts";
 import { EndividamentoCharts } from "./EndividamentoCharts";
 import { ReceitasCharts } from "./ReceitasCharts";
-import { FCCaixaDiretoCharts } from "./FCCaixaDiretoCharts";
+import { CaixaDfcTab } from "./CaixaDfcTab";
 import { ImobilizadoCharts } from "./ImobilizadoCharts";
 import { ResultadoCharts } from "./ResultadoCharts";
 import { ComparativoReceitas } from "./ComparativoReceitas";
@@ -26,6 +26,11 @@ import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
 import { ProjecaoTab } from './ProjecaoTab';
 import { PerguntasRespostasTab } from "./PerguntasRespostasTab";
 import { DemonstracoesFinanceiras } from "./DemonstracoesFinanceiras";
+import {
+  calcularLinhas, chavePeriodo, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, listarLinhasDre,
+  type DadosDemonstracoes, type LinhaDemonstracao, type PeriodoDemonstracao,
+} from './DemonstracoesFinanceiras/modelo';
+import { loadCadastroDemonstracoes, loadDadosDemonstracoes } from './DemonstracoesFinanceiras/storage';
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -400,131 +405,6 @@ const TableRow2 = ({ label, ant, atu, highlight, indent = 0 }: any) => {
         {pct !== null ? `${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%` : '—'}
       </td>
     </tr>
-  );
-};
-
-type DFCDetail = { label: string; value: number; value2?: number };
-
-function getDFCAnalyticalAccounts(
-  accounts: Record<string, any>,
-  prefixes: string[],
-  excludedPrefixes: string[] = [],
-): Array<{ id: string; description: string }> {
-  const matchesPrefix = (id: string, prefix: string) => prefix.endsWith('.')
-    ? id.startsWith(prefix)
-    : id === prefix || id.startsWith(`${prefix}.`);
-  const isIncluded = (id: string) => prefixes.some(prefix => matchesPrefix(id, prefix));
-  const isExcluded = (id: string) => excludedPrefixes.some(prefix => matchesPrefix(id, prefix));
-  const candidates = Object.keys(accounts).filter(id => isIncluded(id) && !isExcluded(id));
-  const candidateSet = new Set(candidates);
-  const parents = new Set<string>();
-
-  for (const id of candidates) {
-    const parts = id.split('.');
-    while (parts.length > 1) {
-      parts.pop();
-      const parent = parts.join('.');
-      if (candidateSet.has(parent)) parents.add(parent);
-    }
-  }
-
-  return candidates
-    .filter(id => !parents.has(id))
-    .map(id => ({ id, description: accounts[id]?.desc || id }));
-}
-
-function reconcileDFCDetails(details: DFCDetail[], value: number, value2?: number): DFCDetail[] {
-  const difference = value - details.reduce((sum, detail) => sum + detail.value, 0);
-  const difference2 = value2 === undefined
-    ? undefined
-    : value2 - details.reduce((sum, detail) => sum + (detail.value2 ?? 0), 0);
-
-  if (Math.abs(difference) > 0.005 || (difference2 !== undefined && Math.abs(difference2) > 0.005)) {
-    details.push({
-      label: 'Ajuste residual / diferença não atribuída às contas analíticas',
-      value: difference,
-      value2: difference2,
-    });
-  }
-
-  return details;
-}
-
-function getDFCAccountDetails(
-  accounts: Record<string, any>,
-  prefixes: string[],
-  monthlyValue: (id: string, account: any) => number,
-  accumulatedValue?: (id: string, account: any) => number,
-  excludedPrefixes: string[] = [],
-): DFCDetail[] {
-  return getDFCAnalyticalAccounts(accounts, prefixes, excludedPrefixes)
-    .map(({ id, description }) => ({
-      label: `${id} — ${description}`,
-      value: monthlyValue(id, accounts[id]),
-      ...(accumulatedValue
-        ? { value2: accumulatedValue(id, accounts[id]) }
-        : {}),
-    }))
-    .filter(detail => Math.abs(detail.value) > 0.005 || Math.abs(detail.value2 ?? 0) > 0.005);
-}
-
-function buildDFCAccountDetails(
-  accounts: Record<string, any>,
-  prefixes: string[],
-  monthlyValue: (id: string, account: any) => number,
-  target: number,
-  accumulatedValue?: (id: string, account: any) => number,
-  target2?: number,
-  excludedPrefixes: string[] = [],
-): DFCDetail[] {
-  return reconcileDFCDetails(
-    getDFCAccountDetails(accounts, prefixes, monthlyValue, target2 !== undefined ? accumulatedValue : undefined, excludedPrefixes),
-    target,
-    target2,
-  );
-}
-
-const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total, details = [] }: any) => {
-  const [expanded, setExpanded] = useState(false);
-  const isPos = value >= 0;
-  const isPos2 = (value2 ?? 0) >= 0;
-  const expandable = typeof details === 'function' || details.length > 0;
-  const detailRows: DFCDetail[] = expanded
-    ? typeof details === 'function' ? details() : details
-    : [];
-  const renderVal = (v: number, pos: boolean) => (
-    <td className={cn('py-2.5 px-3 text-right font-mono text-sm', total || highlight ? 'font-bold' : '', hasAcum && 'w-[20%]')}>
-      {total ? '' : (v >= 0 ? '' : '(')}
-      <span className={cn(total ? (pos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400') : 'text-foreground')}>
-        {total ? '' : fmtBRL(Math.abs(v))}
-        {total && `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtBRL(v)}`}
-      </span>
-      {total ? '' : (v < 0 ? ')' : '')}
-    </td>
-  );
-  const emptyCell = (key?: string) => <td key={key} className={cn('py-2.5 px-3 w-[20%]')} />;
-  return (
-    <>
-      <tr className={cn(highlight && 'bg-emerald-50 dark:bg-emerald-950/20', total && 'bg-muted/50')}>
-        <td className={cn('py-2.5 px-3 text-sm', total || highlight ? 'font-bold text-foreground' : 'text-muted-foreground')} style={{ paddingLeft: 12 + indent * 20 }}>
-          {expandable && <button type="button" className="mr-1 inline-flex rounded p-1 align-middle hover:bg-muted focus-visible:outline focus-visible:outline-2" aria-label={`${expanded ? 'Ocultar' : 'Exibir'} contas de ${label}`} aria-expanded={expanded} onClick={() => setExpanded(open => !open)}>
-            {expanded ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
-          </button>}
-          {label}
-        </td>
-        {highlight && !total ? emptyCell('v1') : renderVal(value, isPos)}
-        {hasAcum && highlight && !total ? emptyCell('v2') : hasAcum && value2 !== undefined ? renderVal(value2, isPos2) : hasAcum && value2 === undefined ? <td className="py-2.5 px-3 text-right text-muted-foreground/40 w-[20%] border-l border-border/20">—</td> : null}
-      </tr>
-      {detailRows.map((detail, index) => (
-        <tr key={`${detail.label}-${index}`} className="border-b border-border/50 bg-muted/20">
-          <td className="py-2 px-3 text-xs text-muted-foreground" style={{ paddingLeft: 28 + indent * 20 }}>{detail.label}</td>
-          {renderVal(detail.value, detail.value >= 0)}
-          {hasAcum && (detail.value2 === undefined
-            ? <td className="py-2 px-3 text-right text-xs text-muted-foreground/40 w-[20%] border-l border-border/20">—</td>
-            : renderVal(detail.value2, detail.value2 >= 0))}
-        </tr>
-      ))}
-    </>
   );
 };
 
@@ -1101,9 +981,9 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
               {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} prevYearAccounts={prevYearAccounts} />}
-              {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
+              {activeTab === 'resultado' && <ResultadoTab fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
+              {activeTab === 'caixa' && <CaixaTab fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
+              {activeTab === 'caixaDireto' && <CaixaDiretoTab fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} prevMonthAccounts={prevMonthAccounts} prevYearAccounts={prevYearAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} />}
@@ -3229,193 +3109,135 @@ function PassivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual, sele
   );
 }
 
-function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selectedMonth, selectedYear, ytdAccountsSums, prevYearAccounts }: any) {
+function ResultadoTab({ fmtBRL, SectionTitle, colAtual, selectedMonth, selectedYear }: any) {
   const [showCharts, setShowCharts] = useState(false);
-  const d = data;
-  const accounts = d.accounts as Record<string, any>;
-  const get = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0, desc: '' };
-
-  // Acumulado YTD — soma mensal de Jan até mês selecionado via ytdAccountsSums
-  // ytdAccountsSums[id] = Σ(valCred − valDeb) de Jan até selectedMonth
+  const [cadastroDre, setCadastroDre] = useState<Awaited<ReturnType<typeof loadCadastroDemonstracoes>> | null>(null);
+  const [dadosDre, setDadosDre] = useState<DadosDemonstracoes | null>(null);
+  const [erroDre, setErroDre] = useState('');
+  const [carregandoDre, setCarregandoDre] = useState(true);
   const isMonthly = selectedMonth > 0;
-  const hasYtd = isMonthly && ytdAccountsSums && Object.keys(ytdAccountsSums).length > 0;
-  // Modo anual com comparativo ao ano anterior
   const isAnual = selectedMonth === 0;
-  const hasPrevYear = isAnual && prevYearAccounts && Object.keys(prevYearAccounts).length > 0;
-  // Para contas de receita/resultado (natureza credora): ytdAccS[id] é positivo → abs preserva
-  // Para contas de custo/despesa (natureza devedora): ytdAccS[id] é negativo → abs preserva
-  // Modo anual: usa movimento do período (valCred−valDeb) para evitar distorção do saldoAnt
-  const absYtd = (id: string) => hasYtd
-    ? Math.abs(ytdAccountsSums[id] ?? 0)
-    : Math.abs(get(id).valCred - get(id).valDeb);
-  // Movimento do mês — usa valDeb / valCred
-  const absMon = (id: string) => { const a = get(id); return Math.abs(a.valDeb - a.valCred); };
-  // Ano anterior (modo anual): movimento do período (valCred−valDeb), nunca saldoAtual
-  const getPrev = (id: string) => (prevYearAccounts || {})[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0 };
-  const absYtdPrev = (id: string) => hasPrevYear ? Math.abs(getPrev(id).valCred - getPrev(id).valDeb) : 0;
-
-  // ── Valores Acumulado (soma mensal YTD) ──────────────────────────────
-  const recBruta    = absYtd('3.1');
-  const impostosV   = absYtd('3.2');
-  const devolucoes  = absYtd('3.3');
-  const recLiq      = recBruta - impostosV - devolucoes;
-  const CMV         = absYtd('4');
-  const lucBruto    = recLiq - CMV;
-  const rendOper    = absYtd('3.4');
-  const rendFinanc  = absYtd('3.5');
-  const rendNaoOper = absYtd('3.6');
-
-  // ── Valores Ano Anterior (balancete anual com comparativo) ──────────────────
-  const recBrutaPrev    = absYtdPrev('3.1');
-  const impostosVPrev   = absYtdPrev('3.2');
-  const devolucoesPrev  = absYtdPrev('3.3');
-  const recLiqPrev      = recBrutaPrev - impostosVPrev - devolucoesPrev;
-  const CMVPrev         = absYtdPrev('4');
-  const lucBrutoPrev    = recLiqPrev - CMVPrev;
-  const rendOperPrev    = absYtdPrev('3.4');
-  const rendFinancPrev  = absYtdPrev('3.5');
-  const rendNaoOperPrev = absYtdPrev('3.6');
-
-  // Para despesas 5.x: quando hasYtd, usa-se os keys do ytdAccountsSums para cobrir todas as
-  // contas que tiveram movimento em qualquer mês de Jan até o mês selecionado
-  const allKeys5Base = Object.keys(accounts).filter(k => k.startsWith('5.'));
-  const allKeys5Ytd  = hasYtd ? Object.keys(ytdAccountsSums).filter(k => k.startsWith('5.')) : [];
-  const allKeys5     = hasYtd
-    ? Array.from(new Set([...allKeys5Base, ...allKeys5Ytd]))
-    : allKeys5Base;
-  const leaves5 = allKeys5.filter(k => !allKeys5.some(other => other !== k && other.startsWith(k + '.')));
-
-  const groupTotals: Record<string, { desc: string; valor: number }> = {};
-  for (const k of leaves5) {
-    // ytdAccountsSums armazena (valCred − valDeb): para contas de despesa (natureza devedora)
-    // esse valor é negativo, por isso negamos para obter o total positivo
-    // Modo anual (não hasYtd): usa valDeb−valCred para evitar distorção do saldoAnt de abertura
-    const val = hasYtd ? -(ytdAccountsSums[k] ?? 0) : (get(k).valDeb - get(k).valCred);
-    if (val === 0) continue;
-    const gk = k.split('.').slice(0, 2).join('.');
-    if (!groupTotals[gk]) groupTotals[gk] = { desc: accounts[gk]?.desc || gk, valor: 0 };
-    groupTotals[gk].valor += val;
-  }
-
-  // Despesas Ano Anterior (balancete anual)
-  const allKeys5Prev = hasPrevYear ? Object.keys(prevYearAccounts).filter(k => k.startsWith('5.')) : [];
-  const leaves5Prev  = allKeys5Prev.filter(k => !allKeys5Prev.some(other => other !== k && other.startsWith(k + '.')));
-  const groupTotalsPrev: Record<string, { desc: string; valor: number }> = {};
-  for (const k of leaves5Prev) {
-    // Usa valDeb−valCred para evitar distorção do saldoAnt de abertura
-    const val = getPrev(k).valDeb - getPrev(k).valCred;
-    if (val === 0) continue;
-    const gk = k.split('.').slice(0, 2).join('.');
-    if (!groupTotalsPrev[gk]) groupTotalsPrev[gk] = { desc: prevYearAccounts[gk]?.desc || gk, valor: 0 };
-    groupTotalsPrev[gk].valor += val;
-  }
-
-  // ── Valores Mês (valDeb / valCred) ───────────────────────────────────
-  const recBrutaMes    = absMon('3.1');
-  const impostosVMes   = absMon('3.2');
-  const devolucoesMes  = absMon('3.3');
-  const recLiqMes      = recBrutaMes - impostosVMes - devolucoesMes;
-  const CMVMes         = absMon('4');
-  const lucBrutoMes    = recLiqMes - CMVMes;
-  const rendOperMes    = absMon('3.4');
-  const rendFinancMes  = absMon('3.5');
-  const rendNaoOperMes = absMon('3.6');
-
-  const groupTotalsMes: Record<string, { desc: string; valor: number }> = {};
-  for (const k of leaves5) {
-    const val = get(k).valDeb - get(k).valCred;
-    if (val === 0) continue;
-    const gk = k.split('.').slice(0, 2).join('.');
-    if (!groupTotalsMes[gk]) groupTotalsMes[gk] = { desc: accounts[gk]?.desc || gk, valor: 0 };
-    groupTotalsMes[gk].valor += val;
-  }
-
-  // ── Merge union de despesas (acumulado + mês) ─────────────────────────
-  const allDespKeys = Array.from(new Set([...Object.keys(groupTotals), ...Object.keys(groupTotalsMes), ...Object.keys(groupTotalsPrev)])).sort();
-  const allDespRows = allDespKeys
-    .map(k => ({
-      conta: k,
-      desc: groupTotals[k]?.desc || groupTotalsMes[k]?.desc || groupTotalsPrev[k]?.desc || k,
-      valorMes: groupTotalsMes[k]?.valor || 0,
-      valorAcu: groupTotals[k]?.valor || 0,
-      valorPrev: groupTotalsPrev[k]?.valor || 0,
-    }))
-    .filter(r => r.valorMes !== 0 || r.valorAcu !== 0 || r.valorPrev !== 0);
-
-  const despTotal    = allDespRows.reduce((s, x) => s + x.valorAcu, 0);
-  const despTotalMes = allDespRows.reduce((s, x) => s + x.valorMes, 0);
-
-  const lucAnteIR    = lucBruto    - despTotal    + rendOper    + rendFinanc    + rendNaoOper;
-  const lucAnteIRMes = lucBrutoMes - despTotalMes + rendOperMes + rendFinancMes + rendNaoOperMes;
-
-  // Provisão IR/CSLL com sinal: devedor (valDeb > valCred) → positivo → deduz resultado
-  // credor (valCred > valDeb) → negativo → adiciona ao resultado (reversão/benefício fiscal)
-  const getSign6Mes = (): number => { const a = get('6'); return a.valDeb - a.valCred; };
-  const getSign6Ytd = (): number => {
-    if (hasYtd) return -(ytdAccountsSums['6'] ?? 0); // ytdSums = valCred−valDeb, negamos para valDeb−valCred
-    // Modo anual: inclui saldoAnt da conta 6 (carryforward de exercícios anteriores)
-    // saldoAtual = saldoAnt + (valDeb − valCred) → equivale ao saldo acumulado do balancete
-    const a = get('6');
-    return (a.saldoAnt || 0) + (a.valDeb - a.valCred);
-  };
-  const provisaoIRMes = getSign6Mes(); // positivo = dedutor, negativo = adicionador
-  const provisaoIR    = getSign6Ytd();
-  const resLiq    = lucAnteIR    - provisaoIR;
-  const resLiqMes = lucAnteIRMes - provisaoIRMes;
-
-  // Totais Ano Anterior (balancete anual com comparativo)
-  const despTotalPrev  = allDespRows.reduce((s, x) => s + x.valorPrev, 0);
-  const lucAnteIRPrev  = lucBrutoPrev - despTotalPrev + rendOperPrev + rendFinancPrev + rendNaoOperPrev;
-  // Sinal preservado: devedor (> 0) = deduz, credor (< 0) = reversão/benefício fiscal
-  // Inclui saldoAnt para bater com o saldoAtual do balancete
-  const provisaoIRPrev = hasPrevYear ? (getPrev('6').saldoAnt || 0) + (getPrev('6').valDeb - getPrev('6').valCred) : 0;
-  const resLiqPrev     = lucAnteIRPrev - provisaoIRPrev;
-
-  // Cabeçalhos das colunas
   const MONTH_SHORT: Record<number, string> = {
     1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
     7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez',
   };
-  const shortYear = String(selectedYear).slice(2);
-  const headerMes = colAtual; // ex: "Jun/25"
+  const shortYear = String(selectedYear).slice(-2);
+  const headerMes = colAtual;
   const headerAcu = isMonthly ? `Jan – ${MONTH_SHORT[selectedMonth]}/${shortYear}` : colAtual;
 
-  // ── Linhas do DRE ─────────────────────────────────────────────────────
-  type DRERow = { label: string; valueMes: number; valueAcu: number; valuePrev: number; type: string };
-  const rows: DRERow[] = [
-    { label: 'RECEITA BRUTA DE VENDAS',                    valueMes: recBrutaMes,    valueAcu: recBruta,    valuePrev: recBrutaPrev,    type: 'header'   },
-    { label: '  (–) Impostos sobre Vendas',                valueMes: -impostosVMes,  valueAcu: -impostosV,  valuePrev: -impostosVPrev,  type: 'sub'      },
-    { label: '  (–) Devoluções de Vendas',                 valueMes: -devolucoesMes, valueAcu: -devolucoes, valuePrev: -devolucoesPrev, type: 'sub'      },
-    { label: 'RECEITA LÍQUIDA',                            valueMes: recLiqMes,      valueAcu: recLiq,      valuePrev: recLiqPrev,      type: 'subtotal' },
-    { label: '  (–) Custo das Mercadorias Vendidas (CMV)', valueMes: -CMVMes,        valueAcu: -CMV,        valuePrev: -CMVPrev,        type: 'sub'      },
-    { label: 'LUCRO (PREJUÍZO) BRUTO',                     valueMes: lucBrutoMes,    valueAcu: lucBruto,    valuePrev: lucBrutoPrev,    type: 'subtotal' },
-    { label: 'RENDAS OPERACIONAIS',                        valueMes: rendOperMes,    valueAcu: rendOper,    valuePrev: rendOperPrev,    type: 'group'    },
-    ...((rendNaoOper !== 0 || rendNaoOperMes !== 0 || rendNaoOperPrev !== 0)
-      ? [{ label: 'RENDAS NÃO OPERACIONAIS', valueMes: rendNaoOperMes, valueAcu: rendNaoOper, valuePrev: rendNaoOperPrev, type: 'group' }]
-      : []),
-    { label: 'DESPESAS OPERACIONAIS',                      valueMes: -despTotalMes,  valueAcu: -despTotal,  valuePrev: -despTotalPrev,  type: 'group'    },
-    ...allDespRows.map(s => ({
-      label: `    (–) ${toTitleCase(s.desc)}`,
-      valueMes: -s.valorMes,
-      valueAcu: -s.valorAcu,
-      valuePrev: -s.valorPrev,
-      type: 'sub',
-    })),
-    { label: '  (+) Rendas Financeiras',                   valueMes: rendFinancMes,  valueAcu: rendFinanc,  valuePrev: rendFinancPrev,  type: 'sub'      },
-    { label: 'RESULTADO ANTES DO IR/CSLL',                 valueMes: lucAnteIRMes,   valueAcu: lucAnteIR,   valuePrev: lucAnteIRPrev,   type: 'subtotal' },
-    ...((provisaoIR !== 0 || provisaoIRMes !== 0 || provisaoIRPrev !== 0)
-      // provisaoIR/Mes tem sinal: positivo = dedutor (mostrar negado), negativo = credor (mostrar positivo)
-      ? [{ label: '  (–) Provisão IR + CSLL', valueMes: -provisaoIRMes, valueAcu: -provisaoIR, valuePrev: -provisaoIRPrev, type: 'sub' }]
-      : []),
-    { label: 'RESULTADO LÍQUIDO DO EXERCÍCIO',             valueMes: resLiqMes,      valueAcu: resLiq,      valuePrev: resLiqPrev,      type: 'total'    },
-  ];
+  const [valoresDre, setValoresDre] = useState<{
+    mes: Map<string, number | null> | null;
+    acumulado: Map<string, number | null> | null;
+    anual: Map<string, number | null> | null;
+    anterior: Map<string, number | null> | null;
+  } | null>(null);
 
-  const renderCell = (val: number, important: boolean) => ({
-    text: val >= 0 ? fmtBRL(val) : `(${fmtBRL(Math.abs(val))})`,
-    color: important
-      ? (val >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')
-      : (val >= 0 ? 'text-foreground/80' : 'text-red-600 dark:text-red-400'),
+  useEffect(() => {
+    let ativo = true;
+    const principal = { ano: selectedYear, mes: selectedMonth };
+    const comparacoes: PeriodoDemonstracao[] = selectedMonth === 0
+      ? [{ ano: selectedYear, mes: 0 }, { ano: selectedYear - 1, mes: 0 }]
+      : [{ ano: selectedYear, mes: selectedMonth }];
+    setCarregandoDre(true);
+    setErroDre('');
+    setCadastroDre(null);
+    setDadosDre(null);
+    setValoresDre(null);
+
+    Promise.all([
+      loadCadastroDemonstracoes(),
+      loadDadosDemonstracoes(principal, comparacoes, 'dre', selectedMonth > 0),
+    ]).then(([cadastro, dados]) => {
+      if (!ativo) return;
+      setCadastroDre(cadastro);
+      setDadosDre(dados);
+    }).catch(error => {
+      if (!ativo) return;
+      setErroDre(error instanceof Error ? error.message : String(error));
+    }).finally(() => {
+      if (ativo) setCarregandoDre(false);
+    });
+
+    return () => { ativo = false; };
+  }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    if (!cadastroDre || !dadosDre) return;
+    const calcularPeriodo = (periodos: PeriodoDemonstracao[]) => calcularLinhas(
+      cadastroDre.linhas,
+      'dre',
+      periodos.map(periodo => dadosDre[chavePeriodo(periodo)] ?? null),
+    );
+    if (selectedMonth === 0) {
+      setValoresDre({
+        mes: null,
+        acumulado: null,
+        anual: calcularPeriodo([{ ano: selectedYear, mes: 0 }]),
+        anterior: calcularPeriodo([{ ano: selectedYear - 1, mes: 0 }]),
+      });
+      return;
+    }
+    setValoresDre({
+      mes: calcularPeriodo([{ ano: selectedYear, mes: selectedMonth }]),
+      acumulado: calcularPeriodo(Array.from({ length: selectedMonth }, (_, index) => ({ ano: selectedYear, mes: index + 1 }))),
+      anual: null,
+      anterior: null,
+    });
+  }, [cadastroDre, dadosDre, selectedMonth, selectedYear]);
+
+  const linhaReceitaBruta = cadastroDre
+    ? encontrarLinhaDrePorNomes(cadastroDre.linhas, ['Receita Bruta de Vendas', 'Receita Bruta'])
+    : undefined;
+  const linhaReceitaLiquida = cadastroDre ? encontrarLinhaBasePercentualDre(cadastroDre.linhas) : undefined;
+  const linhaLucroBruto = cadastroDre
+    ? encontrarLinhaDrePorNomes(cadastroDre.linhas, ['Lucro (Prejuízo) Bruto', 'Lucro Bruto'])
+    : undefined;
+  const linhaResultadoLiquido = cadastroDre
+    ? encontrarLinhaDrePorNomes(cadastroDre.linhas, [
+      'Resultado Líquido do Exercício', 'Resultado Líquido', 'Lucro Líquido do Exercício', 'Lucro Líquido',
+    ])
+    : undefined;
+  const valorDaLinha = (valores: Map<string, number | null> | null, linha?: LinhaDemonstracao) =>
+    valores && linha ? valores.get(linha.id) ?? null : null;
+  const valoresCartoes = [
+    { linha: linhaReceitaBruta, label: 'Receita Bruta', icon: '💼' },
+    { linha: linhaReceitaLiquida, label: 'Receita Líquida', icon: '📊' },
+    { linha: linhaLucroBruto, label: 'Lucro / Prej. Bruto', icon: '📦' },
+    { linha: linhaResultadoLiquido, label: 'Resultado Líquido', icon: '🏆' },
+  ].map(cartao => ({
+    ...cartao,
+    mes: valorDaLinha(valoresDre?.mes ?? null, cartao.linha),
+    acu: valorDaLinha(isMonthly ? valoresDre?.acumulado ?? null : valoresDre?.anual ?? null, cartao.linha),
+    prev: valorDaLinha(valoresDre?.anterior ?? null, cartao.linha),
+  }));
+  const linhasVisiveis = cadastroDre ? listarLinhasDre(cadastroDre.linhas) : [];
+  const ultimaLinhaTotalId = [...linhasVisiveis].reverse().find(({ linha }) => linha.tipo === 'total')?.linha.id;
+  const rows = linhasVisiveis.map(({ linha, recuo }, index) => ({
+    id: linha.id,
+    label: linha.nome,
+    valueMes: valorDaLinha(valoresDre?.mes ?? null, linha),
+    valueAcu: valorDaLinha(isMonthly ? valoresDre?.acumulado ?? null : valoresDre?.anual ?? null, linha),
+    valuePrev: valorDaLinha(valoresDre?.anterior ?? null, linha),
+    recuo,
+    type: linha.tipo === 'total'
+      ? linha.id === linhaResultadoLiquido?.id || linha.id === ultimaLinhaTotalId ? 'total' : 'subtotal'
+      : recuo ? 'sub' : index === 0 ? 'header' : 'group',
+  }));
+  const hasPrevYear = isAnual && Boolean(dadosDre?.[chavePeriodo({ ano: selectedYear - 1, mes: 0 })]);
+  const renderCell = (val: number | null, important: boolean) => ({
+    text: val === null ? '—' : val >= 0 ? fmtBRL(val) : `(${fmtBRL(Math.abs(val))})`,
+    color: val === null
+      ? 'text-muted-foreground'
+      : important
+        ? (val >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')
+        : (val >= 0 ? 'text-foreground/80' : 'text-red-600 dark:text-red-400'),
   });
+  const corKpi = (valor: number | null) => valor === null
+    ? 'text-muted-foreground'
+    : valor >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400';
+  const textoKpi = (valor: number | null, indice: number) => valor === null
+    ? '—'
+    : `${indice >= 2 && valor > 0 ? '+' : indice >= 2 && valor < 0 ? '−' : ''}${fmtBRL(valor, true)}`;
 
   if (showCharts) {
     return <ResultadoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
@@ -3423,6 +3245,9 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
 
   return (
     <div>
+      {erroDre && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroDre}</p>}
+      {!erroDre && carregandoDre && <p role="status" className="mb-4 text-sm text-muted-foreground">Carregando DRE cadastrada...</p>}
+      {!erroDre && !carregandoDre && linhasVisiveis.length === 0 && <p role="status" className="mb-4 text-sm text-amber-800">Nenhuma linha DRE cadastrada na Emissão de Demonstrações Financeiras.</p>}
       {/* Botão Evolução Mensal */}
       <div className="flex justify-end mb-4">
         <button
@@ -3434,12 +3259,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
       </div>
       {/* KPIs — duplo quando mensal, comparativo quando anual com ano anterior */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Receita Bruta',       mes: recBrutaMes,  acu: recBruta,  prev: recBrutaPrev,  icon: '💼' },
-          { label: 'Receita Líquida',     mes: recLiqMes,    acu: recLiq,    prev: recLiqPrev,    icon: '📊' },
-          { label: 'Lucro / Prej. Bruto', mes: lucBrutoMes,  acu: lucBruto,  prev: lucBrutoPrev,  icon: '📦' },
-          { label: 'Resultado Líquido',   mes: resLiqMes,    acu: resLiq,    prev: resLiqPrev,    icon: '🏆' },
-        ].map((kpi, i) => (
+        {valoresCartoes.map((kpi, i) => (
           <Card key={i}>
             <CardContent className="pt-5 pb-4">
               <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
@@ -3449,14 +3269,14 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                 <div className="space-y-2">
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerMes}</div>
-                    <div className={cn('text-lg font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                      {i >= 2 && kpi.mes > 0 ? '+' : i >= 2 && kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}
+                    <div className={cn('text-lg font-bold', corKpi(kpi.mes))}>
+                      {textoKpi(kpi.mes, i)}
                     </div>
                   </div>
                   <div className="border-t border-border/50 pt-2">
                     <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerAcu}</div>
-                    <div className={cn('text-xl font-bold', kpi.acu >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                      {i >= 2 && kpi.acu > 0 ? '+' : i >= 2 && kpi.acu < 0 ? '−' : ''}{fmtBRL(kpi.acu, true)}
+                    <div className={cn('text-xl font-bold', corKpi(kpi.acu))}>
+                      {textoKpi(kpi.acu, i)}
                     </div>
                   </div>
                 </div>
@@ -3465,22 +3285,24 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{selectedYear - 1}</div>
                     <div className="text-base font-semibold text-muted-foreground">
-                      {fmtBRL(kpi.prev, true)}
+                      {textoKpi(kpi.prev, i)}
                     </div>
                   </div>
                   <div className="border-t border-border/50 pt-2">
                     <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{selectedYear}</div>
-                    <div className={cn('text-xl font-bold', kpi.acu >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                      {i >= 2 && kpi.acu > 0 ? '+' : i >= 2 && kpi.acu < 0 ? '−' : ''}{fmtBRL(kpi.acu, true)}
+                    <div className={cn('text-xl font-bold', corKpi(kpi.acu))}>
+                      {textoKpi(kpi.acu, i)}
                     </div>
                   </div>
                   {(() => {
-                    const varV = kpi.acu - kpi.prev;
-                    const varP = kpi.prev !== 0 ? (varV / Math.abs(kpi.prev)) * 100 : null;
+                    const varV = kpi.acu === null || kpi.prev === null ? null : kpi.acu - kpi.prev;
+                    const varP = varV !== null && kpi.prev !== null && kpi.prev !== 0
+                      ? (varV / Math.abs(kpi.prev)) * 100
+                      : null;
                     return (
                       <div className="border-t border-border/50 pt-1">
-                        <span className={cn('text-xs font-semibold', varV >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                          {varV >= 0 ? '+' : ''}{fmtBRL(varV, true)}
+                        <span className={cn('text-xs font-semibold', varV === null ? 'text-muted-foreground' : varV >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+                          {varV === null ? '—' : `${varV >= 0 ? '+' : ''}${fmtBRL(varV, true)}`}
                           {varP !== null && <span className="ml-1 text-[10px]">({varP >= 0 ? '+' : ''}{varP.toFixed(1)}%)</span>}
                         </span>
                       </div>
@@ -3488,8 +3310,8 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                   })()}
                 </div>
               ) : (
-                <div className={cn('text-2xl font-bold', kpi.acu >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                  {i >= 2 && kpi.acu > 0 ? '+' : i >= 2 && kpi.acu < 0 ? '−' : ''}{fmtBRL(kpi.acu, true)}
+                <div className={cn('text-2xl font-bold', corKpi(kpi.acu))}>
+                  {textoKpi(kpi.acu, i)}
                 </div>
               )}
             </CardContent>
@@ -3544,11 +3366,15 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                 const mesCell   = renderCell(r.valueMes, important);
                 const acuCell   = renderCell(r.valueAcu, important);
                 const prevCell  = renderCell(r.valuePrev, important);
-                const varV      = r.valueAcu - r.valuePrev;
-                const varP      = r.valuePrev !== 0 ? (varV / Math.abs(r.valuePrev)) * 100 : null;
-                const varColor  = varV > 0 ? 'text-emerald-600 dark:text-emerald-400' : varV < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
+                const varV      = r.valueAcu === null || r.valuePrev === null ? null : r.valueAcu - r.valuePrev;
+                const varP      = varV !== null && r.valuePrev !== null && r.valuePrev !== 0
+                  ? (varV / Math.abs(r.valuePrev)) * 100
+                  : null;
+                const varColor  = varV === null || varV === 0
+                  ? 'text-muted-foreground'
+                  : varV > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400';
                 return (
-                  <tr key={i} className={cn(
+                  <tr key={r.id} className={cn(
                     'border-b border-border',
                     isHeader && 'bg-emerald-50/50 dark:bg-emerald-950/20',
                     isSub    && 'bg-muted/30',
@@ -3556,7 +3382,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                     isGroup  && 'bg-amber-50/40 dark:bg-amber-950/20',
                   )}>
                     <td className={cn('py-3 px-4 text-sm', important ? 'font-bold text-foreground' : 'text-muted-foreground')}>
-                      {r.label}
+                      <span className={r.recuo ? 'ml-5' : undefined}>{r.label}</span>
                     </td>
                     {isMonthly && (
                       <td className={cn('py-3 px-4 text-right text-sm font-mono tabular-nums', important ? 'font-bold' : '', mesCell.color)}>
@@ -3574,7 +3400,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                     {hasPrevYear && (
                       <>
                         <td className={cn('py-3 px-4 text-right text-sm font-mono tabular-nums', important ? 'font-bold' : '', varColor)}>
-                          {varV > 0 ? `+${fmtBRL(varV)}` : varV < 0 ? `(${fmtBRL(Math.abs(varV))})` : '—'}
+                          {varV === null ? '—' : varV > 0 ? `+${fmtBRL(varV)}` : varV < 0 ? `(${fmtBRL(Math.abs(varV))})` : '—'}
                         </td>
                         <td className={cn('py-3 px-4 text-right text-xs font-mono tabular-nums', important ? 'font-semibold' : '', varColor)}>
                           {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
@@ -3584,14 +3410,19 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                   </tr>
                 );
               })}
+              {!carregandoDre && !erroDre && rows.length === 0 && <tr>
+                <td colSpan={1 + Number(isMonthly) + 1 + (hasPrevYear ? 3 : 0)} className="py-6 text-center text-sm text-muted-foreground">
+                  Nenhuma linha DRE cadastrada para exibição.
+                </td>
+              </tr>}
             </tbody>
           </table>
           <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
             {isMonthly
-              ? `* Mês (${headerMes}): movimentação do período (Déb/Créd). Acumulado (${headerAcu}): saldo atual YTD.`
+              ? `* Mês (${headerMes}) e acumulado (${headerAcu}) calculados pelas mesmas linhas e critérios da DRE em Emissão de Demonstrações Financeiras.`
               : hasPrevYear
-                ? `* Comparativo ${selectedYear - 1} vs ${selectedYear} com base no saldo atual (YTD) do balancete. Para encerramento definitivo, consultar as demonstrações completas.`
-                : '* DRE calculada com base no saldo atual (YTD) do balancete. Para encerramento definitivo, consultar as demonstrações completas.'
+                ? `* Comparativo ${selectedYear - 1} vs ${selectedYear} calculado pelas mesmas linhas da DRE em Emissão de Demonstrações Financeiras.`
+                : '* Valores calculados pelas linhas cadastradas em Emissão de Demonstrações Financeiras.'
             }
           </p>
         </CardContent>
@@ -3600,1016 +3431,13 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   );
 }
 
-function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtual, janAccounts, selectedMonth, selectedYear }: any) {
-  const d = data.dfc;
-  const hasAcum = selectedMonth > 1 && janAccounts !== null;
-
-  // ── Cabeçalhos de colunas ─────────────────────────────────────────────
-  const MONTH_SHORT: Record<number, string> = {
-    1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
-    7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez',
-  };
-  const shortYear = String(selectedYear).slice(2);
-  const headerMes = colAtual;
-  const headerAcu = hasAcum ? `Jan – ${MONTH_SHORT[selectedMonth]}/${shortYear}` : '';
-  const monthAccounts = data.accounts as Record<string, any>;
-  const previousAccounts = janAccounts as Record<string, any> | null;
-  const accountDetails = (
-    prefixes: string[],
-    monthlyValue: (id: string, account: any) => number,
-    target: number,
-    target2?: number,
-    accumulatedValue?: (id: string, account: any) => number,
-    excludedPrefixes: string[] = [],
-  ) => () => buildDFCAccountDetails(
-    monthAccounts,
-    prefixes,
-    monthlyValue,
-    target,
-    target2 !== undefined ? accumulatedValue : undefined,
-    target2,
-    excludedPrefixes,
-  );
-  const balanceImpactDetails = (prefixes: string[], factor: number, target: number, target2?: number, excludedPrefixes: string[] = []) =>
-    accountDetails(
-      prefixes,
-      (_id, account) => factor * (Math.abs(account?.saldoAtual || 0) - Math.abs(account?.saldoAnt || 0)),
-      target,
-      target2,
-      (id) => factor * (Math.abs(monthAccounts[id]?.saldoAtual || 0) - Math.abs(previousAccounts?.[id]?.saldoAnt || 0)),
-      excludedPrefixes,
-    );
-  const rawAccountDetails = (
-    prefixes: string[],
-    monthlyValue: (id: string, account: any) => number,
-    accumulatedValue?: (id: string, account: any) => number,
-    excludedPrefixes: string[] = [],
-  ) => getDFCAccountDetails(
-    monthAccounts,
-    prefixes,
-    monthlyValue,
-    hasAcum ? accumulatedValue : undefined,
-    excludedPrefixes,
-  );
-  const netResultDetails = (target: number, target2?: number) => reconcileDFCDetails([
-    ...rawAccountDetails(['3.1'], (_id, a) => Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => Math.abs(a?.saldoAtual || 0)),
-    ...rawAccountDetails(['3.2', '3.3', '4'], (_id, a) => -Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
-    ...rawAccountDetails(['5.'], (_id, a) => -((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
-    ...rawAccountDetails(['3.4', '3.5', '3.6'], (_id, a) => Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => Math.abs(a?.saldoAtual || 0)),
-    ...rawAccountDetails(['6'], (_id, a) => -((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
-  ], target, target2);
-
-  // ── Cálculo acumulado YTD (Jan–Mês selecionado) ───────────────────────
-  let dAcum: any = null;
-  if (hasAcum) {
-    const cur = data.accounts as Record<string, any>;
-    const jan = janAccounts as Record<string, any>;
-    const getAtu = (id: string) => Math.abs(cur[id]?.saldoAtual || 0);
-    // saldoAnt do balancete de Janeiro = encerramento de Dez/ano anterior
-    const getJanAnt = (id: string) => Math.abs(jan[id]?.saldoAnt || 0);
-
-    // Variações patrimoniais YTD: saldoAtual(mês) - saldoAnt(Jan=Dez anterior)
-    const estoques_ant = getJanAnt('1.1.2');
-    const estoques_atu = getAtu('1.1.2');
-    const estAudi_ant  = getJanAnt('1.1.7.02');
-    const estAudi_atu  = getAtu('1.1.7.02');
-    const outrasAtivAudi_ant = getJanAnt('1.1.7');
-    const outrasAtivAudi_atu = getAtu('1.1.7');
-    const dEstoque_acum    = (estoques_atu + estAudi_atu) - (estoques_ant + estAudi_ant);
-    const dCred_acum       = getAtu('1.1.3') - getJanAnt('1.1.3');
-    const dContasCorr_acum = getAtu('1.1.4') - getJanAnt('1.1.4');
-    const dDespAntec_acum  = getAtu('1.1.6') - getJanAnt('1.1.6');
-    const dValDiv_acum     = getAtu('1.1.5') - getJanAnt('1.1.5');
-    const fpFloorAudi_ant  = getJanAnt('2.1.4.01.01.007');
-    const fpFloorAudi_atu  = getAtu('2.1.4.01.01.007');
-    const dFpFloorAudi_acum = fpFloorAudi_atu - fpFloorAudi_ant;
-    const dFornec_acum     = (getAtu('2.1.3') + getAtu('2.1.4') - fpFloorAudi_atu) - (getJanAnt('2.1.3') + getJanAnt('2.1.4') - fpFloorAudi_ant);
-    const dObrigTrib_acum  = getAtu('2.1.2.02') - getJanAnt('2.1.2.02');
-    const dObrigTrab_acum  = getAtu('2.1.2.01') - getJanAnt('2.1.2.01');
-    const dContasPag_acum  = getAtu('2.1.2.03') - getJanAnt('2.1.2.03');
-    // Outros ativos Audi (1.1.7 − 1.1.7.02): resíduo operacional
-    const outrasAtivAudiResiduo_acum = (outrasAtivAudi_atu - estAudi_atu) - (outrasAtivAudi_ant - estAudi_ant);
-    // Realizável LP resíduo além de 1.5.1.01.52
-    const realizLP_ant = getJanAnt('1.5.1');
-    const realizLP_atu = getAtu('1.5.1');
-    const realizLPCred_ant = getJanAnt('1.5.1.01.52');
-    const realizLPCred_atu = getAtu('1.5.1.01.52');
-    const dRealizLPOutros_acum = (realizLP_atu - realizLPCred_atu) - (realizLP_ant - realizLPCred_ant);
-    // Variação do PL além do resultado (aportes / retiradas / dividendos)
-    const PL_ant = getJanAnt('2.3');
-    const PL_atu = getAtu('2.3');
-
-    const ajusteEstoque_acum    = -dEstoque_acum;
-    const ajusteCred_acum       = -dCred_acum;
-    const ajusteContasCorr_acum = -dContasCorr_acum;
-    const ajusteDespAntec_acum  = -dDespAntec_acum;
-    const ajusteValDiv_acum     = -dValDiv_acum;
-    const ajusteOutrasAtivAudi_acum = -outrasAtivAudiResiduo_acum;
-    const ajusteFornec_acum     = dFornec_acum;
-    const ajusteTrib_acum       = dObrigTrib_acum;
-    const ajusteTrab_acum       = dObrigTrab_acum;
-    const ajusteContasPag_acum  = dContasPag_acum;
-
-    // Contas de resultado: saldoAtual já é o acumulado YTD
-    const absAtu_acum = (id: string) => Math.abs(cur[id]?.saldoAtual || 0);
-    const despOper5Net_acum = Math.abs(cur['5']?.saldoAtual || 0);
-    const resLiq_dfc_acum = absAtu_acum('3.1') - absAtu_acum('3.2') - absAtu_acum('3.3')
-                           - absAtu_acum('4') - despOper5Net_acum
-                           + absAtu_acum('3.4') + absAtu_acum('3.5') + absAtu_acum('3.6') - absAtu_acum('6');
-    const deprec_acum = Math.abs(cur['5.5.2.07.20']?.saldoAtual || 0);
-
-    // Investimento
-    const dImobiliz_acum     = getAtu('1.5.5')          - getJanAnt('1.5.5');
-    const dIntangivel_acum   = getAtu('1.5.7')          - getJanAnt('1.5.7');
-    const dRealizLPCred_acum = realizLPCred_atu - realizLPCred_ant;
-    const dInvestimentos_acum = getAtu('1.5.3')         - getJanAnt('1.5.3');
-    const fluxoInvest_acum = -dImobiliz_acum - dIntangivel_acum - dInvestimentos_acum
-                           - dRealizLPOutros_acum; // Realizável LP resíduo
-
-    const fluxoOper_acum = resLiq_dfc_acum + deprec_acum
-      + ajusteEstoque_acum + ajusteCred_acum + ajusteContasCorr_acum + ajusteValDiv_acum
-      + ajusteDespAntec_acum + ajusteOutrasAtivAudi_acum + ajusteFornec_acum + ajusteTrib_acum + ajusteTrab_acum + ajusteContasPag_acum
-      - dRealizLPCred_acum;
-
-    // Financiamento
-    const emprestCP_ant   = getJanAnt('2.1.1');    const emprestCP_atu   = getAtu('2.1.1');
-    // 2.1.1 dividido: 01 = Fornecedores (operacional) · 02 = Financiamentos CP (financiamento)
-    const emprestCP_01_ant = getJanAnt('2.1.1.01'); const emprestCP_01_atu = getAtu('2.1.1.01');
-    const emprestCP_02_ant = getJanAnt('2.1.1.02'); const emprestCP_02_atu = getAtu('2.1.1.02');
-    const dEmprestCP_01_acum = emprestCP_01_atu - emprestCP_01_ant;
-    const dEmprestCP_02_acum = emprestCP_02_atu - emprestCP_02_ant;
-    const dEmprestCP_acum    = emprestCP_atu   - emprestCP_ant; // total 2.1.1 (referência)
-    const emprestLP_ant   = getJanAnt('2.2.1.07'); const emprestLP_atu   = getAtu('2.2.1.07');
-    const pessoasLig_ant  = getJanAnt('2.2.1.01'); const pessoasLig_atu  = getAtu('2.2.1.01');
-    const debitosLig_ant  = getJanAnt('2.2.1.02'); const debitosLig_atu  = getAtu('2.2.1.02');
-    const arrendLP_ant    = getJanAnt('2.2.1.15'); const arrendLP_atu    = getAtu('2.2.1.15');
-    const outrosPassLP_ant = getJanAnt('2.2.3');   const outrosPassLP_atu = getAtu('2.2.3');
-    const grupo2_2_1_ant  = getJanAnt('2.2.1');    const grupo2_2_1_atu  = getAtu('2.2.1');
-    const outros2_2_1_ant = grupo2_2_1_ant - emprestLP_ant - pessoasLig_ant - debitosLig_ant - arrendLP_ant;
-    const outros2_2_1_atu = grupo2_2_1_atu - emprestLP_atu - pessoasLig_atu - debitosLig_atu - arrendLP_atu;
-
-    const dEmprestLP_acum   = emprestLP_atu   - emprestLP_ant;
-    const dPessoasLig_acum  = pessoasLig_atu  - pessoasLig_ant;
-    const dDebitosLig_acum  = debitosLig_atu  - debitosLig_ant;
-    const dArrendLP_acum    = arrendLP_atu    - arrendLP_ant;
-    const dOutrosPassLP_acum = outrosPassLP_atu - outrosPassLP_ant;
-    const dOutros2_2_1_acum = outros2_2_1_atu - outros2_2_1_ant;
-
-    const fluxoOper_acum_comForn = resLiq_dfc_acum + deprec_acum
-      + ajusteEstoque_acum + ajusteCred_acum + ajusteContasCorr_acum + ajusteValDiv_acum
-      + ajusteDespAntec_acum + ajusteOutrasAtivAudi_acum + ajusteFornec_acum + ajusteTrib_acum + ajusteTrab_acum + ajusteContasPag_acum
-      - dRealizLPCred_acum + dEmprestCP_01_acum + dOutros2_2_1_acum;
-    const dRecDiferidas_acum = getAtu('2.2.2') - getJanAnt('2.2.2');
-    const fluxoOper_acum_comRec = fluxoOper_acum_comForn + dRecDiferidas_acum;
-    const dPL_extra_acum = (PL_atu - PL_ant) - resLiq_dfc_acum;
-    const fluxoFinanc_acum = dEmprestCP_02_acum + dEmprestLP_acum + dPessoasLig_acum + dDebitosLig_acum
-                           + dArrendLP_acum + dOutrosPassLP_acum + dFpFloorAudi_acum + dPL_extra_acum;
-    const disponibAnt_jan  = getJanAnt('1.1.1');
-    const varCaixaReal_acum = getAtu('1.1.1') - disponibAnt_jan;
-    const ajusteResidualBP_acum = varCaixaReal_acum - (fluxoOper_acum_comRec + fluxoInvest_acum + fluxoFinanc_acum);
-    const fluxoOper_acum_final = fluxoOper_acum_comRec + ajusteResidualBP_acum;
-    const fluxoTotal_acum  = fluxoOper_acum_final + fluxoInvest_acum + fluxoFinanc_acum;
-
-    dAcum = {
-      resLiq: resLiq_dfc_acum, deprec: deprec_acum,
-      ajusteEstoque: ajusteEstoque_acum, ajusteCred: ajusteCred_acum,
-      ajusteContasCorr: ajusteContasCorr_acum, ajusteValDiv: ajusteValDiv_acum,
-      ajusteDespAntec: ajusteDespAntec_acum, ajusteOutrasAtivAudi: ajusteOutrasAtivAudi_acum,
-      ajusteFornec: ajusteFornec_acum,
-      ajusteTrib: ajusteTrib_acum, ajusteTrab: ajusteTrab_acum,
-      ajusteContasPag: ajusteContasPag_acum,
-      fluxoOper: fluxoOper_acum_final, fluxoInvest: fluxoInvest_acum,
-      fluxoFinanc: fluxoFinanc_acum, fluxoTotal: fluxoTotal_acum,
-      varCaixaReal: varCaixaReal_acum,
-      dRecDiferidas: dRecDiferidas_acum, ajusteResidualBP: ajusteResidualBP_acum,
-      dEstoque: dEstoque_acum, dCred: dCred_acum, dContasCorr: dContasCorr_acum,
-      dValDiv: dValDiv_acum, dDespAntec: dDespAntec_acum, dFornec: dFornec_acum,
-      dObrigTrib: dObrigTrib_acum, dObrigTrab: dObrigTrab_acum, dContasPag: dContasPag_acum,
-      outrasAtivAudiResiduo: outrasAtivAudiResiduo_acum,
-      dRealizLPOutros: dRealizLPOutros_acum,
-      dPL_extra: dPL_extra_acum,
-      dEmprestCP: dEmprestCP_acum, dEmprestCP_01: dEmprestCP_01_acum, dEmprestCP_02: dEmprestCP_02_acum,
-      dEmprestLP: dEmprestLP_acum,
-      dPessoasLig: dPessoasLig_acum, dDebitosLig: dDebitosLig_acum,
-      dArrendLP: dArrendLP_acum, dIntangivel: dIntangivel_acum,
-      dFpFloorAudi: dFpFloorAudi_acum, fpFloorAudiAnt: fpFloorAudi_ant, fpFloorAudiAtu: fpFloorAudi_atu,
-      dRealizLPCred: dRealizLPCred_acum, dInvestimentos: dInvestimentos_acum,
-      dOutrosPassLP: dOutrosPassLP_acum, dOutros2_2_1: dOutros2_2_1_acum,
-      outros2_2_1Ant: outros2_2_1_ant, outros2_2_1Atu: outros2_2_1_atu,
-      despOper5Net: despOper5Net_acum,
-      emprestCPAnt: emprestCP_ant, emprestCPAtu: emprestCP_atu,
-      emprestCP_01Ant: emprestCP_01_ant, emprestCP_01Atu: emprestCP_01_atu,
-      emprestCP_02Ant: emprestCP_02_ant, emprestCP_02Atu: emprestCP_02_atu,
-      emprestLPAnt: emprestLP_ant, emprestLPAtu: emprestLP_atu,
-      pessoasLigAnt: pessoasLig_ant, pessoasLigAtu: pessoasLig_atu,
-      debitosLigAnt: debitosLig_ant, debitosLigAtu: debitosLig_atu,
-      arrendLPAnt: arrendLP_ant, arrendLPAtu: arrendLP_atu,
-      estoques: { ant: estoques_ant, atu: estoques_atu },
-      estAudi:  { ant: estAudi_ant,  atu: estAudi_atu  },
-      imobiliz: { ant: getJanAnt('1.5.5'), atu: getAtu('1.5.5') },
-      investimentosAnt: getJanAnt('1.5.3'), investimentosAtu: getAtu('1.5.3'),
-      realizLPAnt: realizLP_ant, realizLPAtu: realizLP_atu,
-      PLAnt: PL_ant, PLAtu: PL_atu,
-      disponibAnt: disponibAnt_jan, disponibAtu: getAtu('1.1.1'),
-    };
-  }
-
-  // Alias para o acumulado ou mensal dependendo do modo (usado nos KPIs sem acum)
-  const da = dAcum ?? d;
-
-  const [showCharts, setShowCharts] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
-  const [printing, setPrinting] = useState(false);
-
-  const handlePDF = () => {
-    const printSource = printRef.current;
-    const root = document.getElementById('print-root');
-    if (!printSource || !root) return;
-
-    setPrinting(true);
-
-    const clone = printSource.cloneNode(true) as HTMLElement;
-    clone.style.display = 'block';
-    root.innerHTML = clone.outerHTML;
-
-    const style = document.createElement('style');
-    style.id = '__dfc-indireto-print-override__';
-    style.textContent = `
-      @page { size: A4 portrait; margin: 1cm; }
-      body > *:not(#print-root) { display: none !important; }
-      #print-root {
-        display: block !important;
-        font-family: Inter, system-ui, sans-serif;
-        font-size: 10px;
-      }
-      #print-root, #print-root * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        forced-color-adjust: none !important;
-        color-scheme: light !important;
-      }
-      #print-root .overflow-auto,
-      #print-root [class*="overflow-auto"],
-      #print-root [class*="overflow-y"] {
-        overflow: visible !important;
-        max-height: none !important;
-        height: auto !important;
-      }
-      #print-root .grid { display: grid !important; }
-      #print-root .dfc-table { width: 100%; border-collapse: collapse; }
-      #print-root .dfc-table th,
-      #print-root .dfc-table td { font-size: 8px !important; padding: 3px 6px !important; }
-    `;
-    document.head.appendChild(style);
-
-    setPrinting(false);
-
-    window.onafterprint = () => {
-      document.head.querySelector('#__dfc-indireto-print-override__')?.remove();
-      root.innerHTML = '';
-      window.onafterprint = null;
-    };
-
-    window.print();
-  };
-
-  if (showCharts) {
-    return <FCCaixaDiretoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} title="FC Indireto" />;
-  }
-
-  return (
-    <div>
-      {/* Botões de ação */}
-      <div className="flex justify-end gap-2 mb-4">
-        <button
-          onClick={() => setShowCharts(true)}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
-        >
-          <span>📈</span> Evolução Mensal
-        </button>
-        <button
-          onClick={handlePDF}
-          disabled={printing}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
-        </button>
-      </div>
-      <div ref={printRef}>
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Fluxo Operacional',    mes: d.fluxoOper + d.dPL_extra - d.dIntangivel,   acu: dAcum ? dAcum.fluxoOper + dAcum.dPL_extra - dAcum.dIntangivel : undefined,   icon: '⚙️',  color: (v: number) => v >= 0 ? 'emerald' : 'red',   sub: 'Principal fonte de caixa' },
-          { label: 'Fluxo de Investimento', mes: d.fluxoInvest + d.dIntangivel, acu: dAcum ? dAcum.fluxoInvest + dAcum.dIntangivel : undefined, icon: '🏗️', color: (v: number) => v >= 0 ? 'emerald' : 'amber',  sub: 'Imobilizado + Intangível + Créditos LP' },
-          { label: 'Fluxo de Financiamento',mes: d.fluxoFinanc - d.dPL_extra, acu: dAcum ? dAcum.fluxoFinanc - dAcum.dPL_extra : undefined, icon: '🏛️', color: (v: number) => v >= 0 ? 'amber' : 'red',     sub: `Floor Plan ${d.dEmprestCP >= 0 ? '+' : ''}${fmtBRL(d.dEmprestCP, true)} | Arrend. ${d.dArrendLP >= 0 ? '+' : ''}${fmtBRL(d.dArrendLP, true)}` },
-          { label: 'Var. Total de Caixa',   mes: d.fluxoTotal,  acu: dAcum?.fluxoTotal,  icon: '💰',  color: (v: number) => v >= 0 ? 'emerald' : 'red',   sub: `Var. real no balanço: ${fmtBRL(d.varCaixaReal, true)}` },
-        ].map((kpi, i) => {
-          const colorClasses: any = {
-            emerald: 'border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/30',
-            amber:   'border-l-amber-500 bg-amber-50 dark:bg-amber-950/30',
-            red:     'border-l-red-500 bg-red-50 dark:bg-red-950/30',
-          };
-          return (
-            <Card key={i} className={cn('border-l-4', colorClasses[kpi.color(kpi.mes)])}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {kpi.icon} {kpi.label}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {hasAcum ? (
-                  <div className="space-y-2">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerMes}</div>
-                      <div className={cn('text-lg font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                        {kpi.mes > 0 ? '+' : kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}
-                      </div>
-                    </div>
-                    <div className="border-t border-border/50 pt-2">
-                      <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerAcu}</div>
-                      <div className={cn('text-xl font-bold', (kpi.acu ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                        {(kpi.acu ?? 0) > 0 ? '+' : (kpi.acu ?? 0) < 0 ? '−' : ''}{fmtBRL(kpi.acu ?? 0, true)}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className={cn('text-2xl font-bold mb-1', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{kpi.mes > 0 ? '+' : kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}</div>
-                    <div className="text-sm text-muted-foreground">{kpi.sub}</div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
-        <SectionTitle icon="💰">Demonstração do Fluxo de Caixa — Método Indireto</SectionTitle>
-        <table className="dfc-table w-full border-collapse">
-          <thead>
-            <tr className="bg-muted/50">
-              <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Descrição</th>
-              <th className={cn('py-2.5 px-3 text-right text-xs uppercase tracking-wider', hasAcum ? 'font-bold text-blue-600 dark:text-blue-400 w-[20%]' : 'text-muted-foreground w-[22%]')}>
-                {hasAcum ? headerMes : 'Valor (R$)'}
-              </th>
-              {hasAcum && (
-                <th className="py-2.5 px-3 text-right text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 w-[20%] border-l border-border/30">
-                  {headerAcu}
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} value2={0} hasAcum={hasAcum} highlight />
-            <DFCRow label={`${d.resLiq >= 0 ? '(+)' : '(–)'} Resultado Líquido do Exercício (base NBC TG 03)`} value={d.resLiq} value2={dAcum?.resLiq} hasAcum={hasAcum} indent={1} details={() => netResultDetails(d.resLiq, dAcum?.resLiq)} />
-            <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques VW + Audi ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'} (1.1.2 + 1.1.7.02)`} value={d.ajusteEstoque} value2={dAcum?.ajusteEstoque} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.2', '1.1.7.02'], -1, d.ajusteEstoque, dAcum?.ajusteEstoque)} />
-            <DFCRow label={`    ↳ Estoques VW (1.1.2): ${fmtBRL(data.estoques.ant, true)} → ${fmtBRL(data.estoques.atu, true)}`} value={-(data.estoques.atu - data.estoques.ant)} value2={dAcum ? -(dAcum.estoques.atu - dAcum.estoques.ant) : undefined} hasAcum={hasAcum} indent={2} details={balanceImpactDetails(['1.1.2'], -1, -(data.estoques.atu - data.estoques.ant), dAcum ? -(dAcum.estoques.atu - dAcum.estoques.ant) : undefined)} />
-            <DFCRow label={`    ↳ Estoques Audi (1.1.7.02): ${fmtBRL(data.estAudi.ant, true)} → ${fmtBRL(data.estAudi.atu, true)}`} value={-(data.estAudi.atu - data.estAudi.ant)} value2={dAcum ? -(dAcum.estAudi.atu - dAcum.estAudi.ant) : undefined} hasAcum={hasAcum} indent={2} details={balanceImpactDetails(['1.1.7.02'], -1, -(data.estAudi.atu - data.estAudi.ant), dAcum ? -(dAcum.estAudi.atu - dAcum.estAudi.ant) : undefined)} />
-            <DFCRow label={`${d.ajusteCred >= 0 ? '(+)' : '(–)'} Variação de Créditos de Vendas (1.1.3) ${d.dCred < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteCred} value2={dAcum?.ajusteCred} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.3'], -1, d.ajusteCred, dAcum?.ajusteCred)} />
-            {(d.dContasCorr !== 0 || (dAcum && dAcum.dContasCorr !== 0)) && <DFCRow label={`${d.ajusteContasCorr >= 0 ? '(+)' : '(–)'} Variação de Contas Correntes (1.1.4) ${d.dContasCorr > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteContasCorr} value2={dAcum?.ajusteContasCorr} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.4'], -1, d.ajusteContasCorr, dAcum?.ajusteContasCorr)} />}
-            {(d.dValDiv !== 0 || (dAcum && dAcum.dValDiv !== 0)) && <DFCRow label={`${d.ajusteValDiv >= 0 ? '(+)' : '(–)'} Variação de Valores Diversos (1.1.5) ${d.dValDiv > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteValDiv} value2={dAcum?.ajusteValDiv} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.5'], -1, d.ajusteValDiv, dAcum?.ajusteValDiv)} />}
-            <DFCRow label={`${d.ajusteDespAntec >= 0 ? '(+)' : '(–)'} Variação de Despesas Antecipadas (1.1.6) ${d.dDespAntec > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteDespAntec} value2={dAcum?.ajusteDespAntec} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.6'], -1, d.ajusteDespAntec, dAcum?.ajusteDespAntec)} />
-            {(d.outrasAtivAudiResiduo !== 0 || (dAcum && dAcum.outrasAtivAudiResiduo !== 0)) && (
-              <DFCRow label={`${d.ajusteOutrasAtivAudi >= 0 ? '(+)' : '(–)'} Variação Outros Ativos Audi excl. estoque (1.1.7 − 1.1.7.02) ${d.outrasAtivAudiResiduo > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteOutrasAtivAudi} value2={dAcum?.ajusteOutrasAtivAudi} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.1.7'], -1, d.ajusteOutrasAtivAudi, dAcum?.ajusteOutrasAtivAudi, ['1.1.7.02'])} />
-            )}
-            <DFCRow label={`${d.ajusteFornec >= 0 ? '(+)' : '(–)'} Variação de Fornecedores (2.1.3 + 2.1.4) ${d.dFornec < 0 ? '— redução (uso de caixa)' : '— aumento (fonte)'}`} value={d.ajusteFornec} value2={dAcum?.ajusteFornec} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.3', '2.1.4'], 1, d.ajusteFornec, dAcum?.ajusteFornec, ['2.1.4.01.01.007'])} />
-            <DFCRow label={`${d.ajusteTrib >= 0 ? '(+)' : '(–)'} Variação de Obrigações Tributárias (2.1.2.02)`} value={d.ajusteTrib} value2={dAcum?.ajusteTrib} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.2.02'], 1, d.ajusteTrib, dAcum?.ajusteTrib)} />
-            <DFCRow label={`${d.ajusteTrab >= 0 ? '(+)' : '(–)'} Variação de Obrigações Trabalhistas (2.1.2.01)`} value={d.ajusteTrab} value2={dAcum?.ajusteTrab} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.2.01'], 1, d.ajusteTrab, dAcum?.ajusteTrab)} />
-            <DFCRow label={`${d.ajusteContasPag >= 0 ? '(+)' : '(–)'} Variação de Contas a Pagar (2.1.2.03)`} value={d.ajusteContasPag} value2={dAcum?.ajusteContasPag} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.2.03'], 1, d.ajusteContasPag, dAcum?.ajusteContasPag)} />
-            <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={dAcum ? -dAcum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.1.01.52'], -1, -d.dRealizLPCred, dAcum ? -dAcum.dRealizLPCred : undefined)} />
-            {(d.emprestCP_01Ant > 0 || d.emprestCP_01Atu > 0 || (d.dEmprestCP_01 !== undefined && d.dEmprestCP_01 !== 0)) && (
-              <DFCRow label={`${d.dEmprestCP_01 >= 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.1.01) ${d.dEmprestCP_01 >= 0 ? '— aumento (fonte de caixa)' : '— redução (uso de caixa)'} (${fmtBRL(d.emprestCP_01Ant, true)} → ${fmtBRL(d.emprestCP_01Atu, true)})`} value={d.dEmprestCP_01} value2={dAcum?.dEmprestCP_01} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.1.01'], 1, d.dEmprestCP_01, dAcum?.dEmprestCP_01)} />
-            )}
-            {(Math.abs(d.dOutros2_2_1) > 0.01) && (
-              <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos L.P. não mapeados (2.2.1 — demais) (${fmtBRL(d.outros2_2_1Ant, true)} → ${fmtBRL(d.outros2_2_1Atu, true)})`} value={d.dOutros2_2_1} value2={dAcum?.dOutros2_2_1} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1'], 1, d.dOutros2_2_1, dAcum?.dOutros2_2_1, ['2.2.1.07', '2.2.1.01', '2.2.1.02', '2.2.1.15'])} />
-            )}
-            {(Math.abs(d.dRecDiferidas) > 0.01 || (dAcum && Math.abs(dAcum.dRecDiferidas) > 0.01)) && (
-              <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={dAcum?.dRecDiferidas} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.2'], 1, d.dRecDiferidas, dAcum?.dRecDiferidas)} />
-            )}
-            {(Math.abs(d.ajusteResidualBP + d.dPL_extra) > 0.01 || (dAcum && Math.abs((dAcum.ajusteResidualBP ?? 0) + (dAcum.dPL_extra ?? 0)) > 0.01)) && (
-              <DFCRow label={`${(d.ajusteResidualBP + d.dPL_extra) >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP + d.dPL_extra} value2={dAcum ? (dAcum.ajusteResidualBP + dAcum.dPL_extra) : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails([], 1, d.ajusteResidualBP + d.dPL_extra, dAcum ? dAcum.ajusteResidualBP + dAcum.dPL_extra : undefined)} />
-            )}
-            <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} value2={dAcum ? -dAcum.dIntangivel : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.7'], -1, -d.dIntangivel, dAcum ? -dAcum.dIntangivel : undefined)} />
-            <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper + d.dPL_extra - d.dIntangivel} value2={dAcum ? (dAcum.fluxoOper + dAcum.dPL_extra - dAcum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
-
-            <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
-            <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={dAcum ? -(dAcum.imobiliz.atu - dAcum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.5'], -1, -(data.imobiliz.atu - data.imobiliz.ant), dAcum ? -(dAcum.imobiliz.atu - dAcum.imobiliz.ant) : undefined)} />
-            {(d.dInvestimentos !== 0 || (dAcum && dAcum.dInvestimentos !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={dAcum ? -dAcum.dInvestimentos : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.3'], -1, -d.dInvestimentos, dAcum ? -dAcum.dInvestimentos : undefined)} />}
-            {(d.dRealizLPOutros !== 0 || (dAcum && dAcum.dRealizLPOutros !== 0)) && (
-              <DFCRow label={`${-d.dRealizLPOutros >= 0 ? '(+)' : '(–)'} Variação Realizável LP excl. cred. ligadas (1.5.1 − 1.5.1.01.52) ${d.dRealizLPOutros > 0 ? '— aumento ativo (uso de caixa)' : '— redução ativo (fonte de caixa)'} (${fmtBRL(d.realizLPAnt, true)} → ${fmtBRL(d.realizLPAtu, true)})`} value={-d.dRealizLPOutros} value2={dAcum ? -dAcum.dRealizLPOutros : undefined} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['1.5.1'], -1, -d.dRealizLPOutros, dAcum ? -dAcum.dRealizLPOutros : undefined, ['1.5.1.01.52'])} />
-            )}
-            <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={d.fluxoInvest + d.dIntangivel} value2={dAcum ? (dAcum.fluxoInvest + dAcum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
-
-            <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
-            {(d.emprestCP_02Ant > 0 || d.emprestCP_02Atu > 0) && (
-              <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02)  (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={dAcum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.1.02'], 1, d.dEmprestCP_02, dAcum?.dEmprestCP_02)} />
-            )}
-            {(d.fpFloorAudiAnt > 0 || d.fpFloorAudiAtu > 0) && (
-              <DFCRow label={`${d.dFpFloorAudi >= 0 ? '(+) Captação' : '(–) Amortização'} Floor Plan Novos Audi (2.1.4.01.01.007)  (${fmtBRL(d.fpFloorAudiAnt, true)} → ${fmtBRL(d.fpFloorAudiAtu, true)})`} value={d.dFpFloorAudi} value2={dAcum?.dFpFloorAudi} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.1.4.01.01.007'], 1, d.dFpFloorAudi, dAcum?.dFpFloorAudi)} />
-            )}
-            {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && (
-              <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP  (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={dAcum?.dEmprestLP} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1.07'], 1, d.dEmprestLP, dAcum?.dEmprestLP)} />
-            )}
-            {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && (
-              <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas  (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} value2={dAcum?.dPessoasLig} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1.01'], 1, d.dPessoasLig, dAcum?.dPessoasLig)} />
-            )}
-            {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && (
-              <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP  (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={dAcum?.dDebitosLig} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1.02'], 1, d.dDebitosLig, dAcum?.dDebitosLig)} />
-            )}
-            {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && (
-              <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'}  (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} value2={dAcum?.dArrendLP} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.1.15'], 1, d.dArrendLP, dAcum?.dArrendLP)} />
-            )}
-            {(d.dOutrosPassLP !== 0) && (
-              <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={dAcum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} details={balanceImpactDetails(['2.2.3'], 1, d.dOutrosPassLP, dAcum?.dOutrosPassLP)} />
-            )}
-            <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc - d.dPL_extra} value2={dAcum ? (dAcum.fluxoFinanc - dAcum.dPL_extra) : undefined} hasAcum={hasAcum} total highlight />
-          </tbody>
-          <tfoot>
-            <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-t-2 border-emerald-500/30">
-              <td className="py-3.5 px-3 text-sm font-bold text-foreground">VARIAÇÃO TOTAL DE CAIXA NO PERÍODO</td>
-              <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(d.fluxoTotal > 0 ? '+' : d.fluxoTotal < 0 ? '−' : '') + fmtBRL(d.fluxoTotal)}</td>
-              {hasAcum && <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold border-l border-border/30', (dAcum.fluxoTotal ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{((dAcum.fluxoTotal ?? 0) > 0 ? '+' : (dAcum.fluxoTotal ?? 0) < 0 ? '−' : '') + fmtBRL(dAcum.fluxoTotal)}</td>}
-            </tr>
-            <tr className="bg-muted/30">
-              <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Anterior</td>
-              <td className="py-2.5 px-3 text-right font-mono text-sm text-muted-foreground">{fmtBRL(data.disponib.ant)}</td>
-              {hasAcum && <td className="py-2.5 px-3 text-right font-mono text-sm text-muted-foreground border-l border-border/30">{fmtBRL(dAcum.disponibAnt)}</td>}
-            </tr>
-            <tr className="bg-muted/30">
-              <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Atual</td>
-              <td className="py-2.5 px-3 text-right font-mono text-sm font-semibold text-foreground">{fmtBRL(data.disponib.atu)}</td>
-              {hasAcum && <td className="py-2.5 px-3 text-right font-mono text-sm font-semibold text-foreground border-l border-border/30">{fmtBRL(dAcum.disponibAtu)}</td>}
-            </tr>
-            <tr className="bg-violet-50/50 dark:bg-violet-950/20 border-t border-violet-500/30">
-              <td className="py-3 px-3 text-sm font-semibold text-foreground/80">Variação Real de Caixa (conferência com balanço)</td>
-              <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold', d.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(d.varCaixaReal > 0 ? '+' : d.varCaixaReal < 0 ? '−' : '') + fmtBRL(d.varCaixaReal)}</td>
-              {hasAcum && <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold border-l border-border/30', dAcum.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(dAcum.varCaixaReal > 0 ? '+' : dAcum.varCaixaReal < 0 ? '−' : '') + fmtBRL(dAcum.varCaixaReal)}</td>}
-            </tr>
-            {(() => {
-              const gapMes = d.fluxoTotal - d.varCaixaReal;
-              const gapAcu = dAcum ? dAcum.fluxoTotal - dAcum.varCaixaReal : null;
-              const showGap = Math.abs(gapMes) > 0.5 || (gapAcu !== null && Math.abs(gapAcu) > 0.5);
-              if (!showGap) return null;
-              return (
-                <tr className="bg-amber-50/50 dark:bg-amber-950/20 border-t border-amber-500/30">
-                  <td className="py-2.5 px-3 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                    ⚠️ Gap residual (DFC − Var. Real) — contas não-caixa ou não mapeadas (ex: 2.2.2 ICMS ST Diferido)
-                  </td>
-                  <td className={cn('py-2.5 px-3 text-right font-mono text-xs font-bold', Math.abs(gapMes) < 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
-                    {Math.abs(gapMes) < 0.5 ? '✓ Zero' : (gapMes > 0 ? '+' : '−') + fmtBRL(gapMes)}
-                  </td>
-                  {hasAcum && gapAcu !== null && (
-                    <td className={cn('py-2.5 px-3 text-right font-mono text-xs font-bold border-l border-border/30', Math.abs(gapAcu) < 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
-                      {Math.abs(gapAcu) < 0.5 ? '✓ Zero' : (gapAcu > 0 ? '+' : '−') + fmtBRL(gapAcu)}
-                    </td>
-                  )}
-                </tr>
-              );
-            })()}
-          </tfoot>
-        </table>
-        <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
-          {hasAcum
-            ? `* ${headerMes}: movimentação do mês (Déb/Créd). ${headerAcu}: variação patrimonial usando saldo de Dez/${String(selectedYear - 1).slice(2)} como base (saldoAnt de Jan/${shortYear}); contas de resultado consideradas pelo saldoAtual acumulado.`
-            : '* DFC pelo método indireto. Todas contas patrimoniais mapeadas: Receitas Diferidas (2.2.2/ ICMS ST) incluída no operacional; Outros Ativos Audi (1.1.7 excl. estoque); Realizável LP (1.5.1 excl. créditos ligadas) — investimento; Aportes/retiradas PL (2.3 excl. resultado) — financiamento. Ajuste residual captura depreciação líquida e sub-contas não detalhadas individualmente.'
-          }
-        </p>
-        </CardContent>
-      </Card>
-      </div>
-
-      <ProjecaoCaixaChart currentYear={selectedYear} currentMonth={selectedMonth} />
-    </div>
-  );
+function CaixaTab({ fmtBRL, SectionTitle, colAtual, selectedMonth, selectedYear }: any) {
+  return <CaixaDfcTab method="indireto" title="FC Indireto" fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />;
 }
 
 // ─── FLUXO DE CAIXA DIRETO ──────────────────────────────────────────────────
-function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtual, janAccounts, selectedMonth, selectedYear }: any) {
-  const d = data.dfc;
-  const rec = data.receitas;
-  const hasAcum = selectedMonth > 1 && janAccounts !== null;
-
-  // ── Cabeçalhos de colunas ─────────────────────────────────────────────
-  const MONTH_SHORT: Record<number, string> = {
-    1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
-    7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez',
-  };
-  const shortYear = String(selectedYear).slice(2);
-  const headerMes = colAtual;
-  const headerAcu = hasAcum ? `Jan – ${MONTH_SHORT[selectedMonth]}/${shortYear}` : '';
-  const directAccounts = data.accounts as Record<string, any>;
-  const janAccountMap = janAccounts as Record<string, any> | null;
-  const directAccountDetails = (
-    prefixes: string[],
-    monthlyValue: (id: string, account: any) => number,
-    target: number,
-    target2?: number,
-    accumulatedValue?: (id: string, account: any) => number,
-    excludedPrefixes: string[] = [],
-  ) => () => buildDFCAccountDetails(
-    directAccounts,
-    prefixes,
-    monthlyValue,
-    target,
-    target2 !== undefined ? accumulatedValue : undefined,
-    target2,
-    excludedPrefixes,
-  );
-  const directBalanceDetails = (prefixes: string[], factor: number, target: number, target2?: number, excludedPrefixes: string[] = []) =>
-    directAccountDetails(
-      prefixes,
-      (_id, account) => factor * (Math.abs(account?.saldoAtual || 0) - Math.abs(account?.saldoAnt || 0)),
-      target,
-      target2,
-      (id) => factor * (Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0)),
-      excludedPrefixes,
-    );
-  const directResultDetails = (
-    prefixes: string[],
-    factor: number,
-    target: number,
-    target2?: number,
-    monthlyMode: 'absolute' | 'signed' = 'absolute',
-    accumulatedMode: 'absolute' | 'signed' = 'absolute',
-  ) => directAccountDetails(
-    prefixes,
-    (_id, account) => factor * (monthlyMode === 'absolute'
-      ? Math.abs((account?.valDeb || 0) - (account?.valCred || 0))
-      : (account?.valDeb || 0) - (account?.valCred || 0)),
-    target,
-    target2,
-    (_id, account) => factor * (accumulatedMode === 'absolute'
-      ? Math.abs(account?.saldoAtual || 0)
-      : (account?.saldoAtual || 0)),
-  );
-  const rawDirectAccountDetails = (
-    prefixes: string[],
-    monthlyValue: (id: string, account: any) => number,
-    accumulatedValue?: (id: string, account: any) => number,
-    excludedPrefixes: string[] = [],
-  ) => getDFCAccountDetails(
-    directAccounts,
-    prefixes,
-    monthlyValue,
-    hasAcum ? accumulatedValue : undefined,
-    excludedPrefixes,
-  );
-  const customerReceiptDetails = (target: number, target2?: number) => reconcileDFCDetails([
-    ...rawDirectAccountDetails(['3.1'], (_id, a) => Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => Math.abs(a?.saldoAtual || 0)),
-    ...rawDirectAccountDetails(['3.3'], (_id, a) => -Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
-    ...rawDirectAccountDetails(['1.1.3', '1.1.4'], (_id, a) => -(Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0)), (id) => -(Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0))),
-  ], target, target2);
-  const supplierPaymentDetails = (target: number, target2?: number) => reconcileDFCDetails([
-    ...rawDirectAccountDetails(['4'], (_id, a) => -Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
-    ...rawDirectAccountDetails(['1.1.2', '1.1.7.02'], (_id, a) => -(Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0)), (id) => -(Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0))),
-    ...rawDirectAccountDetails(['2.1.3', '2.1.4'], (_id, a) => Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0), (id) => Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0), ['2.1.4.01.01.007']),
-  ], target, target2);
-  const operatingPaymentDetails = (target: number, target2?: number) => reconcileDFCDetails([
-    ...rawDirectAccountDetails(['5.'], (_id, a) => -((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
-    ...rawDirectAccountDetails(['2.1.2.03', '2.1.2.01'], (_id, a) => Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0), (id) => Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0)),
-    ...rawDirectAccountDetails(['1.1.6', '1.1.5'], (_id, a) => -(Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0)), (id) => -(Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0))),
-    ...rawDirectAccountDetails(['1.1.7'], (_id, a) => -(Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0)), (id) => -(Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0)), ['1.1.7.02']),
-  ], target, target2);
-
-  // ── Mês: contas de resultado via valDeb/valCred; patrimonial via saldoAtual–saldoAnt ──
-  const mAccounts = data.accounts as Record<string, any>;
-  const absMov = (id: string) => { const a = mAccounts[id] || {}; return Math.abs((a.valDeb || 0) - (a.valCred || 0)); };
-  const recBrutaMes    = absMov('3.1');
-  const devolucoesMes  = absMov('3.3');
-  const impostosVMes   = absMov('3.2');
-  const CMVMes         = absMov('4');
-  const rendOperMes    = absMov('3.4');
-  const rendFinancMes  = absMov('3.5');
-  const rendNaoOperMes = absMov('3.6');
-  const provisaoIRMes  = (mAccounts['6']?.valDeb || 0) - (mAccounts['6']?.valCred || 0);
-
-  const recebClientes = recBrutaMes - devolucoesMes - d.dCred - d.dContasCorr;
-  const pagFornec     = -(CMVMes + d.dEstoque - d.dFornec);
-  const pagImpostos   = -(impostosVMes - d.dObrigTrib);
-  // outrasAtivAudiResiduo: outros ativos Audi além do estoque — ajuste operacional
-  const despOperCaixa = -(
-    d.despOper5Net - d.dContasPag - d.dObrigTrab + d.dDespAntec + d.dValDiv + d.outrasAtivAudiResiduo
-  );
-  const pagIR               = -provisaoIRMes;
-  const rendasRecebidas     = rendOperMes + rendFinancMes + rendNaoOperMes;
-  const fluxoOperDireto     = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas - d.dRealizLPCred + d.dEmprestCP_01 + d.dOutros2_2_1 + d.dRecDiferidas + d.ajusteResidualBP;
-  // fluxoInvestDireto/fluxoFinancDireto reusa valores do DFC Indireto (iguais)
-  const fluxoInvestDireto   = d.fluxoInvest; // já inclui dRealizLPOutros
-  const fluxoFinancDireto   = d.fluxoFinanc; // já inclui dPL_extra
-  const fluxoTotalDireto    = fluxoOperDireto + fluxoInvestDireto + fluxoFinancDireto;
-  const diff = Math.abs(fluxoOperDireto - d.fluxoOper);
-
-  const [showCharts, setShowCharts] = useState(false);
-
-  // ── Acumulado YTD: usando saldoAtual (resultado) e variação Jan→mês (patrimonial) ──
-  let acum: any = null;
-  if (hasAcum) {
-    const cur = data.accounts as Record<string, any>;
-    const jan = janAccounts as Record<string, any>;
-    const getAtu  = (id: string) => Math.abs(cur[id]?.saldoAtual || 0);
-    const getJanAnt = (id: string) => Math.abs(jan[id]?.saldoAnt || 0);
-
-    // Contas de resultado: saldoAtual já acumulado YTD
-    const recBruta_a       = getAtu('3.1');
-    const devolucoes_a     = getAtu('3.3');
-    const impostosV_a      = getAtu('3.2');
-    const CMV_a            = getAtu('4');
-    const rendOper_a       = getAtu('3.4');
-    const rendFinanc_a     = getAtu('3.5');
-    const rendNaoOper_a    = getAtu('3.6');
-    const provisaoIR_a     = (cur['6']?.saldoAtual || 0);  // sinal preservado: devedor (+) deduz · credor (−) adiciona
-    const despOper5Net_a   = Math.abs(cur['5']?.saldoAtual || 0);
-    const deprec_a         = Math.abs(cur['5.5.2.07.20']?.saldoAtual || 0);
-
-    // Variações patrimoniais YTD: saldoAtual(mês) – saldoAnt(Jan=Dez anterior)
-    const dCred_a       = getAtu('1.1.3')       - getJanAnt('1.1.3');
-    const dContasCorr_a = getAtu('1.1.4')       - getJanAnt('1.1.4');
-    const dEstoque_a    = (getAtu('1.1.2') + getAtu('1.1.7.02')) - (getJanAnt('1.1.2') + getJanAnt('1.1.7.02'));
-    const fpFloorAudi_ant_a = getJanAnt('2.1.4.01.01.007');
-    const fpFloorAudi_atu_a = getAtu('2.1.4.01.01.007');
-    const dFpFloorAudi_a    = fpFloorAudi_atu_a - fpFloorAudi_ant_a;
-    const dFornec_a     = (getAtu('2.1.3') + getAtu('2.1.4') - fpFloorAudi_atu_a) - (getJanAnt('2.1.3') + getJanAnt('2.1.4') - fpFloorAudi_ant_a);
-    const dObrigTrib_a  = getAtu('2.1.2.02')    - getJanAnt('2.1.2.02');
-    const dObrigTrab_a  = getAtu('2.1.2.01')    - getJanAnt('2.1.2.01');
-    const dContasPag_a  = getAtu('2.1.2.03')    - getJanAnt('2.1.2.03');
-    const dDespAntec_a  = getAtu('1.1.6')       - getJanAnt('1.1.6');
-    const dValDiv_a     = getAtu('1.1.5')        - getJanAnt('1.1.5');
-    // Outros ativos Audi excl. estoque — ajuste operacional
-    const outrasAtivAudi_a = getAtu('1.1.7')  - getJanAnt('1.1.7');
-    const estAudi_a        = getAtu('1.1.7.02') - getJanAnt('1.1.7.02');
-    const outrasAtivAudiResiduo_a = (outrasAtivAudi_a - estAudi_a);
-    // Realizável LP além de 1.5.1.01.52 — investimento
-    const realizLP_a      = getAtu('1.5.1')        - getJanAnt('1.5.1');
-    const realizLPCred_a  = getAtu('1.5.1.01.52') - getJanAnt('1.5.1.01.52');
-    const dRealizLPOutros_a = realizLP_a - realizLPCred_a;
-    // Variação PL além do resultado — financiamento
-    const PL_a_ant = getJanAnt('2.3');
-    const PL_a_atu = getAtu('2.3');
-
-    // Derivados FC Direto acumulado
-    const recebClientes_a = recBruta_a - devolucoes_a - dCred_a - dContasCorr_a;
-    const pagFornec_a     = -(CMV_a + dEstoque_a - dFornec_a);
-    const pagImpostos_a   = -(impostosV_a - dObrigTrib_a);
-    const despOperCaixa_a = -(
-      despOper5Net_a - dContasPag_a - dObrigTrab_a + dDespAntec_a + dValDiv_a + outrasAtivAudiResiduo_a
-    );
-    const pagIR_a           = -provisaoIR_a;
-    const rendasRecebidas_a = rendOper_a + rendFinanc_a + rendNaoOper_a;
-
-    // Investimento e financiamento
-    const dImobiliz_a     = getAtu('1.5.5')       - getJanAnt('1.5.5');
-    const dIntangivel_a   = getAtu('1.5.7')        - getJanAnt('1.5.7');
-    const dRealizLPCred_a = realizLPCred_a;
-    const dInvest_a       = getAtu('1.5.3')        - getJanAnt('1.5.3');
-    const fluxoInvest_a   = -dImobiliz_a - dIntangivel_a - dInvest_a - dRealizLPOutros_a;
-
-    const fluxoOperDireto_a = recebClientes_a + pagFornec_a + pagImpostos_a + despOperCaixa_a + pagIR_a + rendasRecebidas_a - dRealizLPCred_a;
-
-    const empCP_ant = getJanAnt('2.1.1');     const empCP_atu = getAtu('2.1.1');
-    // 2.1.1 dividido: 01 = Fornecedores (operacional) · 02 = Financiamentos CP (financiamento)
-    const empCP_01_ant = getJanAnt('2.1.1.01'); const empCP_01_atu = getAtu('2.1.1.01');
-    const empCP_02_ant = getJanAnt('2.1.1.02'); const empCP_02_atu = getAtu('2.1.1.02');
-    const dEmprestCP_01_a = empCP_01_atu - empCP_01_ant;
-    const dEmprestCP_02_a = empCP_02_atu - empCP_02_ant;
-    const empLP_ant = getJanAnt('2.2.1.07'); const empLP_atu = getAtu('2.2.1.07');
-    const pesLig_ant = getJanAnt('2.2.1.01'); const pesLig_atu = getAtu('2.2.1.01');
-    const debLig_ant = getJanAnt('2.2.1.02'); const debLig_atu = getAtu('2.2.1.02');
-    const arr_ant    = getJanAnt('2.2.1.15'); const arr_atu    = getAtu('2.2.1.15');
-    const outLP_ant  = getJanAnt('2.2.3');    const outLP_atu  = getAtu('2.2.3');
-    const g221_ant   = getJanAnt('2.2.1');    const g221_atu   = getAtu('2.2.1');
-    const out221_ant = g221_ant - empLP_ant - pesLig_ant - debLig_ant - arr_ant;
-    const out221_atu = g221_atu - empLP_atu - pesLig_atu - debLig_atu - arr_atu;
-    const dOutros221_a = out221_atu - out221_ant;
-    const dRecDiferidas_a = getAtu('2.2.2') - getJanAnt('2.2.2');
-    const fluxoOperDireto_a_base = fluxoOperDireto_a + dEmprestCP_01_a + dOutros221_a + dRecDiferidas_a;
-    const dPL_extra_a = (PL_a_atu - PL_a_ant) - (recBruta_a - impostosV_a - devolucoes_a - CMV_a
-      - despOper5Net_a + rendOper_a + rendFinanc_a + rendNaoOper_a - provisaoIR_a);
-    const fluxoFinanc_a = dEmprestCP_02_a + (empLP_atu - empLP_ant) + (pesLig_atu - pesLig_ant)
-                        + (debLig_atu - debLig_ant) + (arr_atu - arr_ant) + (outLP_atu - outLP_ant)
-                        + dFpFloorAudi_a + dPL_extra_a;
-    const disponibJan   = getJanAnt('1.1.1');
-    const varCaixaReal_a = getAtu('1.1.1') - disponibJan;
-    const ajusteResidualBP_a = varCaixaReal_a - (fluxoOperDireto_a_base + fluxoInvest_a + fluxoFinanc_a);
-    const fluxoOperDireto_a_final = fluxoOperDireto_a_base + ajusteResidualBP_a;
-    const fluxoTotal_a  = fluxoOperDireto_a_final + fluxoInvest_a + fluxoFinanc_a;
-
-    acum = {
-      recBruta: recBruta_a, devolucoes: devolucoes_a,
-      dCred: dCred_a, dContasCorr: dContasCorr_a,
-      CMV: CMV_a, dEstoque: dEstoque_a, dFornec: dFornec_a,
-      despOper5Net: despOper5Net_a, deprec: deprec_a,
-      dContasPag: dContasPag_a, dObrigTrab: dObrigTrab_a,
-      dDespAntec: dDespAntec_a, dValDiv: dValDiv_a,
-      impostosV: impostosV_a, dObrigTrib: dObrigTrib_a,
-      provisaoIR: provisaoIR_a, rendOper: rendOper_a,
-      rendFinanc: rendFinanc_a, rendNaoOper: rendNaoOper_a,
-      recebClientes: recebClientes_a, pagFornec: pagFornec_a,
-      pagImpostos: pagImpostos_a, despOperCaixa: despOperCaixa_a,
-      pagIR: pagIR_a, rendasRecebidas: rendasRecebidas_a,
-      fluxoOperDireto: fluxoOperDireto_a_final,
-      fluxoInvest: fluxoInvest_a, fluxoFinanc: fluxoFinanc_a,
-      fluxoTotal: fluxoTotal_a,
-      dImobiliz: dImobiliz_a, dIntangivel: dIntangivel_a,
-      dRealizLPCred: dRealizLPCred_a, dRealizLPOutros: dRealizLPOutros_a, dInvest: dInvest_a,
-      outrasAtivAudiResiduo: outrasAtivAudiResiduo_a, dPL_extra: dPL_extra_a,
-      realizLPAnt: PL_a_ant, realizLPAtu: PL_a_atu,
-      dEmprestCP: empCP_atu - empCP_ant,   empCP_ant, empCP_atu,
-      dEmprestCP_01: dEmprestCP_01_a, empCP_01_ant, empCP_01_atu,
-      dEmprestCP_02: dEmprestCP_02_a, empCP_02_ant, empCP_02_atu,
-      dFpFloorAudi: dFpFloorAudi_a, fpFloorAudiAnt: fpFloorAudi_ant_a, fpFloorAudiAtu: fpFloorAudi_atu_a,
-      dEmprestLP: empLP_atu - empLP_ant,   empLP_ant, empLP_atu,
-      dPessoasLig: pesLig_atu - pesLig_ant, pesLig_ant, pesLig_atu,
-      dDebitosLig: debLig_atu - debLig_ant, debLig_ant, debLig_atu,
-      dArrendLP:   arr_atu - arr_ant,       arr_ant,   arr_atu,
-      dOutrosPassLP: outLP_atu - outLP_ant,
-      dOutros221: out221_atu - out221_ant,
-      dRecDiferidas: dRecDiferidas_a, ajusteResidualBP: ajusteResidualBP_a,
-      varCaixaReal: varCaixaReal_a,
-      disponibAnt: disponibJan, disponibAtu: getAtu('1.1.1'),
-      imobiliz: { ant: getJanAnt('1.5.5'), atu: getAtu('1.5.5') },
-      investAnt: getJanAnt('1.5.3'), investAtu: getAtu('1.5.3'),
-    };
-  }
-
-  const diffAcum = acum ? Math.abs(acum.fluxoOperDireto - (acum.fluxoInvest + acum.fluxoFinanc + acum.fluxoTotal - acum.fluxoTotal)) : 0;
-  // Validação cruzada acum: compara com fluxo indireto acumulado (não disponível aqui — skip)
-
-  const printRef = useRef<HTMLDivElement>(null);
-  const [printing, setPrinting] = useState(false);
-
-  const handlePDF = () => {
-    const printSource = printRef.current;
-    const root = document.getElementById('print-root');
-    if (!printSource || !root) return;
-
-    setPrinting(true);
-
-    const clone = printSource.cloneNode(true) as HTMLElement;
-    clone.style.display = 'block';
-    root.innerHTML = clone.outerHTML;
-
-    const style = document.createElement('style');
-    style.id = '__dfc-direto-print-override__';
-    style.textContent = `
-      @page { size: A4 portrait; margin: 1cm; }
-      body > *:not(#print-root) { display: none !important; }
-      #print-root {
-        display: block !important;
-        font-family: Inter, system-ui, sans-serif;
-        font-size: 10px;
-      }
-      #print-root, #print-root * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        forced-color-adjust: none !important;
-        color-scheme: light !important;
-      }
-      #print-root .overflow-auto,
-      #print-root [class*="overflow-auto"],
-      #print-root [class*="overflow-y"] {
-        overflow: visible !important;
-        max-height: none !important;
-        height: auto !important;
-      }
-      #print-root .grid { display: grid !important; }
-      #print-root .dfc-table { width: 100%; border-collapse: collapse; }
-      #print-root .dfc-table th,
-      #print-root .dfc-table td { font-size: 8px !important; padding: 3px 6px !important; }
-    `;
-    document.head.appendChild(style);
-
-    setPrinting(false);
-
-    window.onafterprint = () => {
-      document.head.querySelector('#__dfc-direto-print-override__')?.remove();
-      root.innerHTML = '';
-      window.onafterprint = null;
-    };
-
-    window.print();
-  };
-
-  if (showCharts) {
-    return <FCCaixaDiretoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
-  }
-
-  return (
-    <div>
-      {/* Botões de ação */}
-      <div className="flex justify-end gap-2 mb-4">
-        <button
-          onClick={() => setShowCharts(true)}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
-        >
-          <span>📈</span> Evolução Mensal
-        </button>
-        <button
-          onClick={handlePDF}
-          disabled={printing}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
-        </button>
-      </div>
-      <div ref={printRef}>
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Caixa Operacional (Direto)', mes: fluxoOperDireto + d.dPL_extra - d.dIntangivel,  acu: acum ? acum.fluxoOperDireto + acum.dPL_extra - acum.dIntangivel : undefined, icon: '🏭', color: (v: number) => v >= 0 ? 'emerald' : 'red' },
-          { label: 'Caixa de Investimento',      mes: fluxoInvestDireto + d.dIntangivel, acu: acum ? acum.fluxoInvest + acum.dIntangivel : undefined,    icon: '🏗️', color: (v: number) => v >= 0 ? 'emerald' : 'amber' },
-          { label: 'Caixa de Financiamento',     mes: fluxoFinancDireto - d.dPL_extra, acu: acum ? acum.fluxoFinanc - acum.dPL_extra : undefined,    icon: '🏦', color: (v: number) => v >= 0 ? 'blue' : 'amber' },
-          { label: 'Variação Total de Caixa',    mes: fluxoTotalDireto,  acu: acum?.fluxoTotal,     icon: '💰', color: (v: number) => v >= 0 ? 'emerald' : 'red' },
-        ].map((kpi, i) => {
-          const colorMap: any = {
-            emerald: 'border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/30',
-            amber:   'border-l-amber-500 bg-amber-50 dark:bg-amber-950/30',
-            red:     'border-l-red-500 bg-red-50 dark:bg-red-950/30',
-            blue:    'border-l-blue-500 bg-blue-50 dark:bg-blue-950/30',
-          };
-          return (
-            <Card key={i} className={cn('border-l-4', colorMap[kpi.color(kpi.mes)])}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {kpi.icon} {kpi.label}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {hasAcum ? (
-                  <div className="space-y-2">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerMes}</div>
-                      <div className={cn('text-lg font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{kpi.mes > 0 ? '+' : kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}</div>
-                    </div>
-                    <div className="border-t border-border/50 pt-2">
-                      <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerAcu}</div>
-                      <div className={cn('text-xl font-bold', (kpi.acu ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(kpi.acu ?? 0) > 0 ? '+' : (kpi.acu ?? 0) < 0 ? '−' : ''}{fmtBRL(kpi.acu ?? 0, true)}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className={cn('text-2xl font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{kpi.mes > 0 ? '+' : kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}</div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {diff > 1 && (
-        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-sm">
-          ⚠️ Diferença de {fmtBRL(diff)} entre método direto e indireto ({headerMes}) — verifique contas não mapeadas.
-        </div>
-      )}
-      {diff <= 1 && (
-        <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
-          ✅ Validação cruzada ({headerMes}): método direto e indireto convergem ({fmtBRL(diff)} de diferença).
-        </div>
-      )}
-
-      <Card>
-        <CardContent className="pt-6">
-          <SectionTitle icon="💵">DFC — Método Direto (NBC TG 03)</SectionTitle>
-          <table className="dfc-table w-full border-collapse">
-            <thead>
-              <tr className="bg-muted/50">
-                <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Descrição</th>
-                <th className={cn('py-2.5 px-3 text-right text-xs uppercase tracking-wider w-[20%]', hasAcum ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-muted-foreground')}>
-                  {hasAcum ? headerMes : 'Valor (R$)'}
-                </th>
-                {hasAcum && (
-                  <th className="py-2.5 px-3 text-right text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 w-[20%] border-l border-border/30">
-                    {headerAcu}
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {/* ── Operacional ── */}
-              <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} value2={0} hasAcum={hasAcum} highlight />
-              <DFCRow label="(+) Recebimentos de Clientes" value={recebClientes} value2={acum?.recebClientes} hasAcum={hasAcum} indent={1} details={() => customerReceiptDetails(recebClientes, acum?.recebClientes)} />
-              <DFCRow label={`    ↳ Receita Bruta: ${fmtBRL(recBrutaMes, true)}`} value={recBrutaMes} value2={acum?.recBruta} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.1'], 1, recBrutaMes, acum?.recBruta)} />
-              {(devolucoesMes !== 0 || (acum && acum.devolucoes !== 0)) && <DFCRow label="    ↳ (–) Devoluções devolvidas a clientes" value={-devolucoesMes} value2={acum ? -acum.devolucoes : undefined} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.3'], -1, -devolucoesMes, acum ? -acum.devolucoes : undefined)} />}
-              {(d.dCred !== 0 || (acum && acum.dCred !== 0)) && <DFCRow label={`    ↳ ${d.dCred > 0 ? '(–)' : '(+)'} Variação Créditos de Vendas (1.1.3)`} value={-d.dCred} value2={acum ? -acum.dCred : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.3'], -1, -d.dCred, acum ? -acum.dCred : undefined)} />}
-              {(d.dContasCorr !== 0 || (acum && acum.dContasCorr !== 0)) && <DFCRow label={`    ↳ ${d.dContasCorr > 0 ? '(–)' : '(+)'} Variação Contas Correntes (1.1.4)`} value={-d.dContasCorr} value2={acum ? -acum.dContasCorr : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.4'], -1, -d.dContasCorr, acum ? -acum.dContasCorr : undefined)} />}
-
-              <DFCRow label="(–) Pagamentos a Fornecedores" value={pagFornec} value2={acum?.pagFornec} hasAcum={hasAcum} indent={1} details={() => supplierPaymentDetails(pagFornec, acum?.pagFornec)} />
-              <DFCRow label={`    ↳ CMV do período: ${fmtBRL(CMVMes, true)}`} value={-CMVMes} value2={acum ? -acum.CMV : undefined} hasAcum={hasAcum} indent={2} details={directResultDetails(['4'], -1, -CMVMes, acum ? -acum.CMV : undefined)} />
-              {(d.dEstoque !== 0 || (acum && acum.dEstoque !== 0)) && <DFCRow label={`    ↳ ${d.dEstoque > 0 ? '(–)' : '(+)'} Variação Estoques (1.1.2 + 1.1.7.02)`} value={-d.dEstoque} value2={acum ? -acum.dEstoque : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.2', '1.1.7.02'], -1, -d.dEstoque, acum ? -acum.dEstoque : undefined)} />}
-              {(d.dFornec !== 0 || (acum && acum.dFornec !== 0)) && <DFCRow label={`    ↳ ${d.dFornec > 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.3 + 2.1.4)`} value={d.dFornec} value2={acum?.dFornec} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['2.1.3', '2.1.4'], 1, d.dFornec, acum?.dFornec, ['2.1.4.01.01.007'])} />}
-
-              <DFCRow label="(–) Pagamentos de Despesas Operacionais" value={despOperCaixa} value2={acum?.despOperCaixa} hasAcum={hasAcum} indent={1} details={() => operatingPaymentDetails(despOperCaixa, acum?.despOperCaixa)} />
-              <DFCRow label={`    ↳ Despesas operacionais do período (conta 5, líquido): ${fmtBRL(d.despOper5Net, true)}`} value={-d.despOper5Net} value2={acum ? -acum.despOper5Net : undefined} hasAcum={hasAcum} indent={2} details={directResultDetails(['5.'], -1, -d.despOper5Net, acum ? -acum.despOper5Net : undefined, 'signed')} />
-              {(d.dContasPag !== 0 || (acum && acum.dContasPag !== 0)) && <DFCRow label={`    ↳ ${d.dContasPag > 0 ? '(+)' : '(–)'} Variação Contas a Pagar (2.1.2.03)`} value={d.dContasPag} value2={acum?.dContasPag} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['2.1.2.03'], 1, d.dContasPag, acum?.dContasPag)} />}
-              {(d.dObrigTrab !== 0 || (acum && acum.dObrigTrab !== 0)) && <DFCRow label={`    ↳ ${d.dObrigTrab > 0 ? '(+)' : '(–)'} Variação Obrig. Trabalhistas (2.1.2.01)`} value={d.dObrigTrab} value2={acum?.dObrigTrab} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['2.1.2.01'], 1, d.dObrigTrab, acum?.dObrigTrab)} />}
-              {(d.dDespAntec !== 0 || (acum && acum.dDespAntec !== 0)) && <DFCRow label={`    ↳ ${d.dDespAntec > 0 ? '(–)' : '(+)'} Variação Despesas Antecipadas (1.1.6)`} value={-d.dDespAntec} value2={acum ? -acum.dDespAntec : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.6'], -1, -d.dDespAntec, acum ? -acum.dDespAntec : undefined)} />}
-              {(d.dValDiv !== 0 || (acum && acum.dValDiv !== 0)) && <DFCRow label={`    ↳ ${d.dValDiv > 0 ? '(–)' : '(+)'} Variação Valores Diversos (1.1.5)`} value={-d.dValDiv} value2={acum ? -acum.dValDiv : undefined} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['1.1.5'], -1, -d.dValDiv, acum ? -acum.dValDiv : undefined)} />}
-
-              <DFCRow label="(–) Pagamentos de Impostos sobre Vendas" value={pagImpostos} value2={acum?.pagImpostos} hasAcum={hasAcum} indent={1} details={() => reconcileDFCDetails([
-                ...rawDirectAccountDetails(['3.2'], (_id, a) => -Math.abs((a?.valDeb || 0) - (a?.valCred || 0)), (_id, a) => -Math.abs(a?.saldoAtual || 0)),
-                ...rawDirectAccountDetails(['2.1.2.02'], (_id, a) => Math.abs(a?.saldoAtual || 0) - Math.abs(a?.saldoAnt || 0), (id) => Math.abs(directAccounts[id]?.saldoAtual || 0) - Math.abs(janAccountMap?.[id]?.saldoAnt || 0)),
-              ], pagImpostos, acum?.pagImpostos)} />
-              <DFCRow label={`    ↳ Impostos sobre Vendas do período: ${fmtBRL(impostosVMes, true)}`} value={-impostosVMes} value2={acum ? -acum.impostosV : undefined} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.2'], -1, -impostosVMes, acum ? -acum.impostosV : undefined)} />
-              {(d.dObrigTrib !== 0 || (acum && acum.dObrigTrib !== 0)) && <DFCRow label={`    ↳ ${d.dObrigTrib > 0 ? '(+)' : '(–)'} Variação Obrig. Tributárias (2.1.2.02)`} value={d.dObrigTrib} value2={acum?.dObrigTrib} hasAcum={hasAcum} indent={2} details={directBalanceDetails(['2.1.2.02'], 1, d.dObrigTrib, acum?.dObrigTrib)} />}
-
-              {(pagIR !== 0 || (acum && acum.pagIR !== 0)) && <DFCRow label="(–) IR + CSLL pago (conta 6)" value={pagIR} value2={acum?.pagIR} hasAcum={hasAcum} indent={1} details={directResultDetails(['6'], -1, pagIR, acum?.pagIR, 'signed', 'signed')} />}
-
-              {(rendasRecebidas !== 0 || (acum && acum.rendasRecebidas !== 0)) && <DFCRow label="(+) Rendas Recebidas (Oper. + Financ. + Não Oper.)" value={rendasRecebidas} value2={acum?.rendasRecebidas} hasAcum={hasAcum} indent={1} details={directResultDetails(['3.4', '3.5', '3.6'], 1, rendasRecebidas, acum?.rendasRecebidas)} />}
-              {(rendOperMes !== 0 || (acum && acum.rendOper !== 0)) && <DFCRow label={`    ↳ Rendas Operacionais (3.4): ${fmtBRL(rendOperMes, true)}`} value={rendOperMes} value2={acum?.rendOper} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.4'], 1, rendOperMes, acum?.rendOper)} />}
-              {(rendFinancMes !== 0 || (acum && acum.rendFinanc !== 0)) && <DFCRow label={`    ↳ Rendas Financeiras (3.5): ${fmtBRL(rendFinancMes, true)}`} value={rendFinancMes} value2={acum?.rendFinanc} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.5'], 1, rendFinancMes, acum?.rendFinanc)} />}
-              {(rendNaoOperMes !== 0 || (acum && acum.rendNaoOper !== 0)) && <DFCRow label={`    ↳ Rendas Não Operacionais (3.6): ${fmtBRL(rendNaoOperMes, true)}`} value={rendNaoOperMes} value2={acum?.rendNaoOper} hasAcum={hasAcum} indent={2} details={directResultDetails(['3.6'], 1, rendNaoOperMes, acum?.rendNaoOper)} />}
-              <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(\u2013)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={acum ? -acum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.1.01.52'], -1, -d.dRealizLPCred, acum ? -acum.dRealizLPCred : undefined)} />
-              {(d.emprestCP_01Ant > 0 || d.emprestCP_01Atu > 0 || (d.dEmprestCP_01 !== undefined && d.dEmprestCP_01 !== 0)) && (
-                <DFCRow label={`${d.dEmprestCP_01 >= 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.1.01) ${d.dEmprestCP_01 >= 0 ? '— aumento (fonte de caixa)' : '— redução (uso de caixa)'} (${fmtBRL(d.emprestCP_01Ant, true)} → ${fmtBRL(d.emprestCP_01Atu, true)})`} value={d.dEmprestCP_01} value2={acum?.dEmprestCP_01} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.1.1.01'], 1, d.dEmprestCP_01, acum?.dEmprestCP_01)} />
-              )}
-              {(Math.abs(d.dOutros2_2_1) > 0.01 || (acum && Math.abs(acum.dOutros221) > 0.01)) && (
-                <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos LP não mapeados (2.2.1 — demais)`} value={d.dOutros2_2_1} value2={acum?.dOutros221} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1'], 1, d.dOutros2_2_1, acum?.dOutros221, ['2.2.1.07', '2.2.1.01', '2.2.1.02', '2.2.1.15'])} />
-              )}
-              {(Math.abs(d.dRecDiferidas) > 0.01 || (acum && Math.abs(acum.dRecDiferidas) > 0.01)) && (
-                <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={acum?.dRecDiferidas} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.2'], 1, d.dRecDiferidas, acum?.dRecDiferidas)} />
-              )}
-              {(Math.abs(d.ajusteResidualBP + d.dPL_extra) > 0.01 || (acum && Math.abs((acum.ajusteResidualBP ?? 0) + (acum.dPL_extra ?? 0)) > 0.01)) && (
-                <DFCRow label={`${(d.ajusteResidualBP + d.dPL_extra) >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP + d.dPL_extra} value2={acum ? (acum.ajusteResidualBP + acum.dPL_extra) : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails([], 1, d.ajusteResidualBP + d.dPL_extra, acum ? acum.ajusteResidualBP + acum.dPL_extra : undefined)} />
-              )}
-              <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} value2={acum ? -acum.dIntangivel : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.7'], -1, -d.dIntangivel, acum ? -acum.dIntangivel : undefined)} />
-
-              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto + d.dPL_extra - d.dIntangivel} value2={acum ? (acum.fluxoOperDireto + acum.dPL_extra - acum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
-
-              {/* ── Investimento ── */}
-              <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
-              <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={acum ? -(acum.imobiliz.atu - acum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.5'], -1, -(data.imobiliz.atu - data.imobiliz.ant), acum ? -(acum.imobiliz.atu - acum.imobiliz.ant) : undefined)} />
-              {(d.dInvestimentos !== 0 || (acum && acum.dInvest !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={acum ? -acum.dInvest : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.3'], -1, -d.dInvestimentos, acum ? -acum.dInvest : undefined)} />}
-              {(d.dRealizLPOutros !== 0 || (acum && acum.dRealizLPOutros !== 0)) && (
-                <DFCRow label={`${-d.dRealizLPOutros >= 0 ? '(+)' : '(–)'} Variação Realizável LP excl. cred. ligadas (1.5.1 − 1.5.1.01.52) ${d.dRealizLPOutros > 0 ? '— aumento (uso)' : '— redução (fonte)'} (${fmtBRL(d.realizLPAnt, true)} → ${fmtBRL(d.realizLPAtu, true)})`} value={-d.dRealizLPOutros} value2={acum ? -acum.dRealizLPOutros : undefined} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['1.5.1'], -1, -d.dRealizLPOutros, acum ? -acum.dRealizLPOutros : undefined, ['1.5.1.01.52'])} />
-              )}
-              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={fluxoInvestDireto + d.dIntangivel} value2={acum ? (acum.fluxoInvest + acum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
-
-              {/* ── Financiamento ── */}
-              <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
-              {(d.emprestCP_02Ant > 0 || d.emprestCP_02Atu > 0) && <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02) (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={acum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.1.1.02'], 1, d.dEmprestCP_02, acum?.dEmprestCP_02)} />}
-              {(d.fpFloorAudiAnt > 0 || d.fpFloorAudiAtu > 0) && <DFCRow label={`${d.dFpFloorAudi >= 0 ? '(+) Captação' : '(–) Amortização'} Floor Plan Novos Audi (2.1.4.01.01.007) (${fmtBRL(d.fpFloorAudiAnt, true)} → ${fmtBRL(d.fpFloorAudiAtu, true)})`} value={d.dFpFloorAudi} value2={acum?.dFpFloorAudi} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.1.4.01.01.007'], 1, d.dFpFloorAudi, acum?.dFpFloorAudi)} />}
-              {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={acum?.dEmprestLP} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1.07'], 1, d.dEmprestLP, acum?.dEmprestLP)} />}
-              {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} value2={acum?.dPessoasLig} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1.01'], 1, d.dPessoasLig, acum?.dPessoasLig)} />}
-              {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={acum?.dDebitosLig} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1.02'], 1, d.dDebitosLig, acum?.dDebitosLig)} />}
-              {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'} (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} value2={acum?.dArrendLP} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.1.15'], 1, d.dArrendLP, acum?.dArrendLP)} />}
-              {(d.dOutrosPassLP !== 0 || (acum && acum.dOutrosPassLP !== 0)) && <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={acum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} details={directBalanceDetails(['2.2.3'], 1, d.dOutrosPassLP, acum?.dOutrosPassLP)} />}
-              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={fluxoFinancDireto - d.dPL_extra} value2={acum ? (acum.fluxoFinanc - acum.dPL_extra) : undefined} hasAcum={hasAcum} total highlight />
-            </tbody>
-            <tfoot>
-              <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-t-2 border-emerald-500/30">
-                <td className="py-3.5 px-3 text-sm font-bold text-foreground">VARIAÇÃO TOTAL DE CAIXA NO PERÍODO</td>
-                <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold', fluxoTotalDireto >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(fluxoTotalDireto > 0 ? '+' : fluxoTotalDireto < 0 ? '−' : '') + fmtBRL(fluxoTotalDireto)}</td>
-                {hasAcum && <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold border-l border-border/30', (acum.fluxoTotal ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{((acum.fluxoTotal ?? 0) > 0 ? '+' : (acum.fluxoTotal ?? 0) < 0 ? '−' : '') + fmtBRL(acum.fluxoTotal)}</td>}
-              </tr>
-              <tr className="bg-muted/30">
-                <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Anterior</td>
-                <td className="py-2.5 px-3 text-right font-mono text-sm text-muted-foreground">{fmtBRL(data.disponib.ant)}</td>
-                {hasAcum && <td className="py-2.5 px-3 text-right font-mono text-sm text-muted-foreground border-l border-border/30">{fmtBRL(acum.disponibAnt)}</td>}
-              </tr>
-              <tr className="bg-muted/30">
-                <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Atual</td>
-                <td className="py-2.5 px-3 text-right font-mono text-sm font-semibold text-foreground">{fmtBRL(data.disponib.atu)}</td>
-                {hasAcum && <td className="py-2.5 px-3 text-right font-mono text-sm font-semibold text-foreground border-l border-border/30">{fmtBRL(acum.disponibAtu)}</td>}
-              </tr>
-              <tr className="bg-violet-50/50 dark:bg-violet-950/20 border-t border-violet-500/30">
-                <td className="py-3 px-3 text-sm font-semibold text-foreground/80">Variação Real de Caixa (conferência com balanço)</td>
-                <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold', d.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(d.varCaixaReal > 0 ? '+' : d.varCaixaReal < 0 ? '−' : '') + fmtBRL(d.varCaixaReal)}</td>
-                {hasAcum && <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold border-l border-border/30', acum.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(acum.varCaixaReal > 0 ? '+' : acum.varCaixaReal < 0 ? '−' : '') + fmtBRL(acum.varCaixaReal)}</td>}
-              </tr>
-              {(() => {
-                const gapMes = fluxoTotalDireto - d.varCaixaReal;
-                const gapAcu = acum ? acum.fluxoTotal - acum.varCaixaReal : null;
-                const showGap = Math.abs(gapMes) > 0.5 || (gapAcu !== null && Math.abs(gapAcu) > 0.5);
-                if (!showGap) return null;
-                return (
-                  <tr className="bg-amber-50/50 dark:bg-amber-950/20 border-t border-amber-500/30">
-                    <td className="py-2.5 px-3 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                      ⚠️ Gap residual (DFC − Var. Real) — contas não-caixa ou não mapeadas (ex: 2.2.2 ICMS ST Diferido)
-                    </td>
-                    <td className={cn('py-2.5 px-3 text-right font-mono text-xs font-bold', Math.abs(gapMes) < 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
-                      {Math.abs(gapMes) < 0.5 ? '✓ Zero' : (gapMes > 0 ? '+' : '−') + fmtBRL(gapMes)}
-                    </td>
-                    {hasAcum && gapAcu !== null && (
-                      <td className={cn('py-2.5 px-3 text-right font-mono text-xs font-bold border-l border-border/30', Math.abs(gapAcu) < 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
-                        {Math.abs(gapAcu) < 0.5 ? '✓ Zero' : (gapAcu > 0 ? '+' : '−') + fmtBRL(gapAcu)}
-                      </td>
-                    )}
-                  </tr>
-                );
-              })()}
-            </tfoot>
-          </table>
-          <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
-            {hasAcum
-              ? `* ${headerMes}: movimentação do mês (Déb/Créd). ${headerAcu}: variação patrimonial usando saldo de Dez/${String(selectedYear - 1).slice(2)} como base; contas de resultado pelo saldoAtual acumulado YTD.`
-              : '* DFC pelo método direto. Receitas Diferidas (2.2.2/ ICMS ST) incluída no operacional. Outros Ativos Audi (1.1.7 excl. estoque) incorporados em Despesas Operacionais; Realizável LP excl. créditos ligadas — investimento; Aportes/retiradas PL excl. resultado — financiamento. Ajuste residual captura depreciação líquida e contas não detalhadas.'
-            }
-          </p>
-        </CardContent>
-      </Card>
-      </div>
-    </div>
-  );
+function CaixaDiretoTab({ fmtBRL, SectionTitle, colAtual, selectedMonth, selectedYear }: any) {
+  return <CaixaDfcTab method="direto" title="FC Direto" fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />;
 }
 
 // ─── DIAGNÓSTICO DE GERAÇÃO DE CAIXA ────────────────────────────────────────

@@ -2,6 +2,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { FluxoCaixaDashboard } from '@/components/FluxoCaixaDashboard';
 import { loadFluxoCaixaRaw } from '@/components/FluxoCaixaDashboard/fluxoCaixaStorage';
+import { cadastroVazio } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { kvGet } from '@/lib/kvClient';
 
 vi.mock('@/components/FluxoCaixaDashboard/fluxoCaixaStorage', () => ({
   loadFluxoCaixaRaw: vi.fn().mockResolvedValue(null),
@@ -77,4 +79,60 @@ it('mostra o aviso ao entrar em Projeção, fecha com OK e reaparece somente em 
   expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Projeção' }));
   expect(await screen.findByRole('alertdialog')).toHaveTextContent('Funcionalidade ainda em Teste.');
+});
+
+it('recarrega em Resultado as linhas e valores do cadastro atualizado da DRE', async () => {
+  const mesAnterior = localStorage.getItem('fluxo_caixa_selected_month');
+  localStorage.setItem('fluxo_caixa_selected_month', '1');
+  const rawText = [
+    'A;3.1.1;Receita original;0,00;0,00;100,00;100,00',
+    'A;3.1.2;Receita atualizada;0,00;0,00;500,00;500,00',
+    ...Array.from({ length: 8 }, (_, index) => `A;7.${index + 1};Conta ${index};0,00;0,00;0,00;0,00`),
+  ].join('\n');
+  const createCadastro = (referencia: string) => ({
+    ...cadastroVazio(),
+    version: `cadastro-${referencia}`,
+    empresa: { nome: 'Sorana', cnpj: '12345678901234', nire: '' },
+    linhas: [
+      {
+        id: 'receita-liquida',
+        nome: 'Receita Líquida de Vendas',
+        demonstracao: 'dre' as const,
+        tipo: 'contas' as const,
+        itens: [{ referencia, operacao: 1 as const }],
+      },
+    ],
+  });
+  let cadastroSalvo = createCadastro('3.1.1');
+  vi.mocked(kvGet).mockImplementation(async key => (
+    key === 'fluxo_caixa_demonstracoes_cadastro' ? cadastroSalvo : null
+  ));
+  vi.mocked(loadFluxoCaixaRaw).mockResolvedValue({ rawText });
+
+  try {
+    render(<FluxoCaixaDashboard />);
+    await screen.findByText('Total do Ativo');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resultado' }));
+    const linhaOriginal = await screen.findByRole('row', { name: /Receita Líquida de Vendas/ });
+    await waitFor(() => expect(linhaOriginal).toHaveTextContent(/100/));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Emissão de Demonstrações Financeiras' }));
+    await screen.findByRole('heading', { name: 'Emissão de Demonstrações Financeiras' });
+    cadastroSalvo = createCadastro('3.1.2');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resultado' }));
+    const linhaAtualizada = await screen.findByRole('row', { name: /Receita Líquida de Vendas/ });
+    await waitFor(() => expect(linhaAtualizada).toHaveTextContent(/500/));
+
+    fireEvent.click(screen.getByRole('button', { name: /Evolução Mensal/ }));
+    expect(await screen.findByRole('heading', { name: 'Evolução Mensal — Resultado (DRE)' })).toBeInTheDocument();
+    expect(await screen.findByText(/Total:.*500/)).toBeInTheDocument();
+  } finally {
+    cleanup();
+    if (mesAnterior === null) localStorage.removeItem('fluxo_caixa_selected_month');
+    else localStorage.setItem('fluxo_caixa_selected_month', mesAnterior);
+    vi.mocked(loadFluxoCaixaRaw).mockResolvedValue(null);
+    vi.mocked(kvGet).mockResolvedValue(null);
+  }
 });
