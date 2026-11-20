@@ -4,6 +4,7 @@ import { DFC_LINHAS_PADRAO, DFC_PREFIXOS_PADRAO, DFC_SECOES_PADRAO } from './dfc
 
 export const TIPOS = { dre: 'DRE', ativo: 'Ativo', passivo: 'Passivo', dfc: 'DFC', endividamento: 'Endividamento' } as const;
 export type TipoDemonstracao = keyof typeof TIPOS;
+export const DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO = ['1.1.1'] as const;
 export const MESES = ['Anual', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 const itemSchema = z.object({ referencia: z.string().min(1), operacao: z.union([z.literal(1), z.literal(-1)]) });
@@ -38,6 +39,7 @@ export const cadastroSchema = z.object({
   linhas: z.array(linhaSchema),
   assinantes: z.array(z.object({ id: z.string(), nome: z.string(), cargo: z.string(), registro: z.string() })),
   dfcModeloInicializado: z.boolean().optional(),
+  dfcContasCaixaEquivalentes: z.array(z.string().trim().min(1)).min(1).optional(),
 });
 export type CadastroDemonstracoes = z.infer<typeof cadastroSchema>;
 export type LinhaDemonstracao = z.infer<typeof linhaSchema>;
@@ -113,7 +115,10 @@ export function identificarContasNaoClassificadas(
 }
 
 export function cadastroVazio(): CadastroDemonstracoes {
-  return { version: '', empresa: { nome: '', cnpj: '', nire: '' }, linhas: [], assinantes: [], dfcModeloInicializado: false };
+  return {
+    version: '', empresa: { nome: '', cnpj: '', nire: '' }, linhas: [], assinantes: [],
+    dfcModeloInicializado: false, dfcContasCaixaEquivalentes: [...DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO],
+  };
 }
 
 export function criarLinhasDfcPadrao(): LinhaDemonstracao[] {
@@ -173,12 +178,17 @@ export function criarLinhasDfcPadrao(): LinhaDemonstracao[] {
 }
 
 export function aplicarModeloDfcPadrao(cadastro: CadastroDemonstracoes): CadastroDemonstracoes {
-  if (cadastro.dfcModeloInicializado) return cadastro;
+  const dfcContasCaixaEquivalentes = cadastro.dfcContasCaixaEquivalentes
+    ?? [...DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO];
+  if (cadastro.dfcModeloInicializado) {
+    return cadastro.dfcContasCaixaEquivalentes ? cadastro : { ...cadastro, dfcContasCaixaEquivalentes };
+  }
   const jaConfigurada = cadastro.linhas.some(linha => linha.demonstracao === 'dfc');
   return {
     ...cadastro,
     linhas: jaConfigurada ? cadastro.linhas : [...cadastro.linhas, ...criarLinhasDfcPadrao()],
     dfcModeloInicializado: true,
+    dfcContasCaixaEquivalentes,
   };
 }
 
@@ -335,6 +345,46 @@ export function listarContasDfcDaLinha(
 ): ItemDemonstracao[] {
   return (distribuirContasDfc(linhas, periodos).porLinha.get(linhaId) ?? [])
     .map(conta => ({ referencia: conta.conta, operacao: 1 }));
+}
+
+export interface SaldosCaixaEquivalentes {
+  saldoInicial: number | null;
+  saldoFinal: number | null;
+  variacaoReal: number | null;
+}
+
+export function calcularSaldosCaixaEquivalentes(
+  prefixos: string[],
+  periodos: Array<ContasBalancete | null>,
+): SaldosCaixaEquivalentes {
+  const indisponivel = { saldoInicial: null, saldoFinal: null, variacaoReal: null };
+  if (!prefixos.length || !periodos.length || periodos.some(periodo => periodo === null)) {
+    return indisponivel;
+  }
+
+  const incompletas = identificarContasIncompletas(periodos);
+  const contas = new Map<string, ContaBalancete>();
+  for (const periodo of periodos) {
+    for (const conta of Object.values(periodo ?? {})) {
+      if (!incompletas.has(conta.conta)
+        && prefixos.some(prefixo => conta.conta === prefixo || conta.conta.startsWith(`${prefixo}.`))) {
+        contas.set(conta.conta, conta);
+      }
+    }
+  }
+  const primeiro = periodos[0]!;
+  const ultimo = periodos[periodos.length - 1]!;
+  const somarSaldo = (periodo: ContasBalancete, campo: 'saldoAnt' | 'saldoAtual') =>
+    [...contas.keys()].reduce((total, conta) => total + Math.round((periodo[conta]?.[campo] ?? 0) * 100), 0);
+  const saldoInicialCentavos = somarSaldo(primeiro, 'saldoAnt');
+  const saldoFinalCentavos = somarSaldo(ultimo, 'saldoAtual');
+  const saldoInicial = saldoInicialCentavos / 100;
+  const saldoFinal = saldoFinalCentavos / 100;
+  return {
+    saldoInicial,
+    saldoFinal,
+    variacaoReal: (saldoFinalCentavos - saldoInicialCentavos) / 100,
+  };
 }
 
 export function identificarContasDfcNaoMapeadas(

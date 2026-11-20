@@ -118,7 +118,8 @@ it('exibe DFC Direto por mês e no acumulado de janeiro até o mês selecionado'
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
   await screen.findByRole('rowheader', { name: 'Fluxo operacional' });
-  expect(screen.getByRole('columnheader', { name: 'Fev/26' })).toBeInTheDocument();
+  const tabelaDfc = within(screen.getByRole('region', { name: 'Demonstração DFC' })).getAllByRole('table')[0];
+  expect(within(tabelaDfc).getByRole('columnheader', { name: 'Fev/26' })).toBeInTheDocument();
   expect(within(screen.getByRole('row', { name: /Fluxo operacional/ })).getByRole('cell')).toHaveTextContent('385');
   fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Fluxo operacional' }));
   expect(within(await screen.findByRole('row', { name: /3\.1 — Receita/ })).getByRole('cell')).toHaveTextContent('500');
@@ -150,6 +151,56 @@ it('pré-carrega o mapeamento DFC, mostra contas fora da DFC e destaca contas se
   expect(await screen.findByRole('row', { name: /1\.1\.1\.01\.01\.001 — Caixa/ })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Contas não mapeadas (1)' }));
   expect(screen.getByRole('row', { name: /9\.9\.9 — Conta sem regra/ })).toBeInTheDocument();
+});
+
+it('concilia o caixa pelo mês ou acumulado e mantém as contas de caixa personalizadas após salvar', async () => {
+  persistido = {
+    ...cadastroVazio(),
+    version: 'v1',
+    empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+  };
+  mocks.raw.mockImplementation(async (_ano: number, mes: number) => {
+    if (mes === 1) return { rawText: [
+      'A;3.1.1;Receita;0;0;80;0',
+      'A;1.1.1.01.01.001;Banco A;100;0;0;150',
+      'A;1.1.1.02.01.001;Banco B;200;0;0;200',
+    ].join('\n') };
+    if (mes === 2) return { rawText: [
+      'A;3.1.1;Receita;0;0;50;0',
+      'A;1.1.1.01.01.001;Banco A;150;0;0;200',
+      'A;1.1.1.02.01.001;Banco B;200;0;0;250',
+    ].join('\n') };
+    return null;
+  });
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  const linhaVariacaoDfc = await screen.findByRole('row', { name: /Variação de caixa pela DFC/ });
+  expect(within(linhaVariacaoDfc).getByRole('cell')).toHaveTextContent('50,00');
+  expect(within(screen.getByRole('row', { name: /Saldo de caixa — início/ })).getByRole('cell')).toHaveTextContent('350,00');
+  expect(within(screen.getByRole('row', { name: /Saldo de caixa — fim/ })).getByRole('cell')).toHaveTextContent('450,00');
+  expect(within(screen.getByRole('row', { name: /Variação real de caixa/ })).getByRole('cell')).toHaveTextContent('100,00');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Acumulado (Jan–Fev/26)' }));
+  await waitFor(() => {
+    expect(within(screen.getByRole('row', { name: /Variação de caixa pela DFC/ })).getByRole('cell')).toHaveTextContent('130,00');
+    expect(within(screen.getByRole('row', { name: /Saldo de caixa — início/ })).getByRole('cell')).toHaveTextContent('300,00');
+    expect(within(screen.getByRole('row', { name: /Saldo de caixa — fim/ })).getByRole('cell')).toHaveTextContent('450,00');
+    expect(within(screen.getByRole('row', { name: /Variação real de caixa/ })).getByRole('cell')).toHaveTextContent('150,00');
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Editar contas de caixa/equivalentes' }));
+  const editor = within(await screen.findByRole('dialog'));
+  fireEvent.click(editor.getByRole('button', { name: 'Remover regra 1.1.1' }));
+  fireEvent.click(editor.getByRole('checkbox', { name: /^1\.1\.1\.01\.01\.001 — Banco A/ }));
+  fireEvent.click(editor.getByRole('button', { name: 'Salvar contas' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  expect(persistido?.dfcContasCaixaEquivalentes).toEqual(['1.1.1.01.01.001']);
+
+  await waitFor(() => {
+    expect(within(screen.getByRole('row', { name: /Saldo de caixa — início/ })).getByRole('cell')).toHaveTextContent('100,00');
+    expect(within(screen.getByRole('row', { name: /Saldo de caixa — fim/ })).getByRole('cell')).toHaveTextContent('200,00');
+    expect(within(screen.getByRole('row', { name: /Variação real de caixa/ })).getByRole('cell')).toHaveTextContent('100,00');
+  });
 });
 
 it('marca como indisponível o detalhe de uma conta agrupadora vinculada em cadastro antigo', async () => {

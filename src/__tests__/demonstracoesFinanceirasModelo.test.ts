@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
-import { aplicarModeloDfcPadrao, calcularLinhas, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { aplicarModeloDfcPadrao, calcularLinhas, calcularSaldosCaixaEquivalentes, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 
 const grupo = (id: string, conta: string, operacao: 1 | -1 = 1): LinhaDemonstracao => ({
   id, nome: id, demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: conta, operacao }],
@@ -105,15 +105,26 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     expect(linhasDfc.filter(linha => linha.tipo === 'contas' && !linha.foraDfc)).toHaveLength(18);
     expect(linhasDfc.filter(linha => linha.tipo === 'contas').reduce((total, linha) => total + linha.itens.length, 0)).toBe(189);
     expect(validarLinhas(inicial.linhas)).toBeNull();
+    expect(inicial.dfcContasCaixaEquivalentes).toEqual(['1.1.1']);
 
     const personalizada = {
       ...inicial,
       linhas: inicial.linhas.map(linha => linha.id === 'dfc-op01' ? { ...linha, nome: 'Receita ajustada pelo usuário' } : linha),
+      dfcContasCaixaEquivalentes: ['1.1.1.01.01.001'],
     };
     expect(aplicarModeloDfcPadrao(personalizada)).toBe(personalizada);
 
+    const cadastroLegado = { ...inicial };
+    delete cadastroLegado.dfcContasCaixaEquivalentes;
+    expect(aplicarModeloDfcPadrao({ ...cadastroLegado, dfcModeloInicializado: true }).dfcContasCaixaEquivalentes).toEqual(['1.1.1']);
+
     const removida = { ...inicial, linhas: inicial.linhas.filter(linha => linha.demonstracao !== 'dfc') };
     expect(aplicarModeloDfcPadrao(removida).linhas.some(linha => linha.demonstracao === 'dfc')).toBe(false);
+    const removidaLegada = { ...removida };
+    delete removidaLegada.dfcContasCaixaEquivalentes;
+    const migrada = aplicarModeloDfcPadrao(removidaLegada);
+    expect(migrada.linhas.some(linha => linha.demonstracao === 'dfc')).toBe(false);
+    expect(migrada.dfcContasCaixaEquivalentes).toEqual(['1.1.1']);
   });
 
   it('classifica pelo prefixo mais longo, mantém contas fora dos totais e lista contas não mapeadas', () => {
@@ -144,6 +155,35 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     expect(identificarContasDfcNaoMapeadas(linhas, [[contas]])).toEqual([
       { conta: '9.9.1', desc: 'Sem prefixo', valores: [-5] },
     ]);
+  });
+
+  it('concilia o saldo inicial e final usando somente contas cobertas pelos prefixos selecionados', () => {
+    const prefixosPadrao = aplicarModeloDfcPadrao(cadastroVazio()).dfcContasCaixaEquivalentes ?? [];
+    const janeiro = extractAccounts([
+      'A;1.1.1.01.01.001;Banco A;100;0;0;150',
+      'A;1.1.1.02.01.001;Banco B;200;0;0;200',
+      'A;1.1.2.01;Estoque;900;0;0;900',
+    ].join('\n'), { strict: true });
+    const fevereiro = extractAccounts([
+      'A;1.1.1.01.01.001;Banco A;150;0;0;200',
+      'A;1.1.1.02.01.001;Banco B;200;0;0;250',
+      'A;1.1.2.01;Estoque;900;0;0;900',
+    ].join('\n'), { strict: true });
+
+    expect(calcularSaldosCaixaEquivalentes(prefixosPadrao, [fevereiro])).toEqual({
+      saldoInicial: 350, saldoFinal: 450, variacaoReal: 100,
+    });
+    expect(calcularSaldosCaixaEquivalentes(prefixosPadrao, [janeiro, fevereiro])).toEqual({
+      saldoInicial: 300, saldoFinal: 450, variacaoReal: 150,
+    });
+
+    const prefixosPersonalizados = ['1.1.1.01.01.001'];
+    expect(calcularSaldosCaixaEquivalentes(prefixosPersonalizados, [janeiro, fevereiro])).toEqual({
+      saldoInicial: 100, saldoFinal: 200, variacaoReal: 100,
+    });
+    expect(calcularSaldosCaixaEquivalentes(prefixosPersonalizados, [janeiro, null])).toEqual({
+      saldoInicial: null, saldoFinal: null, variacaoReal: null,
+    });
   });
 
   it('preserva centavos e ignora operações manuais antigas tanto nas contas quanto nas totalizações da DRE', () => {

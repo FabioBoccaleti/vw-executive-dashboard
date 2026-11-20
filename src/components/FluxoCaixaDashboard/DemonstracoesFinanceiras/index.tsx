@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TIPOS, MESES, calcularConta, calcularLinhas, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcNaoMapeadas,
+  TIPOS, MESES, calcularConta, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcNaoMapeadas,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
@@ -13,6 +13,9 @@ import { loadCadastroDemonstracoes, loadDadosDemonstracoes, saveCadastroDemonstr
 
 const moeda = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const moedaComCentavos = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatarMoedaComCentavos = (valor: number | null) => valor === null
+  ? '—'
+  : valor < 0 ? `(${moedaComCentavos.format(Math.abs(valor))})` : moedaComCentavos.format(valor);
 const titulosDemonstracoes: Record<TipoDemonstracao, string> = {
   dre: 'Demonstração do Resultado do Exercício',
   ativo: 'Balanço Patrimonial — Ativo',
@@ -64,6 +67,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [periodoDfc, setPeriodoDfc] = useState<'mes' | 'acumulado'>('mes');
   const [naoClassificadasAberto, setNaoClassificadasAberto] = useState(false);
   const [dfcNaoMapeadasAberto, setDfcNaoMapeadasAberto] = useState(false);
+  const [contasCaixaEditor, setContasCaixaEditor] = useState<string[] | null>(null);
+  const [buscaCaixa, setBuscaCaixa] = useState('');
+  const [erroCaixaEditor, setErroCaixaEditor] = useState('');
   const [editor, setEditor] = useState<LinhaDemonstracao | null>(null);
   const [editorCaptacao, setEditorCaptacao] = useState<EditorCaptacao | null>(null);
   const [erroCaptacao, setErroCaptacao] = useState('');
@@ -289,6 +295,30 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     atualizarLinhas(linhas);
   }
 
+  function editarContasCaixaEquivalentes() {
+    setContasCaixaEditor([...(cadastro?.dfcContasCaixaEquivalentes ?? [])]);
+    setBuscaCaixa('');
+    setErroCaixaEditor('');
+  }
+
+  function salvarContasCaixaEquivalentes() {
+    if (!cadastro || !contasCaixaEditor || salvando) return;
+    const prefixos = [...new Set(contasCaixaEditor)];
+    if (!prefixos.length) {
+      setErroCaixaEditor('Selecione ao menos uma conta ou prefixo de caixa/equivalentes.');
+      return;
+    }
+    void salvar({ ...cadastro, dfcContasCaixaEquivalentes: prefixos }, setErroCaixaEditor)
+      .then(salvou => { if (salvou) setContasCaixaEditor(null); });
+  }
+
+  function selecionarContaCaixa(conta: string, marcada: boolean) {
+    setContasCaixaEditor(atuais => {
+      if (!atuais) return atuais;
+      return marcada ? [...atuais, conta] : atuais.filter(item => item !== conta);
+    });
+  }
+
   function adicionarAnoComparacao() {
     const ano = Number(anoAdicionar);
     if (!Number.isInteger(ano) || ano < 1900 || ano > 9999) {
@@ -354,6 +384,10 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
 
   const principal = { ano: selectedYear, mes: selectedMonth };
   const linhas = cadastro?.linhas.filter(item => item.demonstracao === aba) ?? [];
+  const linhasRaizDfc = aba === 'dfc' ? linhas.filter(linha => !linhaPai(linha) && !linha.foraDfc) : [];
+  const referenciasTotalizadasDfc = new Set(linhasRaizDfc.filter(linha => linha.tipo === 'total')
+    .flatMap(linha => linha.itens.map(item => item.referencia)));
+  const linhasAtividadesDfc = linhasRaizDfc.filter(linha => !referenciasTotalizadasDfc.has(linha.id));
   const linhasTabela = linhas.filter(linha => !linhaPai(linha) && !(aba === 'dfc' && linha.foraDfc))
     .flatMap(linha => [linha, ...linhas.filter(filha => linhaPai(filha) === linha.id)]);
   const linhasForaTabela = aba === 'dfc'
@@ -396,11 +430,26 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     ? new Map(linhas.filter(linha => linha.tipo === 'contas')
       .map(linha => [linha.id, listarContasDfcDaLinha(cadastro?.linhas ?? [], linha.id, periodosDetalhamento)]))
     : new Map<string, ItemDemonstracao[]>();
+  const conciliacoesCaixa = aba === 'dfc' && cadastro && dados
+    ? detalhesColunas.map(detalhe => calcularSaldosCaixaEquivalentes(cadastro.dfcContasCaixaEquivalentes ?? [], detalhe.periodos))
+    : [];
+  const variacoesDfc = aba === 'dfc' ? valores.map(resultado => {
+    const atividades = linhasAtividadesDfc.map(linha => resultado.get(linha.id) ?? null);
+    return !atividades.length || atividades.some(valor => valor === null)
+      ? null
+      : Math.round(atividades.reduce<number>((total, valor) => total + Math.round((valor ?? 0) * 100), 0)) / 100;
+  }) : [];
   const contasIncompletasVinculadas = linhas.filter(linha => aba !== 'dfc' && linha.tipo === 'contas')
     .flatMap(linha => linha.itens).filter(item => contasIncompletas.has(item.referencia));
   const linhasDisponiveisEditor = editor && cadastro
     ? cadastro.linhas.filter(item => item.id !== editor.id && item.demonstracao === editor.demonstracao && !linhaPai(item))
     : [];
+  const linhasConciliacaoCaixa = [
+    { nome: 'Variação de caixa pela DFC', valores: variacoesDfc },
+    { nome: 'Saldo de caixa — início', valores: conciliacoesCaixa.map(item => item.saldoInicial) },
+    { nome: 'Saldo de caixa — fim', valores: conciliacoesCaixa.map(item => item.saldoFinal) },
+    { nome: 'Variação real de caixa (balancete)', valores: conciliacoesCaixa.map(item => item.variacaoReal) },
+  ];
 
   function grupoDaConta(referencia: string) {
     if (!editor || !alvoEditor || !cadastro || alvoEditor.tipo !== 'contas') return undefined;
@@ -623,6 +672,31 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </table>
                   </div>
                 )}
+                {aba === 'dfc' && cadastro && dados && <section aria-label="Caixa e equivalentes" className="space-y-3 rounded border p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold">Caixa e equivalentes</h3>
+                      <p className="text-sm text-muted-foreground">A variação real compara o saldo anterior do primeiro mês exibido com o saldo atual do último. O prefixo 1.1.1 vem pré-selecionado; você pode alterar e salvar as contas consideradas neste quadro.</p>
+                    </div>
+                    <Button variant="outline" onClick={editarContasCaixaEquivalentes}>Editar contas de caixa/equivalentes</Button>
+                  </div>
+                  {conciliacoesCaixa.every(item => item.saldoInicial === null) && <p role="status" className="text-sm text-amber-800">
+                    Confira se há contas de caixa/equivalentes selecionadas e balancetes disponíveis para o período.
+                  </p>}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
+                      <tbody>{linhasConciliacaoCaixa.map((linha, linhaIndex) => (
+                        <tr key={linha.nome} className={linhaIndex === 0 || linhaIndex === linhasConciliacaoCaixa.length - 1 ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
+                          <th scope="row" className="p-3 text-left">{linha.nome}</th>
+                          {colunas.map((_, index) => <td key={index} className="whitespace-nowrap p-3 text-right tabular-nums">
+                            {formatarMoedaComCentavos(linha.valores[index] ?? null)}
+                          </td>)}
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </section>}
                 {contasNaoClassificadas.length > 0 && <section aria-label="Contas com movimento não classificadas" className="rounded border border-amber-300">
                   <button type="button" aria-expanded={naoClassificadasAberto} onClick={() => setNaoClassificadasAberto(value => !value)}
                     className="flex w-full items-center gap-2 bg-amber-50 p-3 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
@@ -834,6 +908,45 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
               {erroEditor && <p role="alert" className="text-sm text-red-700">{erroEditor}</p>}
               <DialogFooter><Button variant="outline" onClick={() => setEditor(null)}>Cancelar</Button><Button onClick={confirmarLinha}>Aplicar linha</Button></DialogFooter>
             </>}
+          </DialogContent>
+        </Dialog>
+        <Dialog open={contasCaixaEditor !== null} onOpenChange={open => { if (!open && !salvando) setContasCaixaEditor(null); }}>
+          <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto sm:max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Contas de caixa e equivalentes</DialogTitle>
+              <DialogDescription>Selecione contas analíticas ou prefixos. Um prefixo inclui as contas abaixo dele; para restringir a seleção, remova o prefixo abrangente e marque apenas as contas desejadas. As alterações só passam a valer após salvar.</DialogDescription>
+            </DialogHeader>
+            {contasCaixaEditor && <>
+              <Input aria-label="Pesquisar contas de caixa/equivalentes" placeholder="Pesquisar por código ou descrição" value={buscaCaixa} onChange={event => setBuscaCaixa(event.target.value)} />
+              <div className="max-h-64 space-y-1 overflow-y-auto rounded border p-2">
+                {catalogo.filter(conta => `${conta.codigo} ${conta.descricao}`.toLocaleLowerCase().includes(buscaCaixa.toLocaleLowerCase())).map(conta => {
+                  const prefixoAplicado = contasCaixaEditor
+                    .filter(prefixo => conta.codigo === prefixo || conta.codigo.startsWith(`${prefixo}.`))
+                    .sort((a, b) => b.length - a.length)[0];
+                  const selecionada = contasCaixaEditor.includes(conta.codigo);
+                  const incluidaPorPrefixo = Boolean(prefixoAplicado && prefixoAplicado !== conta.codigo);
+                  return <label key={conta.codigo} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-3 py-2 text-sm hover:bg-muted">
+                    <input type="checkbox" className="size-5 shrink-0" disabled={incluidaPorPrefixo} checked={selecionada}
+                      onChange={event => selecionarContaCaixa(conta.codigo, event.target.checked)} />
+                    <span>{conta.codigo} — {conta.descricao}{incluidaPorPrefixo ? ` (incluída pelo prefixo ${prefixoAplicado})` : ''}</span>
+                  </label>;
+                })}
+                {catalogo.length === 0 && <p className="p-2 text-sm text-muted-foreground">Importe um balancete para selecionar contas analíticas.</p>}
+              </div>
+              <section className="space-y-2 rounded border p-3">
+                <h3 className="text-sm font-semibold">Contas e prefixos selecionados ({contasCaixaEditor.length})</h3>
+                {contasCaixaEditor.map(conta => <div key={conta} className="flex items-center justify-between gap-2 text-sm">
+                  <span>{conta}{descricoes.has(conta) ? ` — ${descricoes.get(conta)}` : ' — prefixo'}</span>
+                  <Button variant="outline" size="sm" aria-label={`Remover regra ${conta}`}
+                    onClick={() => selecionarContaCaixa(conta, false)}>Remover</Button>
+                </div>)}
+              </section>
+            </>}
+            {erroCaixaEditor && <p role="alert" className="text-sm text-red-700">{erroCaixaEditor}</p>}
+            <DialogFooter>
+              <Button variant="outline" disabled={salvando} onClick={() => setContasCaixaEditor(null)}>Cancelar</Button>
+              <Button disabled={salvando || contasCaixaEditor === null} onClick={salvarContasCaixaEquivalentes}>Salvar contas</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </CardContent>
