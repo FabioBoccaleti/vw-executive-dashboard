@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { kvCompareAndSet, kvGet } from '@/lib/kvClient';
 import { extractAccounts } from '../balanceteParser';
 import { loadFluxoCaixaRaw } from '../fluxoCaixaStorage';
@@ -7,6 +8,56 @@ import {
 } from './modelo';
 
 const KEY = 'fluxo_caixa_demonstracoes_cadastro';
+const NOTAS_DFC_KEY = 'fluxo_caixa_dfc_notas';
+
+const escopoNotaDfcSchema = z.object({
+  ano: z.number().int().min(1900).max(9999),
+  mes: z.number().int().min(0).max(12),
+  periodo: z.enum(['mes', 'acumulado', 'anual']),
+  metodo: z.enum(['direto', 'indireto']),
+});
+const notaDfcSchema = z.object({
+  id: z.string().min(1),
+  linhaId: z.string().min(1).optional(),
+  linhaNome: z.string().trim().min(1).optional(),
+  texto: z.string().trim().min(1).max(5000),
+});
+const documentoNotasDfcSchema = z.object({
+  version: z.string().min(1),
+  notas: z.array(notaDfcSchema).max(50),
+});
+
+export type EscopoNotaDfc = z.infer<typeof escopoNotaDfcSchema>;
+export type NotaDfc = z.infer<typeof notaDfcSchema>;
+export type DocumentoNotasDfc = { version: string | null; notas: NotaDfc[] };
+
+function chaveNotasDfc(escopo: EscopoNotaDfc) {
+  const valido = escopoNotaDfcSchema.safeParse(escopo);
+  if (!valido.success) throw new Error('O período ou método das notas da DFC é inválido.');
+  const { ano, mes, periodo, metodo } = valido.data;
+  return `${NOTAS_DFC_KEY}_${ano}_${mes}_${periodo}_${metodo}`;
+}
+
+export async function loadNotasDfc(escopo: EscopoNotaDfc): Promise<DocumentoNotasDfc> {
+  const data = await kvGet<unknown>(chaveNotasDfc(escopo), { throwOnError: true });
+  if (data === null) return { version: null, notas: [] };
+  const parsed = documentoNotasDfcSchema.safeParse(data);
+  if (!parsed.success) throw new Error('As notas explicativas salvas da DFC estão inválidas.');
+  return parsed.data;
+}
+
+export async function saveNotasDfc(
+  escopo: EscopoNotaDfc,
+  documento: DocumentoNotasDfc,
+): Promise<DocumentoNotasDfc> {
+  const atualizadas = documentoNotasDfcSchema.safeParse({
+    version: crypto.randomUUID(),
+    notas: documento.notas,
+  });
+  if (!atualizadas.success) throw new Error('Revise o texto das notas e tente salvar novamente.');
+  await kvCompareAndSet(chaveNotasDfc(escopo), atualizadas.data, documento.version);
+  return atualizadas.data;
+}
 
 export async function loadCadastroDemonstracoes(): Promise<CadastroDemonstracoes> {
   const data = await kvGet<unknown>(KEY, { throwOnError: true });

@@ -4,13 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import {
-  TIPOS, MESES, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcPendentes,
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  TIPOS, MESES, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarCadastro, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcPendentes,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type ContaDfcPendente, type LinhaDemonstracao, type PeriodoDemonstracao, type RegraDfcIndireto, type TipoDemonstracao,
 } from './modelo';
-import { DFC_INDIRETO_AJUSTES, DFC_INDIRETO_CATEGORIAS_MAPEAVEIS, DFC_INDIRETO_VARIACOES } from './dfcMetodoIndireto';
-import { loadCadastroDemonstracoes, loadDadosDemonstracoes, saveCadastroDemonstracoes } from './storage';
+import { DFC_INDIRETO_CATEGORIAS_MAPEAVEIS } from './dfcMetodoIndireto';
+import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
+import {
+  loadCadastroDemonstracoes, loadDadosDemonstracoes, loadNotasDfc, saveCadastroDemonstracoes, saveNotasDfc,
+  type DocumentoNotasDfc, type EscopoNotaDfc, type NotaDfc,
+} from './storage';
 
 const moeda = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const moedaComCentavos = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -49,11 +58,7 @@ type EditorCaptacao = {
   periodo: PeriodoDemonstracao;
   campos: Record<(typeof camposCaptacao)[number]['campo'], string>;
 };
-type LinhaDfcIndiretoTabela = {
-  id: string;
-  nome: string;
-  tipo: 'titulo' | 'grupo' | 'conta' | 'subtotal' | 'total';
-};
+type EditorNotaDfc = { id?: string; linhaId: string; linhaNome?: string; texto: string };
 
 export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { selectedYear: number; selectedMonth: number }) {
   const [aba, setAba] = useState<TipoDemonstracao | 'cadastros'>('dre');
@@ -62,6 +67,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [tentativaCadastro, setTentativaCadastro] = useState(0);
   const [alterado, setAlterado] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
   const [aviso, setAviso] = useState('');
   const [erroAcao, setErroAcao] = useState('');
   const [dados, setDados] = useState<DadosDemonstracoes | null>(null);
@@ -72,6 +78,13 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
   const [periodoDfc, setPeriodoDfc] = useState<'mes' | 'acumulado'>('mes');
   const [metodoDfc, setMetodoDfc] = useState<'direto' | 'indireto'>('direto');
+  const [documentoNotasDfc, setDocumentoNotasDfc] = useState<DocumentoNotasDfc | null>(null);
+  const [carregandoNotasDfc, setCarregandoNotasDfc] = useState(false);
+  const [salvandoNotasDfc, setSalvandoNotasDfc] = useState(false);
+  const [erroNotasDfc, setErroNotasDfc] = useState('');
+  const [tentativaNotasDfc, setTentativaNotasDfc] = useState(0);
+  const [editorNotaDfc, setEditorNotaDfc] = useState<EditorNotaDfc | null>(null);
+  const [notaExcluirId, setNotaExcluirId] = useState<string | null>(null);
   const [modoCadastroDfc, setModoCadastroDfc] = useState<'direto' | 'indireto'>('direto');
   const [editorDfcIndireto, setEditorDfcIndireto] = useState<{ linha: string; referencias: string[] } | null>(null);
   const [buscaDfcIndireto, setBuscaDfcIndireto] = useState('');
@@ -105,6 +118,12 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const acumuladoDre = aba === 'dre' && selectedMonth > 0 && periodoDre === 'acumulado';
   const acumuladoDfc = aba === 'dfc' && selectedMonth > 0 && periodoDfc === 'acumulado';
   const acumuladoDados = acumuladoDre || acumuladoDfc;
+  const escopoNotaDfc = useMemo(() => ({
+    ano: selectedYear,
+    mes: selectedMonth,
+    periodo: selectedMonth === 0 ? 'anual' as const : periodoDfc,
+    metodo: metodoDfc,
+  }), [selectedYear, selectedMonth, periodoDfc, metodoDfc]);
 
   useEffect(() => {
     let ativo = true;
@@ -125,6 +144,22 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     }).catch(error => { if (ativo) setErroDados(mensagem(error)); });
     return () => { ativo = false; };
   }, [selectedYear, selectedMonth, periodosParaCarregar, tentativaDados, escopoDados, acumuladoDados]);
+
+  useEffect(() => {
+    if (aba !== 'dfc') return;
+    let ativo = true;
+    setDocumentoNotasDfc(null);
+    setCarregandoNotasDfc(true);
+    setErroNotasDfc('');
+    loadNotasDfc(escopoNotaDfc).then(value => {
+      if (ativo) setDocumentoNotasDfc(value);
+    }).catch(error => {
+      if (ativo) setErroNotasDfc(mensagem(error));
+    }).finally(() => {
+      if (ativo) setCarregandoNotasDfc(false);
+    });
+    return () => { ativo = false; };
+  }, [aba, escopoNotaDfc, tentativaNotasDfc]);
 
   const catalogo = useMemo(() => {
     const contas = new Map<string, string>();
@@ -182,6 +217,64 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
       return false;
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function exportarExcel() {
+    if (!cadastro || exportandoExcel) return;
+    const erro = validarCadastro(cadastro);
+    if (erro) { setErroAcao(erro); return; }
+    const anos = periodosComparados.map(periodo => periodo.ano);
+    const mesLimite = selectedMonth === 0 ? 12 : selectedMonth;
+    if (!Number.isInteger(mesLimite) || mesLimite < 1 || mesLimite > 12) {
+      setErroAcao('Selecione um mês válido antes de exportar as demonstrações.');
+      return;
+    }
+
+    setExportandoExcel(true);
+    setErroAcao('');
+    setAviso('');
+    try {
+      const periodos = anos.map(ano => ({ ano, mes: mesLimite }));
+      const dadosExportacao = await loadDadosDemonstracoes(
+        periodos[0] ?? { ano: selectedYear, mes: mesLimite },
+        periodos,
+        'dfc',
+        true,
+      );
+      const escopos: EscopoNotaDfc[] = [];
+      for (const ano of anos) {
+        for (const metodo of ['direto', 'indireto'] as const) {
+          for (let mes = 1; mes <= mesLimite; mes++) escopos.push({ ano, mes, periodo: 'mes', metodo });
+          escopos.push({ ano, mes: mesLimite, periodo: 'acumulado', metodo });
+          if (selectedMonth === 0) escopos.push({ ano, mes: 0, periodo: 'anual', metodo });
+        }
+      }
+      const notas: Array<{ escopo: EscopoNotaDfc; notas: NotaDfc[] }> = [];
+      for (let indice = 0; indice < escopos.length; indice += 12) {
+        const lote = escopos.slice(indice, indice + 12);
+        notas.push(...await Promise.all(lote.map(async escopo => ({
+          escopo,
+          notas: (await loadNotasDfc(escopo)).notas,
+        }))));
+      }
+
+      const { exportarDemonstracoesFinanceirasExcel } = await import('./exportacaoExcel');
+      const periodoArquivo = selectedMonth === 0 ? 'Jan-Dez' : `Jan-${MESES[mesLimite]}`;
+      const nomeArquivo = `Demonstracoes_Financeiras_${selectedYear}_${periodoArquivo}.xlsx`;
+      await exportarDemonstracoesFinanceirasExcel({
+        cadastro,
+        dados: dadosExportacao,
+        anos,
+        mesLimite,
+        incluirNotasAnuais: selectedMonth === 0,
+        notas,
+      }, nomeArquivo);
+      setAviso('Arquivo Excel gerado com sucesso.');
+    } catch (error) {
+      setErroAcao(`Não foi possível exportar as demonstrações: ${mensagem(error)}`);
+    } finally {
+      setExportandoExcel(false);
     }
   }
 
@@ -547,28 +640,79 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     { nome: 'Saldo de caixa — fim', valores: conciliacoesCaixa.map(item => item.saldoFinal) },
     { nome: 'Variação real de caixa (balancete)', valores: conciliacoesCaixa.map(item => item.variacaoReal) },
   ];
-  const linhasDfcIndiretoTabela: LinhaDfcIndiretoTabela[] = [
-    { id: 'titulo-operacional', nome: 'ATIVIDADES OPERACIONAIS', tipo: 'titulo' },
-    { id: 'RES', nome: 'Resultado líquido do período (lucro + / prejuízo –)', tipo: 'conta' },
-    { id: 'grupo-ajustes', nome: 'Ajustes ao resultado', tipo: 'grupo' },
-    ...DFC_INDIRETO_AJUSTES.map(({ codigo, nome }) => ({ id: codigo, nome, tipo: 'conta' as const })),
-    { id: 'resultado-ajustado', nome: 'Resultado ajustado', tipo: 'subtotal' },
-    { id: 'grupo-variacoes', nome: 'Variações de ativos e passivos operacionais', tipo: 'grupo' },
-    ...DFC_INDIRETO_VARIACOES.map(({ codigo, nome }) => ({ id: codigo, nome, tipo: 'conta' as const })),
-    { id: 'variacoes-capital-giro', nome: 'Variações do capital de giro', tipo: 'subtotal' },
-    { id: 'dfc-operacional', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS', tipo: 'total' },
-    { id: 'titulo-investimento', nome: 'ATIVIDADES DE INVESTIMENTO', tipo: 'titulo' },
-    ...linhas.filter(linha => linhaPai(linha) === 'dfc-investimento').map(linha => ({
-      id: linha.id, nome: linha.nome, tipo: 'conta' as const,
-    })),
-    { id: 'dfc-investimento', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO', tipo: 'total' },
-    { id: 'titulo-financiamento', nome: 'ATIVIDADES DE FINANCIAMENTO', tipo: 'titulo' },
-    ...linhas.filter(linha => linhaPai(linha) === 'dfc-financiamento').map(linha => ({
-      id: linha.id, nome: linha.nome, tipo: 'conta' as const,
-    })),
-    { id: 'dfc-financiamento', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO', tipo: 'total' },
-    { id: 'dfc-total', nome: 'VARIAÇÃO DE CAIXA PELA DFC', tipo: 'total' },
-  ];
+  const linhasDfcIndiretoTabela = criarLinhasDfcIndiretoTabela(linhas);
+  const linhasDisponiveisNotaDfc = metodoDfc === 'indireto'
+    ? linhasDfcIndiretoTabela.filter(linha => linha.tipo !== 'titulo' && linha.tipo !== 'grupo')
+      .map(({ id, nome }) => ({ id, nome }))
+    : [...new Map(linhasTabela.filter(({ subtotal }) => !subtotal)
+      .map(({ linha }) => [linha.id, { id: linha.id, nome: linha.nome }])).values()];
+  const tituloPeriodoNotaDfc = selectedMonth === 0
+    ? `Ano/${selectedYear}`
+    : periodoDfc === 'acumulado'
+      ? `Acumulado (Jan–${MESES[selectedMonth]}/${String(selectedYear).slice(-2)})`
+      : rotuloPeriodo(principal);
+
+  function abrirEditorNotaDfc(nota?: NotaDfc) {
+    setErroNotasDfc('');
+    setEditorNotaDfc(nota
+      ? { id: nota.id, linhaId: nota.linhaId ?? '', linhaNome: nota.linhaNome, texto: nota.texto }
+      : { linhaId: '', texto: '' });
+  }
+
+  async function salvarNotaDfc() {
+    if (!editorNotaDfc) return;
+    const texto = editorNotaDfc.texto.trim();
+    if (!texto) { setErroNotasDfc('Escreva o conteúdo da nota antes de salvar.'); return; }
+    if (texto.length > 5000) { setErroNotasDfc('A nota deve ter no máximo 5.000 caracteres.'); return; }
+    if (!documentoNotasDfc) { setErroNotasDfc('As notas ainda não foram carregadas. Tente novamente.'); return; }
+    const linha = linhasDisponiveisNotaDfc.find(item => item.id === editorNotaDfc.linhaId);
+    if (editorNotaDfc.linhaId && !linha && !editorNotaDfc.linhaNome) {
+      setErroNotasDfc('A linha selecionada não está disponível nesta DFC.');
+      return;
+    }
+    const nota: NotaDfc = {
+      id: editorNotaDfc.id ?? crypto.randomUUID(),
+      linhaId: editorNotaDfc.linhaId || undefined,
+      linhaNome: linha?.nome ?? (editorNotaDfc.linhaId ? editorNotaDfc.linhaNome : undefined),
+      texto,
+    };
+    const indiceExistente = documentoNotasDfc.notas.findIndex(item => item.id === nota.id);
+    const notas = [...documentoNotasDfc.notas];
+    if (indiceExistente < 0) notas.push(nota);
+    else notas[indiceExistente] = nota;
+    setSalvandoNotasDfc(true);
+    setErroNotasDfc('');
+    try {
+      const salva = await saveNotasDfc(escopoNotaDfc, { ...documentoNotasDfc, notas });
+      setDocumentoNotasDfc(salva);
+      setEditorNotaDfc(null);
+    } catch (error) {
+      setErroNotasDfc(mensagem(error));
+    } finally {
+      setSalvandoNotasDfc(false);
+    }
+  }
+
+  async function excluirNotaDfc() {
+    if (!notaExcluirId || !documentoNotasDfc) {
+      setErroNotasDfc('Não foi possível localizar a nota para exclusão.');
+      return;
+    }
+    setSalvandoNotasDfc(true);
+    setErroNotasDfc('');
+    try {
+      const salva = await saveNotasDfc(escopoNotaDfc, {
+        ...documentoNotasDfc,
+        notas: documentoNotasDfc.notas.filter(nota => nota.id !== notaExcluirId),
+      });
+      setDocumentoNotasDfc(salva);
+      setNotaExcluirId(null);
+    } catch (error) {
+      setErroNotasDfc(mensagem(error));
+    } finally {
+      setSalvandoNotasDfc(false);
+    }
+  }
 
   function grupoDaConta(referencia: string) {
     if (!editor || !alvoEditor || !cadastro || alvoEditor.tipo !== 'contas') return undefined;
@@ -587,12 +731,17 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
         <p className="text-sm text-muted-foreground">Demonstrações gerenciais a partir dos balancetes importados. Impressão e PDF serão disponibilizados posteriormente.</p>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div role="tablist" aria-label="Demonstrações financeiras" className="flex flex-wrap gap-2 border-b pb-3">
-          {([...Object.keys(TIPOS), 'cadastros'] as Array<TipoDemonstracao | 'cadastros'>).map(tipo => (
-            <Button key={tipo} role="tab" aria-selected={aba === tipo} variant={aba === tipo ? 'default' : 'outline'} onClick={() => setAba(tipo)}>
-              {tipo === 'cadastros' ? 'Cadastros' : TIPOS[tipo]}
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+          <div role="tablist" aria-label="Demonstrações financeiras" className="flex flex-wrap gap-2">
+            {([...Object.keys(TIPOS), 'cadastros'] as Array<TipoDemonstracao | 'cadastros'>).map(tipo => (
+              <Button key={tipo} role="tab" aria-selected={aba === tipo} variant={aba === tipo ? 'default' : 'outline'} onClick={() => setAba(tipo)}>
+                {tipo === 'cadastros' ? 'Cadastros' : TIPOS[tipo]}
+              </Button>
+            ))}
+          </div>
+          <Button variant="outline" disabled={!cadastro || exportandoExcel} onClick={() => { void exportarExcel(); }}>
+            {exportandoExcel ? 'Gerando Excel...' : 'Exportar Excel'}
+          </Button>
         </div>
         {alterado && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Alterações não salvas. As demonstrações exibem o cadastro em edição; salve antes de sair desta página.</p>}
         {aviso && <p role="status" className="text-sm text-green-700">{aviso}</p>}
@@ -946,6 +1095,46 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </table>
                   </div>
                 </section>}
+                {aba === 'dfc' && <section aria-label="Notas explicativas da DFC" className="space-y-3 rounded border p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold">Notas explicativas</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {metodoDfc === 'direto' ? 'Método Direto' : 'Método Indireto'} · {tituloPeriodoNotaDfc}.
+                        {' '}As notas não alteram os valores da demonstração.
+                      </p>
+                    </div>
+                    <Button variant="outline" disabled={carregandoNotasDfc || !documentoNotasDfc || salvandoNotasDfc || documentoNotasDfc.notas.length >= 50}
+                      onClick={() => abrirEditorNotaDfc()}>
+                      Adicionar nota
+                    </Button>
+                  </div>
+                  {documentoNotasDfc?.notas.length === 50 && <p className="text-xs text-muted-foreground">Limite de 50 notas atingido para este método e período.</p>}
+                  {carregandoNotasDfc && <p role="status" className="text-sm text-muted-foreground">Carregando notas...</p>}
+                  {erroNotasDfc && <div className="flex flex-wrap items-center gap-3">
+                    <p role="alert" className="text-sm text-red-700">{erroNotasDfc}</p>
+                    {!documentoNotasDfc && <Button variant="outline" size="sm" onClick={() => setTentativaNotasDfc(value => value + 1)}>Tentar novamente</Button>}
+                  </div>}
+                  {documentoNotasDfc && documentoNotasDfc.notas.length === 0 && !carregandoNotasDfc && <p className="text-sm text-muted-foreground">Nenhuma nota explicativa cadastrada para este método e período.</p>}
+                  {documentoNotasDfc && documentoNotasDfc.notas.length > 0 && <ol className="space-y-2">
+                    {documentoNotasDfc.notas.map((nota, index) => {
+                      const linha = linhasDisponiveisNotaDfc.find(item => item.id === nota.linhaId);
+                      const referencia = linha?.nome ?? nota.linhaNome ?? 'Linha da DFC não disponível';
+                      return <li key={nota.id} className="flex flex-wrap items-start justify-between gap-3 rounded border bg-muted/20 p-3">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="text-sm font-medium">{index + 1}. {nota.linhaId ? referencia : 'Nota geral'}</p>
+                          <p className="whitespace-pre-wrap break-words text-sm">{nota.texto}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" disabled={salvandoNotasDfc}
+                            aria-label={`Editar nota ${index + 1}`} onClick={() => abrirEditorNotaDfc(nota)}>Editar</Button>
+                          <Button variant="outline" size="sm" disabled={salvandoNotasDfc}
+                            aria-label={`Excluir nota ${index + 1}`} onClick={() => { setErroNotasDfc(''); setNotaExcluirId(nota.id); }}>Excluir</Button>
+                        </div>
+                      </li>;
+                    })}
+                  </ol>}
+                </section>}
                 {contasNaoClassificadas.length > 0 && <section aria-label="Contas com movimento não classificadas" className="rounded border border-amber-300">
                   <button type="button" aria-expanded={naoClassificadasAberto} onClick={() => setNaoClassificadasAberto(value => !value)}
                     className="flex w-full items-center gap-2 bg-amber-50 p-3 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
@@ -1066,6 +1255,62 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
             )}
           </>
         )}
+        <Dialog open={editorNotaDfc !== null} onOpenChange={open => {
+          if (!open && !salvandoNotasDfc) { setEditorNotaDfc(null); setErroNotasDfc(''); }
+        }}>
+          {editorNotaDfc && <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editorNotaDfc.id ? 'Editar nota explicativa' : 'Adicionar nota explicativa'}</DialogTitle>
+              <DialogDescription>A nota será salva para {metodoDfc === 'direto' ? 'o método Direto' : 'o método Indireto'} e {tituloPeriodoNotaDfc}. Ela não altera os valores da DFC.</DialogDescription>
+            </DialogHeader>
+            <fieldset disabled={salvandoNotasDfc} className="space-y-4">
+              <label className="space-y-1 text-sm">
+                <span className="block">Linha da DFC (opcional)</span>
+                <select className={`${selectClass} w-full`} value={editorNotaDfc.linhaId}
+                  onChange={event => {
+                    const linhaId = event.target.value;
+                    const linhaNome = linhasDisponiveisNotaDfc.find(item => item.id === linhaId)?.nome;
+                    setEditorNotaDfc({ ...editorNotaDfc, linhaId, linhaNome });
+                  }}>
+                  <option value="">Nota geral — sem linha específica</option>
+                  {editorNotaDfc.linhaId && !linhasDisponiveisNotaDfc.some(item => item.id === editorNotaDfc.linhaId)
+                    && <option value={editorNotaDfc.linhaId}>{editorNotaDfc.linhaNome ?? 'Linha não disponível'}</option>}
+                  {linhasDisponiveisNotaDfc.map(linha => <option key={linha.id} value={linha.id}>{linha.nome}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="block">Texto da nota</span>
+                <Textarea aria-label="Texto da nota explicativa" maxLength={5000} rows={6} value={editorNotaDfc.texto}
+                  onChange={event => setEditorNotaDfc({ ...editorNotaDfc, texto: event.target.value })}
+                  placeholder="Descreva o evento, a variação ou o contexto que deseja explicar." />
+                <span className="block text-right text-xs text-muted-foreground">{editorNotaDfc.texto.length}/5.000 caracteres</span>
+              </label>
+            </fieldset>
+            {erroNotasDfc && <p role="alert" className="text-sm text-red-700">{erroNotasDfc}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={salvandoNotasDfc} onClick={() => { setEditorNotaDfc(null); setErroNotasDfc(''); }}>Cancelar</Button>
+              <Button disabled={salvandoNotasDfc} onClick={() => { void salvarNotaDfc(); }}>{salvandoNotasDfc ? 'Salvando...' : 'Salvar nota'}</Button>
+            </DialogFooter>
+          </DialogContent>}
+        </Dialog>
+        <AlertDialog open={notaExcluirId !== null} onOpenChange={open => {
+          if (!open && !salvandoNotasDfc) setNotaExcluirId(null);
+        }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir nota explicativa?</AlertDialogTitle>
+              <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+            </AlertDialogHeader>
+            {erroNotasDfc && <p role="alert" className="text-sm text-red-700">{erroNotasDfc}</p>}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={salvandoNotasDfc}>Cancelar</AlertDialogCancel>
+              <Button type="button" disabled={salvandoNotasDfc} className="bg-red-600 hover:bg-red-700"
+                onClick={() => { void excluirNotaDfc(); }}>
+                {salvandoNotasDfc ? 'Excluindo...' : 'Excluir nota'}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <Dialog open={editorCaptacao !== null} onOpenChange={open => { if (!open && !salvando) setEditorCaptacao(null); }}>
           {editorCaptacao && <DialogContent>
             <DialogHeader>

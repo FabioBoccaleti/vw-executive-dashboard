@@ -2,13 +2,19 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { DemonstracoesFinanceiras } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras';
 import { cadastroVazio, type CadastroDemonstracoes } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
-import { loadCadastroDemonstracoes, loadDadosDemonstracoes } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/storage';
+import {
+  loadCadastroDemonstracoes, loadDadosDemonstracoes, type DocumentoNotasDfc,
+} from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/storage';
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), cas: vi.fn(), raw: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), cas: vi.fn(), raw: vi.fn(), exportExcel: vi.fn() }));
 vi.mock('@/lib/kvClient', () => ({ kvGet: mocks.get, kvCompareAndSet: mocks.cas }));
 vi.mock('@/components/FluxoCaixaDashboard/fluxoCaixaStorage', () => ({ loadFluxoCaixaRaw: mocks.raw }));
+vi.mock('@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/exportacaoExcel', () => ({
+  exportarDemonstracoesFinanceirasExcel: mocks.exportExcel,
+}));
 
 let persistido: CadastroDemonstracoes | null;
+let persistidoNotas: Record<string, DocumentoNotasDfc>;
 const raw = (receita: number, custo: number, caixa: number) => ({
   rawText: `R;3.1;Receita;0,00;0,00;${receita},00;0,00\nD;3.2;Custos;0,00;${custo},00;0,00;0,00\nA;1.1;Caixa;0,00;0,00;0,00;${caixa},00`,
 });
@@ -17,9 +23,14 @@ beforeEach(() => {
   mocks.get.mockReset();
   mocks.cas.mockReset();
   mocks.raw.mockReset();
+  mocks.exportExcel.mockReset().mockResolvedValue(undefined);
   persistido = null;
-  mocks.get.mockImplementation(async () => persistido);
-  mocks.cas.mockImplementation(async (_key, value: CadastroDemonstracoes) => { persistido = value; });
+  persistidoNotas = {};
+  mocks.get.mockImplementation(async (key: string) => key.startsWith('fluxo_caixa_dfc_notas_') ? persistidoNotas[key] ?? null : persistido);
+  mocks.cas.mockImplementation(async (key: string, value: { version: string }) => {
+    if (key.startsWith('fluxo_caixa_dfc_notas_')) persistidoNotas[key] = value as DocumentoNotasDfc;
+    else persistido = value as CadastroDemonstracoes;
+  });
   mocks.raw.mockImplementation(async (ano: number, mes: number) => {
     if (ano === 2026 && mes === 1) return raw(1000, 200, 150);
     if (ano === 2026 && mes === 2) return raw(500, 100, 300);
@@ -45,6 +56,31 @@ async function adicionarGrupo(nome: string, conta: string) {
   fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 }
+
+it('exporta as demonstrações com anos comparativos, período e notas selecionados', async () => {
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
+  persistidoNotas['fluxo_caixa_dfc_notas_2026_1_mes_direto'] = {
+    version: 'nota-v1',
+    notas: [{ id: 'nota-1', linhaId: 'dfc-op01', linhaNome: 'Recebimentos de clientes', texto: 'Recebimento extraordinário.' }],
+  };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await screen.findByRole('button', { name: 'Exportar Excel' });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar Excel' }));
+  await waitFor(() => expect(mocks.exportExcel).toHaveBeenCalledOnce());
+  expect(mocks.exportExcel).toHaveBeenCalledWith(expect.objectContaining({
+    anos: [2026, 2025],
+    mesLimite: 2,
+    incluirNotasAnuais: false,
+    notas: expect.arrayContaining([expect.objectContaining({
+      escopo: { ano: 2026, mes: 1, periodo: 'mes', metodo: 'direto' },
+      notas: [{ id: 'nota-1', linhaId: 'dfc-op01', linhaNome: 'Recebimentos de clientes', texto: 'Recebimento extraordinário.' }],
+    })]),
+  }), 'Demonstracoes_Financeiras_2026_Jan-Fev.xlsx');
+  expect(await screen.findByText('Arquivo Excel gerado com sucesso.')).toBeInTheDocument();
+});
 
 it('expande em Cadastros os grupos e suas sublinhas, sem detalhar totalizações', async () => {
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
@@ -149,6 +185,70 @@ it('permite alternar para o DFC Indireto e confere o subtotal operacional com o 
   await screen.findByRole('button', { name: 'Método Indireto' });
   fireEvent.click(screen.getByRole('button', { name: 'Método Indireto' }));
   expect(await screen.findByRole('button', { name: 'Editar regras V03' })).toBeInTheDocument();
+});
+
+it('salva notas gerais e vinculadas às linhas por método e período, permitindo editar e excluir', async () => {
+  persistido = {
+    ...cadastroVazio(),
+    version: 'v1',
+    dfcModeloInicializado: true,
+    dfcIndiretoModeloInicializado: true,
+    empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+    linhas: [{ id: 'fluxo', nome: 'Fluxo operacional', demonstracao: 'dfc', tipo: 'contas', itens: [{ referencia: '3.1', operacao: 1 }] }],
+  };
+  mocks.raw.mockResolvedValue({ rawText: 'A;3.1;Receita;0;0;100;0' });
+  const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  const notas = await screen.findByRole('region', { name: 'Notas explicativas da DFC' });
+  const adicionar = await within(notas).findByRole('button', { name: 'Adicionar nota' });
+
+  fireEvent.click(adicionar);
+  let dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Texto da nota explicativa'), { target: { value: 'Contexto geral do período.' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Salvar nota' }));
+  expect(await within(notas).findByText('Contexto geral do período.')).toBeInTheDocument();
+  expect(persistidoNotas['fluxo_caixa_dfc_notas_2026_2_mes_direto'].notas[0]).toMatchObject({
+    texto: 'Contexto geral do período.',
+    linhaId: undefined,
+  });
+
+  fireEvent.click(within(notas).getByRole('button', { name: 'Adicionar nota' }));
+  dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Linha da DFC (opcional)'), { target: { value: 'fluxo' } });
+  fireEvent.change(dialogo.getByLabelText('Texto da nota explicativa'), { target: { value: 'Variação excepcional nesta linha.' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Salvar nota' }));
+  expect(await within(notas).findByText('Variação excepcional nesta linha.')).toBeInTheDocument();
+  expect(persistidoNotas['fluxo_caixa_dfc_notas_2026_2_mes_direto'].notas[1]).toMatchObject({
+    linhaId: 'fluxo',
+    linhaNome: 'Fluxo operacional',
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Indireto' }));
+  expect(await within(notas).findByText('Nenhuma nota explicativa cadastrada para este método e período.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Direto' }));
+  expect(await within(notas).findByText('Contexto geral do período.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Acumulado (Jan–Fev/26)' }));
+  expect(await within(notas).findByText('Nenhuma nota explicativa cadastrada para este método e período.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Mês (Fev/26)' }));
+  expect(await within(notas).findByText('Contexto geral do período.')).toBeInTheDocument();
+
+  fireEvent.click(within(notas).getByRole('button', { name: 'Editar nota 1' }));
+  dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Texto da nota explicativa'), { target: { value: 'Contexto geral revisado.' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Salvar nota' }));
+  expect(await within(notas).findByText('Contexto geral revisado.')).toBeInTheDocument();
+
+  fireEvent.click(within(notas).getByRole('button', { name: 'Excluir nota 1' }));
+  const confirmacao = within(await screen.findByRole('alertdialog'));
+  fireEvent.click(confirmacao.getByRole('button', { name: 'Excluir nota' }));
+  await waitFor(() => expect(mocks.cas).toHaveBeenCalledTimes(4));
+  await waitFor(() => expect(within(notas).queryByText('Contexto geral revisado.')).not.toBeInTheDocument());
+  expect(within(notas).getByText('Variação excepcional nesta linha.')).toBeInTheDocument();
+
+  tela.unmount();
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  expect(await screen.findByText('Variação excepcional nesta linha.')).toBeInTheDocument();
 });
 
 it('pré-carrega o mapeamento DFC, mostra contas fora da DFC e destaca contas sem prefixo', async () => {
