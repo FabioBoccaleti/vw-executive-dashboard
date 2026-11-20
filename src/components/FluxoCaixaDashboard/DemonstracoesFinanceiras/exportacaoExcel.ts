@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import {
   DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO, MESES, calcularDfcIndireto, calcularLinhas,
-  calcularSaldosCaixaEquivalentes, chavePeriodo, linhaPai,
+  calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, linhaPai,
   type CadastroDemonstracoes, type DadosDemonstracoes, type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
 import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
@@ -19,6 +19,7 @@ const CORES = {
   vermelho: 'FFB42318',
 };
 const FORMATO_MOEDA = '"R$" #,##0.00;[Red]("R$" #,##0.00);-';
+const FORMATO_PERCENTUAL = '0.0%;[Red]-0.0%;-';
 const BORDA_FINA = { style: 'thin' as const, color: { argb: CORES.borda } };
 
 type ColunaExportacao = {
@@ -27,6 +28,8 @@ type ColunaExportacao = {
   acumulada: boolean;
   periodo: PeriodoDemonstracao[];
 };
+type ColunaPlanilha = { coluna: ColunaExportacao; tipo: 'moeda' | 'percentual'; indice: number };
+type FormatoValor = 'moeda' | 'percentual';
 type EstiloLinha = 'normal' | 'secao' | 'subtotal' | 'total';
 type LinhaExportacao = {
   id: string;
@@ -65,16 +68,25 @@ function periodosDaColuna(dados: DadosDemonstracoes, coluna: ColunaExportacao) {
   return coluna.periodo.map(periodo => dados[chavePeriodo(periodo)] ?? null);
 }
 
+function criarColunasPlanilha(colunas: ColunaExportacao[], incluirPercentuais: boolean): ColunaPlanilha[] {
+  return colunas.flatMap((coluna, indice) => [
+    { coluna, tipo: 'moeda' as const, indice },
+    ...(incluirPercentuais ? [{ coluna, tipo: 'percentual' as const, indice }] : []),
+  ]);
+}
+
 function configurarPlanilha(
   workbook: ExcelJS.Workbook,
   nomeAba: string,
   titulo: string,
   cadastro: CadastroDemonstracoes,
   colunas: ColunaExportacao[],
+  incluirPercentualDre = false,
 ): ExcelJS.Worksheet {
   const ws = workbook.addWorksheet(nomeAba, { properties: { tabColor: { argb: CORES.verde } } });
-  const ultimaColuna = colunas.length + 1;
-  ws.columns = [{ width: 48 }, ...colunas.map(() => ({ width: 15 }))];
+  const colunasPlanilha = criarColunasPlanilha(colunas, incluirPercentualDre);
+  const ultimaColuna = colunasPlanilha.length + 1;
+  ws.columns = [{ width: 48 }, ...colunasPlanilha.map(() => ({ width: 15 }))];
   ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 7, topLeftCell: 'B8', activeCell: 'B8' }];
   ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
   ws.headerFooter.oddFooter = 'Página &P de &N';
@@ -97,7 +109,9 @@ function configurarPlanilha(
   linhaMesclada(2, `CNPJ: ${cadastro.empresa.cnpj || '—'}${cadastro.empresa.nire ? `  |  NIRE: ${cadastro.empresa.nire}` : ''}`,
     CORES.cinzaClaro, { size: 10, color: { argb: CORES.texto } });
   linhaMesclada(3, titulo, CORES.cinzaClaro, { bold: true, size: 13, color: { argb: CORES.texto } });
-  linhaMesclada(4, 'Valores em R$  |  Valores em branco indicam balancete ausente ou cálculo indisponível.',
+  linhaMesclada(4, incluirPercentualDre
+    ? 'Valores em R$  |  % RL Vendas = percentual sobre Receita Líquida de Vendas  |  Células vazias indicam balancete ausente ou cálculo indisponível.'
+    : 'Valores em R$  |  Valores em branco indicam balancete ausente ou cálculo indisponível.',
     CORES.cinzaClaro, { italic: true, size: 9, color: { argb: CORES.texto } });
   ws.getRow(5).height = 8;
 
@@ -111,7 +125,7 @@ function configurarPlanilha(
 
   let colunaInicial = 2;
   for (const ano of [...new Set(colunas.map(coluna => coluna.ano))]) {
-    const grupo = colunas.filter(coluna => coluna.ano === ano);
+    const grupo = colunasPlanilha.filter(coluna => coluna.coluna.ano === ano);
     const colunaFinal = colunaInicial + grupo.length - 1;
     if (colunaFinal > colunaInicial) ws.mergeCells(6, colunaInicial, 6, colunaFinal);
     const celulaAno = ws.getCell(6, colunaInicial);
@@ -124,11 +138,12 @@ function configurarPlanilha(
       celula.border = { top: BORDA_FINA, bottom: BORDA_FINA, left: BORDA_FINA, right: BORDA_FINA };
     }
     for (let index = 0; index < grupo.length; index++) {
-      const coluna = grupo[index];
-      const celula = ws.getCell(7, colunaInicial + index);
-      celula.value = coluna.acumulada
+      const { coluna, tipo } = grupo[index];
+      const rotuloPeriodo = coluna.acumulada
         ? `Acum. Jan–${MESES[coluna.mes]}/${ano}`
         : `${MESES[coluna.mes]}/${ano}`;
+      const celula = ws.getCell(7, colunaInicial + index);
+      celula.value = incluirPercentualDre ? `${rotuloPeriodo}\n${tipo === 'percentual' ? '% RL Vendas' : 'R$'}` : rotuloPeriodo;
       celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CORES.verde } };
       celula.font = { bold: true, color: { argb: CORES.branco }, size: 9 };
       celula.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -137,7 +152,7 @@ function configurarPlanilha(
     colunaInicial = colunaFinal + 1;
   }
   ws.getRow(6).height = 21;
-  ws.getRow(7).height = 32;
+  ws.getRow(7).height = incluirPercentualDre ? 42 : 32;
   return ws;
 }
 
@@ -147,6 +162,7 @@ function adicionarLinhaDados(
   valores: Array<number | null>,
   estilo: EstiloLinha = 'normal',
   recuo = false,
+  formatos: FormatoValor[] = [],
 ) {
   const linha = ws.addRow([nome, ...valores]);
   linha.height = estilo === 'secao' ? 21 : estilo === 'total' ? 22 : 19;
@@ -164,7 +180,7 @@ function adicionarLinhaDados(
     celula.alignment = indice === 1
       ? { vertical: 'middle', horizontal: 'left', indent: recuo ? 1 : 0, wrapText: true }
       : { vertical: 'middle', horizontal: 'right' };
-    if (indice > 1) celula.numFmt = FORMATO_MOEDA;
+    if (indice > 1) celula.numFmt = formatos[indice - 2] === 'percentual' ? FORMATO_PERCENTUAL : FORMATO_MOEDA;
   });
   return linha;
 }
@@ -214,14 +230,31 @@ function adicionarDemonstracao(
   demonstracao: TipoDemonstracao,
   colunas: ColunaExportacao[],
 ) {
+  const incluirPercentualDre = demonstracao === 'dre';
+  const colunasPlanilha = criarColunasPlanilha(colunas, incluirPercentualDre);
+  const linhaBasePercentualDre = incluirPercentualDre
+    ? encontrarLinhaBasePercentualDre(cadastro.linhas)
+    : undefined;
   const resultados = colunas.map(coluna => calcularLinhas(
     cadastro.linhas,
     demonstracao,
     periodosDaColuna(dados, coluna),
   ));
   for (const linha of linhasTabela(cadastro, demonstracao)) {
-    adicionarLinhaDados(ws, linha.nome, colunas.map((_, index) =>
-      linha.ocultarValores ? null : resultados[index].get(linha.id) ?? null), linha.estilo, linha.recuo);
+    const valores = colunasPlanilha.map(({ tipo, indice }) => {
+      const valor = linha.ocultarValores ? null : resultados[indice].get(linha.id) ?? null;
+      if (tipo === 'moeda') return valor;
+      const receitaLiquida = linhaBasePercentualDre
+        ? resultados[indice].get(linhaBasePercentualDre.id) ?? null
+        : null;
+      return valor === null || receitaLiquida === null || receitaLiquida === 0
+        ? null
+        : valor / receitaLiquida;
+    });
+    adicionarLinhaDados(
+      ws, linha.nome, valores, linha.estilo, linha.recuo,
+      colunasPlanilha.map(({ tipo }) => tipo),
+    );
   }
   return resultados;
 }
@@ -434,10 +467,11 @@ export function criarWorkbookDemonstracoesFinanceiras(parametros: ParametrosExpo
   const colunasSaldo = criarColunas(parametros.anos, parametros.mesLimite, false);
 
   const criarAba = (nome: string, titulo: string, tipo: TipoDemonstracao, colunas: ColunaExportacao[]) => {
-    const ws = configurarPlanilha(workbook, nome, titulo, parametros.cadastro, colunas);
+    const incluirPercentualDre = tipo === 'dre';
+    const ws = configurarPlanilha(workbook, nome, titulo, parametros.cadastro, colunas, incluirPercentualDre);
     adicionarDemonstracao(ws, parametros.cadastro, parametros.dados, tipo, colunas);
     if (tipo === 'endividamento') adicionarDetalhesCaptacoes(ws, parametros.cadastro, parametros.anos, parametros.mesLimite, colunas.length + 1);
-    adicionarRodape(ws, colunas.length + 1);
+    adicionarRodape(ws, (incluirPercentualDre ? colunas.length * 2 : colunas.length) + 1);
   };
   criarAba('DRE', 'Demonstração do Resultado do Exercício', 'dre', colunasFluxo);
   criarAba('Ativo', 'Balanço Patrimonial — Ativo', 'ativo', colunasSaldo);

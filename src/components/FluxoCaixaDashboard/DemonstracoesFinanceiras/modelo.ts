@@ -67,6 +67,16 @@ export interface PeriodoDemonstracao { ano: number; mes: number }
 export type DadosDemonstracoes = Record<string, ContasBalancete | null>;
 export const linhaPai = (linha: LinhaDemonstracao) => linha.bancoDe ?? linha.sublinhaDe;
 
+export function encontrarLinhaBasePercentualDre(linhas: LinhaDemonstracao[]): LinhaDemonstracao | undefined {
+  const nomesPrioritarios = ['receita liquida de vendas', 'receita operacional liquida', 'receita liquida'];
+  for (const nome of nomesPrioritarios) {
+    const correspondencias = linhas.filter(linha => linha.demonstracao === 'dre' && !linhaPai(linha)
+      && linha.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR') === nome);
+    if (correspondencias.length > 0) return correspondencias.length === 1 ? correspondencias[0] : undefined;
+  }
+  return undefined;
+}
+
 export const chavePeriodo = ({ ano, mes }: PeriodoDemonstracao) => `${ano}_${mes}`;
 export const rotuloPeriodo = ({ ano, mes }: PeriodoDemonstracao) => `${MESES[mes]}/${String(ano).slice(-2)}`;
 export const mesmaHierarquia = (a: string, b: string) => a === b || a.startsWith(`${b}.`) || b.startsWith(`${a}.`);

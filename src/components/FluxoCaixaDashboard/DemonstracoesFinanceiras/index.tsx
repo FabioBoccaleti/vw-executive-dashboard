@@ -10,7 +10,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  TIPOS, MESES, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarCadastro, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcPendentes,
+  TIPOS, MESES, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarCadastro, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, encontrarLinhaBasePercentualDre, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcPendentes,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type ContaDfcPendente, type LinhaDemonstracao, type PeriodoDemonstracao, type RegraDfcIndireto, type TipoDemonstracao,
 } from './modelo';
@@ -23,6 +23,7 @@ import {
 
 const moeda = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const moedaComCentavos = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const percentual = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const formatarMoedaComCentavos = (valor: number | null) => valor === null
   ? '—'
   : valor < 0 ? `(${moedaComCentavos.format(Math.abs(valor))})` : moedaComCentavos.format(valor);
@@ -76,6 +77,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [anosComparados, setAnosComparados] = useState<number[] | null>(null);
   const [anoAdicionar, setAnoAdicionar] = useState(String(selectedYear - 1));
   const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
+  const [mostrarPercentualDre, setMostrarPercentualDre] = useState(false);
   const [periodoDfc, setPeriodoDfc] = useState<'mes' | 'acumulado'>('mes');
   const [metodoDfc, setMetodoDfc] = useState<'direto' | 'indireto'>('direto');
   const [documentoNotasDfc, setDocumentoNotasDfc] = useState<DocumentoNotasDfc | null>(null);
@@ -569,6 +571,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
       ...linhas.filter(filha => linhaPai(filha) === linha.id).map(filha => ({ linha: filha, subtotal: false })),
       ...(aba === 'dfc' && linha.dfcSubtotalNome ? [{ linha, subtotal: true }] : []),
     ]);
+  const linhaBasePercentualDre = encontrarLinhaBasePercentualDre(linhas);
   const linhasForaTabela = aba === 'dfc'
     ? linhas.filter(linha => linha.foraDfc && !linhaPai(linha))
       .flatMap(linha => [linha, ...linhas.filter(filha => linhaPai(filha) === linha.id)])
@@ -874,6 +877,10 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     Acumulado (Jan–{MESES[selectedMonth]}/{String(selectedYear).slice(-2)})
                   </Button>
                 </div>}
+                {aba === 'dre' && <Button variant={mostrarPercentualDre ? 'default' : 'outline'} aria-pressed={mostrarPercentualDre}
+                  onClick={() => setMostrarPercentualDre(value => !value)}>
+                  {mostrarPercentualDre ? 'Ocultar % da Receita Líquida de Vendas' : 'Mostrar % da Receita Líquida de Vendas'}
+                </Button>}
                 {aba === 'dfc' && selectedMonth !== 0 && <div role="group" aria-label="Período da DFC" className="flex flex-wrap items-center gap-2 rounded border bg-muted/30 p-3">
                   <span className="mr-2 text-sm font-medium">Período da DFC:</span>
                   <Button variant={periodoDfc === 'mes' ? 'default' : 'outline'} aria-pressed={periodoDfc === 'mes'} onClick={() => setPeriodoDfc('mes')}>
@@ -916,6 +923,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 {faltantes.length > 0 && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Balancetes não importados: {faltantes.map(rotuloPeriodo).join(', ')}. As colunas afetadas ficam indisponíveis.</p>}
                 {contasAusentes.length > 0 && <p role="alert" className="text-sm text-amber-800">Contas cadastradas ausentes em algum período: {contasAusentes.join(', ')}. O saldo dessas contas é considerado zero nos períodos em que não constam.</p>}
                 {contasIncompletasVinculadas.length > 0 && <p role="alert" className="text-sm text-amber-800">Existem contas incompletas/agrupadoras vinculadas: {contasIncompletasVinculadas.map(item => item.referencia).join(', ')}. Substitua-as por contas completas em Cadastros. Os valores afetados ficam indisponíveis.</p>}
+                {aba === 'dre' && mostrarPercentualDre && !linhaBasePercentualDre && <p role="status" className="text-sm text-amber-800">
+                  Não foi possível identificar uma única linha “Receita Líquida de Vendas” para calcular os percentuais. Confira o nome da linha na aba Cadastros.
+                </p>}
                 {contasNaoClassificadas.length > 0 && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                   {contasNaoClassificadas.length === 1 ? 'Existe 1 conta de resultado' : `Existem ${contasNaoClassificadas.length} contas de resultado`} com movimento que não {contasNaoClassificadas.length === 1 ? 'está' : 'estão'} em nenhum grupo da DRE. Veja o quadro "Contas com movimento não classificadas" abaixo da tabela.
                 </p>}
@@ -997,8 +1007,18 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                               const captacao = linha.captacao;
                               const restantes = captacao?.restantesPorMes[chavePeriodo(principal)];
                               const juros = captacao?.jurosProvisionadosPorMes?.[chavePeriodo(principal)];
+                              const receitaLiquida = linhaBasePercentualDre
+                                ? valores[index]?.get(linhaBasePercentualDre.id)
+                                : null;
+                              const percentualReceitaLiquida = aba === 'dre' && mostrarPercentualDre
+                                && linhaBasePercentualDre && valor !== null && valor !== undefined
+                                ? receitaLiquida !== null && receitaLiquida !== undefined && receitaLiquida !== 0
+                                  ? `${percentual.format((valor / receitaLiquida) * 100)}%`
+                                  : '—'
+                                : null;
                               return <td key={index} className="whitespace-nowrap p-3 text-right tabular-nums">
                                 {!ocultarValor && <span className={valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : undefined}>{valor === null || valor === undefined ? '—' : formatarMoeda(valor)}</span>}
+                                {percentualReceitaLiquida && <div className="text-xs font-normal text-muted-foreground">{percentualReceitaLiquida}</div>}
                                 {podeEditarCaptacao && <>
                                   {captacao && <div className="mt-1 whitespace-normal text-xs text-muted-foreground">
                                     {captacao.data && <p>Data da captação: {captacao.data.split('-').reverse().join('/')}</p>}

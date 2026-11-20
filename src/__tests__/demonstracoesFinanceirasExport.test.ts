@@ -12,7 +12,11 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     const base = aplicarModeloDfcPadrao(cadastroVazio());
     const linhas: LinhaDemonstracao[] = [
       ...base.linhas,
-      { id: 'dre-receita', nome: 'Receita total', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1.1', operacao: 1 }] },
+      { id: 'dre-receita', nome: 'Receita Líquida de Vendas', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1.1', operacao: 1 }] },
+      { id: 'dre-custos', nome: 'Custos', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.2', operacao: 1 }] },
+      { id: 'dre-resultado', nome: 'Resultado', demonstracao: 'dre', tipo: 'total', itens: [
+        { referencia: 'dre-receita', operacao: 1 }, { referencia: 'dre-custos', operacao: 1 },
+      ] },
       { id: 'ativo-caixa', nome: 'Caixa', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.1.1.01', operacao: 1 }] },
       { id: 'passivo-fornecedor', nome: 'Fornecedores', demonstracao: 'passivo', tipo: 'contas', itens: [{ referencia: '2.1.1', operacao: 1 }] },
       { id: 'debt-root', nome: 'Empréstimos', demonstracao: 'endividamento', tipo: 'total', itens: [{ referencia: 'loan-1', operacao: 1 }] },
@@ -34,11 +38,13 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     const dados: DadosDemonstracoes = {
       [chavePeriodo({ ano: 2026, mes: 1 })]: extractAccounts([
         'A;3.1.1;Receita;0;0;100; -100',
+        'D;3.2;Custos;0;20;0;0',
         'A;1.1.1.01;Bancos;100;0;0;100',
         'P;2.1.1.01;Fornecedores;10;0;20;30',
       ].join('\n'), { strict: true }),
       [chavePeriodo({ ano: 2026, mes: 2 })]: extractAccounts([
         'A;3.1.1;Receita;-100;0;50;-150',
+        'D;3.2;Custos;0;10;0;0',
         'A;1.1.1.01;Bancos;100;0;0;150',
         'P;2.1.1.01;Fornecedores;30;0;10;40',
       ].join('\n'), { strict: true }),
@@ -63,14 +69,28 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     await reopened.xlsx.load(bytes);
 
     const dre = reopened.getWorksheet('DRE')!;
-    expect(dre.getCell('B7').value).toBe('Jan/2026');
-    expect(dre.getCell('C7').value).toBe('Fev/2026');
-    expect(dre.getCell('D7').value).toBe('Acum. Jan–Fev/2026');
+    expect(dre.getCell('B7').value).toBe('Jan/2026\nR$');
+    expect(dre.getCell('C7').value).toBe('Jan/2026\n% RL Vendas');
+    expect(dre.getCell('D7').value).toBe('Fev/2026\nR$');
+    expect(dre.getCell('E7').value).toBe('Fev/2026\n% RL Vendas');
+    expect(dre.getCell('F7').value).toBe('Acum. Jan–Fev/2026\nR$');
+    expect(dre.getCell('G7').value).toBe('Acum. Jan–Fev/2026\n% RL Vendas');
     expect(dre.getCell('B8').value).toBe(100);
-    expect(dre.getCell('C8').value).toBe(50);
-    expect(dre.getCell('D8').value).toBe(150);
+    expect(dre.getCell('C8').value).toBe(1);
+    expect(dre.getCell('D8').value).toBe(50);
+    expect(dre.getCell('E8').value).toBe(1);
+    expect(dre.getCell('F8').value).toBe(150);
+    expect(dre.getCell('G8').value).toBe(1);
     expect(dre.getCell('A1').value).toBe('Empresa Exemplo LTDA');
     expect(dre.getCell('B8').numFmt).toContain('#,##0.00');
+    expect(dre.getCell('C8').numFmt).toBe('0.0%;[Red]-0.0%;-');
+    const linhaCustos = dre.getColumn(1).values.indexOf('Custos');
+    expect(dre.getCell(linhaCustos, 2).value).toBe(-20);
+    expect(dre.getCell(linhaCustos, 3).value).toBe(-0.2);
+    expect(dre.getCell(linhaCustos, 5).value).toBe(-0.2);
+    const linhaResultado = dre.getColumn(1).values.indexOf('Resultado');
+    expect(dre.getCell(linhaResultado, 2).value).toBe(80);
+    expect(dre.getCell(linhaResultado, 3).value).toBe(0.8);
 
     const ativo = reopened.getWorksheet('Ativo')!;
     expect(ativo.getCell('B7').value).toBe('Jan/2026');

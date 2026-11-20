@@ -128,6 +128,38 @@ it('detalha valores da DRE por conta para cada ano e no acumulado, preservando a
   expect(screen.queryByRole('row', { name: /3\.1 — Receita/ })).not.toBeInTheDocument();
 });
 
+it('exibe percentuais opcionais da DRE sobre a receita líquida de cada período, sem detalhar contas expandidas', async () => {
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+    if (ano === 2025 && mes === 2) return raw(200, 20, 300);
+    if (ano === 2026 && mes === 1) return raw(1000, 200, 150);
+    if (ano === 2026 && mes === 2) return raw(500, 100, 300);
+    return null;
+  });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'receita', nome: 'Receita Líquida de Vendas', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1', operacao: 1 }] },
+    { id: 'custos', nome: 'Custos', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.2', operacao: 1 }] },
+    { id: 'resultado', nome: 'Resultado', demonstracao: 'dre', tipo: 'total', itens: [{ referencia: 'receita', operacao: 1 }, { referencia: 'custos', operacao: 1 }] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  const linhaReceita = await screen.findByRole('row', { name: /Receita Líquida de Vendas/ });
+  expect(within(linhaReceita).queryByText('100,0%')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Mostrar % da Receita Líquida de Vendas' }));
+  expect(await within(linhaReceita).findByText('100,0%')).toBeInTheDocument();
+  expect(within(screen.getByRole('row', { name: /Custos/ })).getByText('-20,0%')).toBeInTheDocument();
+  expect(within(screen.getByRole('row', { name: /Resultado/ })).getByText('80,0%')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await screen.findByRole('columnheader', { name: 'Fev/25' });
+  await waitFor(() => {
+    expect(within(screen.getByRole('row', { name: /Custos/ })).getByText('-10,0%')).toBeInTheDocument();
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Custos' }));
+  const contaCustos = await screen.findByRole('row', { name: /3\.2 — Custos/ });
+  expect(within(contaCustos).queryByText(/%/)).not.toBeInTheDocument();
+});
+
 it('exibe DFC Direto por mês e no acumulado de janeiro até o mês selecionado', async () => {
   mocks.raw.mockImplementation(async (ano: number, mes: number) => {
     if (ano !== 2026) return null;
