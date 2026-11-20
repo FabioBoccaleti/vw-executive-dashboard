@@ -267,7 +267,16 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
         : 'Preencha o nome da linha principal e informe o nome e ao menos uma conta para cada sublinha.');
       return;
     }
-    const principal = { ...editor, nome: editor.nome.trim() };
+    const nomeSubtotal = editor.dfcSubtotalNome?.trim();
+    if (editor.dfcSubtotalNome !== undefined && !nomeSubtotal) {
+      setErroEditor('Informe um nome para o subtotal.');
+      return;
+    }
+    const principal = {
+      ...editor,
+      nome: editor.nome.trim(),
+      ...(nomeSubtotal ? { dfcSubtotalNome: nomeSubtotal } : {}),
+    };
     if (bancosEditor) {
       principal.tipo = 'total';
       principal.itens = bancosEditor.map(banco => ({ referencia: banco.id, operacao: 1 }));
@@ -389,7 +398,11 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     .flatMap(linha => linha.itens.map(item => item.referencia)));
   const linhasAtividadesDfc = linhasRaizDfc.filter(linha => !referenciasTotalizadasDfc.has(linha.id));
   const linhasTabela = linhas.filter(linha => !linhaPai(linha) && !(aba === 'dfc' && linha.foraDfc))
-    .flatMap(linha => [linha, ...linhas.filter(filha => linhaPai(filha) === linha.id)]);
+    .flatMap(linha => [
+      { linha, subtotal: false },
+      ...linhas.filter(filha => linhaPai(filha) === linha.id).map(filha => ({ linha: filha, subtotal: false })),
+      ...(aba === 'dfc' && linha.dfcSubtotalNome ? [{ linha, subtotal: true }] : []),
+    ]);
   const linhasForaTabela = aba === 'dfc'
     ? linhas.filter(linha => linha.foraDfc && !linhaPai(linha))
       .flatMap(linha => [linha, ...linhas.filter(filha => linhaPai(filha) === linha.id)])
@@ -625,48 +638,51 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                       <caption className="sr-only">{TIPOS[aba]} — {colunas.map(coluna => coluna.titulo).join(' e ')}</caption>
                       <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
                       <tbody>
-                        {linhasTabela.map(linha => <Fragment key={linha.id}><tr className={linha.tipo === 'total' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
-                          <th scope="row" aria-label={linha.nome} className={`p-3 text-left font-inherit ${linhaPai(linha) ? 'pl-8' : ''}`}>
-                            {linha.tipo === 'contas' && <button type="button" className="mr-2 inline-flex rounded p-1 hover:bg-muted focus-visible:outline focus-visible:outline-2"
-                              aria-label={`${gruposExpandidos.has(linha.id) ? 'Ocultar' : 'Exibir'} contas de ${linha.nome}`}
-                              aria-expanded={gruposExpandidos.has(linha.id)} onClick={() => alternarExpandido(linha.id, setGruposExpandidos)}>
-                              {gruposExpandidos.has(linha.id) ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
-                            </button>}
-                            {linha.nome}
-                          </th>
-                          {colunas.map((coluna, index) => {
-                            const valor = valores[index]?.get(linha.id);
-                            const periodo = coluna.periodos[0];
-                            const podeEditarCaptacao = aba === 'endividamento' && linha.bancoDe && principal.mes > 0
-                              && periodo.ano === principal.ano && periodo.mes === principal.mes;
-                            const captacao = linha.captacao;
-                            const restantes = captacao?.restantesPorMes[chavePeriodo(principal)];
-                            const juros = captacao?.jurosProvisionadosPorMes?.[chavePeriodo(principal)];
-                            return <td key={index} className="whitespace-nowrap p-3 text-right tabular-nums">
-                              <span className={valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : undefined}>{valor === null || valor === undefined ? '—' : formatarMoeda(valor)}</span>
-                              {podeEditarCaptacao && <>
-                                {captacao && <div className="mt-1 whitespace-normal text-xs text-muted-foreground">
-                                  {captacao.data && <p>Data da captação: {captacao.data.split('-').reverse().join('/')}</p>}
-                                  {captacao.valorCentavos !== undefined && <p>Valor da captação: R$ {moedaComCentavos.format(captacao.valorCentavos / 100)}</p>}
-                                  {captacao.taxa && <p>Taxa: {captacao.taxa}</p>}
-                                  {captacao.parcelasTotais !== undefined && <p>Total de parcelas: {captacao.parcelasTotais}</p>}
-                                  {restantes !== undefined && <p>Parcelas restantes: {restantes}</p>}
-                                  {juros !== undefined && <p>Juros Provisionados: R$ {moedaComCentavos.format(juros / 100)}</p>}
-                                </div>}
-                                <Button variant="ghost" size="sm" aria-label={`Editar captação de ${linha.nome}`} onClick={() => abrirCaptacao(linha)}>Editar captação</Button>
-                              </>}
-                            </td>;
-                          })}
-                        </tr>
-                        {linha.tipo === 'contas' && gruposExpandidos.has(linha.id) && (aba === 'dfc' ? contasDfcPorLinha.get(linha.id) ?? [] : linha.itens).map(item => <tr key={item.referencia} className="border-b bg-muted/20">
-                          <th scope="row" className={`p-3 text-left font-normal text-muted-foreground ${linhaPai(linha) ? 'pl-16' : 'pl-12'}`}>{descricaoConta(item)}</th>
-                          {colunas.map((_, index) => {
-                            const detalhe = detalhesColunas[index];
-                            const valor = detalhe ? calcularConta(item, aba, detalhe.periodos, detalhe.incompletas) : null;
-                            return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>;
-                          })}
-                        </tr>)}
-                        </Fragment>)}
+                        {linhasTabela.map(({ linha, subtotal }) => {
+                          const ocultarValor = aba === 'dfc' && Boolean(linha.dfcSubtotalNome) && !subtotal;
+                          return <Fragment key={subtotal ? `${linha.id}-subtotal` : linha.id}><tr className={subtotal ? 'border-y bg-muted/60 font-bold' : linha.tipo === 'total' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
+                            <th scope="row" aria-label={subtotal ? linha.dfcSubtotalNome ?? linha.nome : linha.nome} className={`p-3 text-left font-inherit ${linhaPai(linha) ? 'pl-8' : ''}`}>
+                              {linha.tipo === 'contas' && <button type="button" className="mr-2 inline-flex rounded p-1 hover:bg-muted focus-visible:outline focus-visible:outline-2"
+                                aria-label={`${gruposExpandidos.has(linha.id) ? 'Ocultar' : 'Exibir'} contas de ${linha.nome}`}
+                                aria-expanded={gruposExpandidos.has(linha.id)} onClick={() => alternarExpandido(linha.id, setGruposExpandidos)}>
+                                {gruposExpandidos.has(linha.id) ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+                              </button>}
+                              {subtotal ? linha.dfcSubtotalNome : linha.nome}
+                            </th>
+                            {colunas.map((coluna, index) => {
+                              const valor = valores[index]?.get(linha.id);
+                              const periodo = coluna.periodos[0];
+                              const podeEditarCaptacao = aba === 'endividamento' && linha.bancoDe && principal.mes > 0
+                                && periodo.ano === principal.ano && periodo.mes === principal.mes;
+                              const captacao = linha.captacao;
+                              const restantes = captacao?.restantesPorMes[chavePeriodo(principal)];
+                              const juros = captacao?.jurosProvisionadosPorMes?.[chavePeriodo(principal)];
+                              return <td key={index} className="whitespace-nowrap p-3 text-right tabular-nums">
+                                {!ocultarValor && <span className={valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : undefined}>{valor === null || valor === undefined ? '—' : formatarMoeda(valor)}</span>}
+                                {podeEditarCaptacao && <>
+                                  {captacao && <div className="mt-1 whitespace-normal text-xs text-muted-foreground">
+                                    {captacao.data && <p>Data da captação: {captacao.data.split('-').reverse().join('/')}</p>}
+                                    {captacao.valorCentavos !== undefined && <p>Valor da captação: R$ {moedaComCentavos.format(captacao.valorCentavos / 100)}</p>}
+                                    {captacao.taxa && <p>Taxa: {captacao.taxa}</p>}
+                                    {captacao.parcelasTotais !== undefined && <p>Total de parcelas: {captacao.parcelasTotais}</p>}
+                                    {restantes !== undefined && <p>Parcelas restantes: {restantes}</p>}
+                                    {juros !== undefined && <p>Juros Provisionados: R$ {moedaComCentavos.format(juros / 100)}</p>}
+                                  </div>}
+                                  <Button variant="ghost" size="sm" aria-label={`Editar captação de ${linha.nome}`} onClick={() => abrirCaptacao(linha)}>Editar captação</Button>
+                                </>}
+                              </td>;
+                            })}
+                          </tr>
+                          {linha.tipo === 'contas' && !subtotal && gruposExpandidos.has(linha.id) && (aba === 'dfc' ? contasDfcPorLinha.get(linha.id) ?? [] : linha.itens).map(item => <tr key={item.referencia} className="border-b bg-muted/20">
+                            <th scope="row" className={`p-3 text-left font-normal text-muted-foreground ${linhaPai(linha) ? 'pl-16' : 'pl-12'}`}>{descricaoConta(item)}</th>
+                            {colunas.map((_, index) => {
+                              const detalhe = detalhesColunas[index];
+                              const valor = detalhe ? calcularConta(item, aba, detalhe.periodos, detalhe.incompletas) : null;
+                              return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>;
+                            })}
+                          </tr>)}
+                          </Fragment>;
+                        })}
                         {linhasTabela.length === 0 && <tr><td colSpan={colunas.length + 1} className="p-6 text-center text-muted-foreground">Nenhum grupo cadastrado. Configure as linhas na aba Cadastros.</td></tr>}
                       </tbody>
                     </table>
@@ -829,6 +845,10 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 : 'Selecione contas completas e defina se cada item soma ou subtrai.'}</DialogDescription></DialogHeader>
             {editor && <>
               <label className="space-y-1 text-sm"><span>{bancosEditor ? 'Nome da linha principal *' : 'Nome da linha *'}</span><Input value={editor.nome} onChange={event => setEditor({ ...editor, nome: event.target.value })} /></label>
+              {editor.demonstracao === 'dfc' && !editor.foraDfc && bancosEditor && <label className="space-y-1 text-sm">
+                <span>Nome da linha de subtotal após as sublinhas</span>
+                <Input aria-label="Nome da linha de subtotal" value={editor.dfcSubtotalNome ?? ''} onChange={event => setEditor({ ...editor, dfcSubtotalNome: event.target.value })} />
+              </label>}
               {(editor.demonstracao !== 'endividamento' || !cadastro?.linhas.some(item => item.bancoDe === editor.id)) && <label className="space-y-1 text-sm"><span className="block">Tipo de linha</span>
                 <select className={selectClass} value={bancosEditor ? 'bancos' : editor.tipo} onChange={event => {
                   const tipo = event.target.value;

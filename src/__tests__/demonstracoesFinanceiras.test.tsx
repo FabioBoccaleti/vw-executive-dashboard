@@ -141,7 +141,10 @@ it('pré-carrega o mapeamento DFC, mostra contas fora da DFC e destaca contas se
   fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
   await screen.findByRole('rowheader', { name: 'Atividades Operacionais' });
   expect(screen.getByRole('rowheader', { name: 'Recebimentos de clientes' })).toBeInTheDocument();
-  expect(within(screen.getByRole('row', { name: /Atividades Operacionais/ })).getAllByRole('cell')[0]).toHaveTextContent('100');
+  expect(within(screen.getByRole('row', { name: /Atividades Operacionais/ })).getAllByRole('cell')[0]).toBeEmptyDOMElement();
+  expect(within(screen.getByRole('row', { name: /CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS/ })).getAllByRole('cell')[0]).toHaveTextContent('100');
+  expect(screen.getByRole('rowheader', { name: 'CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO' })).toBeInTheDocument();
+  expect(screen.getByRole('rowheader', { name: 'CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO' })).toBeInTheDocument();
   expect(screen.queryByRole('rowheader', { name: 'Contas fora da DFC' })).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Recebimentos de clientes' }));
@@ -151,6 +154,34 @@ it('pré-carrega o mapeamento DFC, mostra contas fora da DFC e destaca contas se
   expect(await screen.findByRole('row', { name: /1\.1\.1\.01\.01\.001 — Caixa/ })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Contas não mapeadas (1)' }));
   expect(screen.getByRole('row', { name: /9\.9\.9 — Conta sem regra/ })).toBeInTheDocument();
+});
+
+it('permite editar o nome do subtotal da seção da DFC', async () => {
+  persistido = {
+    ...cadastroVazio(),
+    version: 'v1',
+    empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+  };
+  mocks.raw.mockResolvedValue({ rawText: 'A;3.1.1;Receita detalhada;0;0;100;0' });
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  await screen.findByRole('rowheader', { name: 'Atividades Operacionais' });
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'dfc' } });
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar Atividades Operacionais' }));
+
+  const dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Nome da linha de subtotal'), { target: { value: 'Caixa operacional líquido' } });
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  expect(await screen.findByText('Cadastro salvo com sucesso.')).toBeInTheDocument();
+  expect(persistido?.linhas.find(linha => linha.id === 'dfc-operacional')?.dfcSubtotalNome).toBe('Caixa operacional líquido');
+
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  expect(await screen.findByRole('rowheader', { name: 'Caixa operacional líquido' })).toBeInTheDocument();
+  const subtotal = await screen.findByRole('row', { name: /Caixa operacional líquido/ });
+  expect(within(subtotal).getAllByRole('cell')[0]).toHaveTextContent('100');
 });
 
 it('concilia o caixa pelo mês ou acumulado e mantém as contas de caixa personalizadas após salvar', async () => {

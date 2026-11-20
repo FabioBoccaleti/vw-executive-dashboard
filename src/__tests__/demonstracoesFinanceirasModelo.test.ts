@@ -106,6 +106,11 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     expect(linhasDfc.filter(linha => linha.tipo === 'contas').reduce((total, linha) => total + linha.itens.length, 0)).toBe(189);
     expect(validarLinhas(inicial.linhas)).toBeNull();
     expect(inicial.dfcContasCaixaEquivalentes).toEqual(['1.1.1']);
+    expect(linhasDfc.filter(linha => linha.dfcSubtotalNome).map(linha => linha.dfcSubtotalNome)).toEqual([
+      'CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS',
+      'CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO',
+      'CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO',
+    ]);
 
     const personalizada = {
       ...inicial,
@@ -117,6 +122,17 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     const cadastroLegado = { ...inicial };
     delete cadastroLegado.dfcContasCaixaEquivalentes;
     expect(aplicarModeloDfcPadrao({ ...cadastroLegado, dfcModeloInicializado: true }).dfcContasCaixaEquivalentes).toEqual(['1.1.1']);
+
+    const linhasLegadas = inicial.linhas.map(linha => {
+      const copia = { ...linha };
+      delete copia.dfcSubtotalNome;
+      return copia.id === 'dfc-operacional' ? { ...copia, nome: 'Operações ajustadas' } : copia;
+    });
+    const migradaComSubtotais = aplicarModeloDfcPadrao({ ...inicial, linhas: linhasLegadas });
+    expect(migradaComSubtotais.linhas.find(linha => linha.id === 'dfc-operacional')).toMatchObject({
+      nome: 'Operações ajustadas',
+      dfcSubtotalNome: 'CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS',
+    });
 
     const removida = { ...inicial, linhas: inicial.linhas.filter(linha => linha.demonstracao !== 'dfc') };
     expect(aplicarModeloDfcPadrao(removida).linhas.some(linha => linha.demonstracao === 'dfc')).toBe(false);

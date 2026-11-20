@@ -6,6 +6,10 @@ export const TIPOS = { dre: 'DRE', ativo: 'Ativo', passivo: 'Passivo', dfc: 'DFC
 export type TipoDemonstracao = keyof typeof TIPOS;
 export const DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO = ['1.1.1'] as const;
 export const MESES = ['Anual', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const DFC_SUBTOTAIS_PADRAO = new Map(DFC_SECOES_PADRAO.map(secao => [
+  `dfc-${secao.id}`,
+  `CAIXA LÍQUIDO DAS ${secao.nome.toLocaleUpperCase('pt-BR')}`,
+] as const));
 
 const itemSchema = z.object({ referencia: z.string().min(1), operacao: z.union([z.literal(1), z.literal(-1)]) });
 const mesCaptacaoSchema = z.string().regex(/^\d{4}_(?:[1-9]|1[0-2])$/);
@@ -31,6 +35,7 @@ const linhaSchema = z.object({
   bancoDe: z.string().min(1).optional(),
   sublinhaDe: z.string().min(1).optional(),
   foraDfc: z.boolean().optional(),
+  dfcSubtotalNome: z.string().trim().min(1).optional(),
   captacao: captacaoSchema.optional(),
 });
 export const cadastroSchema = z.object({
@@ -132,6 +137,7 @@ export function criarLinhasDfcPadrao(): LinhaDemonstracao[] {
       demonstracao: 'dfc',
       tipo: 'total',
       itens: sublinhas.map(linha => ({ referencia: `dfc-${linha.codigo.toLowerCase()}`, operacao: 1 })),
+      dfcSubtotalNome: DFC_SUBTOTAIS_PADRAO.get(idSecao),
     });
     for (const linha of sublinhas) {
       linhas.push({
@@ -177,16 +183,29 @@ export function criarLinhasDfcPadrao(): LinhaDemonstracao[] {
   return linhas;
 }
 
+function migrarNomesSubtotaisDfc(linhas: LinhaDemonstracao[]): LinhaDemonstracao[] {
+  return linhas.map(linha => {
+    const nome = DFC_SUBTOTAIS_PADRAO.get(linha.id);
+    return linha.demonstracao === 'dfc' && nome && !linha.dfcSubtotalNome
+      ? { ...linha, dfcSubtotalNome: nome }
+      : linha;
+  });
+}
+
 export function aplicarModeloDfcPadrao(cadastro: CadastroDemonstracoes): CadastroDemonstracoes {
   const dfcContasCaixaEquivalentes = cadastro.dfcContasCaixaEquivalentes
     ?? [...DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO];
+  const linhas = migrarNomesSubtotaisDfc(cadastro.linhas);
+  const linhasAlteradas = linhas.some((linha, index) => linha !== cadastro.linhas[index]);
   if (cadastro.dfcModeloInicializado) {
-    return cadastro.dfcContasCaixaEquivalentes ? cadastro : { ...cadastro, dfcContasCaixaEquivalentes };
+    return cadastro.dfcContasCaixaEquivalentes && !linhasAlteradas
+      ? cadastro
+      : { ...cadastro, linhas, dfcContasCaixaEquivalentes };
   }
-  const jaConfigurada = cadastro.linhas.some(linha => linha.demonstracao === 'dfc');
+  const jaConfigurada = linhas.some(linha => linha.demonstracao === 'dfc');
   return {
     ...cadastro,
-    linhas: jaConfigurada ? cadastro.linhas : [...cadastro.linhas, ...criarLinhasDfcPadrao()],
+    linhas: jaConfigurada ? linhas : [...linhas, ...criarLinhasDfcPadrao()],
     dfcModeloInicializado: true,
     dfcContasCaixaEquivalentes,
   };
