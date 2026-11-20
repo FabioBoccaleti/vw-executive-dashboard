@@ -27,7 +27,8 @@ import { ProjecaoTab } from './ProjecaoTab';
 import { PerguntasRespostasTab } from "./PerguntasRespostasTab";
 import { DemonstracoesFinanceiras } from "./DemonstracoesFinanceiras";
 import {
-  calcularLinhas, chavePeriodo, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, listarLinhasDre,
+  calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, chavePeriodo,
+  encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, listarLinhasDre,
   type DadosDemonstracoes, type LinhaDemonstracao, type PeriodoDemonstracao,
 } from './DemonstracoesFinanceiras/modelo';
 import { loadCadastroDemonstracoes, loadDadosDemonstracoes } from './DemonstracoesFinanceiras/storage';
@@ -1004,7 +1005,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'imobilizado' && <ImobilizadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'diagnostico' && <DiagnosticoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
+              {activeTab === 'diagnostico' && <DiagnosticoTab fmtBRL={fmtBRL} SectionTitle={SectionTitle} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
             </div>
           )}
         </div>
@@ -3441,13 +3442,85 @@ function CaixaDiretoTab({ fmtBRL, SectionTitle, colAtual, selectedMonth, selecte
 }
 
 // ─── DIAGNÓSTICO DE GERAÇÃO DE CAIXA ────────────────────────────────────────
-function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
-  const d = data.dfc;
+function DiagnosticoTab({ fmtBRL, SectionTitle, selectedMonth, selectedYear }: any) {
+  const [calculation, setCalculation] = useState<{
+    valores: Map<string, number | null>;
+    variacaoReal: number | null;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState('');
 
-  // Valores ajustados — iguais aos totais da tabela DFC
-  const fluxoOperAdj   = d.fluxoOper   + d.dPL_extra - d.dIntangivel;
-  const fluxoInvestAdj = d.fluxoInvest + d.dIntangivel;
-  const fluxoFinancAdj = d.fluxoFinanc - d.dPL_extra;
+  useEffect(() => {
+    let active = true;
+    const principal = { ano: selectedYear, mes: selectedMonth };
+    setLoading(true);
+    setErro('');
+    setCalculation(null);
+
+    Promise.all([
+      loadCadastroDemonstracoes(),
+      loadDadosDemonstracoes(principal, [principal], 'dfc', selectedMonth > 0),
+    ]).then(([cadastro, dados]) => {
+      if (!active) return;
+      const periodos = [dados[chavePeriodo(principal)] ?? null];
+      const indirect = calcularDfcIndireto(
+        cadastro.linhas,
+        cadastro.dfcIndiretoRegras ?? [],
+        periodos,
+      );
+      const caixa = calcularSaldosCaixaEquivalentes(
+        cadastro.dfcContasCaixaEquivalentes ?? [],
+        periodos,
+      );
+      setCalculation({ valores: indirect.valores, variacaoReal: caixa.variacaoReal });
+    }).catch(error => {
+      if (active) setErro(error instanceof Error ? error.message : String(error));
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+
+    return () => { active = false; };
+  }, [selectedMonth, selectedYear]);
+
+  if (loading) {
+    return <div role="status" className="py-12 text-center text-sm text-muted-foreground">Carregando diagnóstico do FC Indireto...</div>;
+  }
+  if (erro) {
+    return <div role="alert" className="py-12 text-center text-sm text-red-600">Não foi possível carregar o diagnóstico: {erro}</div>;
+  }
+
+  const valor = (codigo: string) => calculation?.valores.get(codigo) ?? null;
+  const fluxoOperAdj = valor('dfc-operacional');
+  const fluxoInvestAdj = valor('dfc-investimento');
+  const fluxoFinancAdj = valor('dfc-financiamento');
+  const fluxoTotal = valor('dfc-total');
+  const varCaixaReal = calculation?.variacaoReal ?? null;
+  if (
+    fluxoOperAdj === null || fluxoInvestAdj === null || fluxoFinancAdj === null
+    || fluxoTotal === null || varCaixaReal === null
+  ) {
+    return (
+      <div role="status" className="py-12 text-center text-sm text-muted-foreground">
+        Não há dados suficientes para calcular o diagnóstico do período e conciliar a variação com as contas de caixa selecionadas.
+      </div>
+    );
+  }
+
+  const d = {
+    ajusteEstoque: valor('V03') ?? 0,
+    ajusteFornec: valor('V08') ?? 0,
+    ajusteCred: (valor('V01') ?? 0) + (valor('V02') ?? 0),
+    deprec: valor('AJ01') ?? 0,
+    varCaixaReal,
+    fluxoTotal,
+  };
+  const resultadoPeriodo = valor('RES') ?? 0;
+  const ajusteDemais = Math.round((
+    fluxoOperAdj - resultadoPeriodo - d.deprec - d.ajusteEstoque - d.ajusteFornec - d.ajusteCred
+  ) * 100) / 100;
+  const diferencaConciliacao = Math.round((fluxoTotal - varCaixaReal) * 100) / 100;
+  const caixaConciliado = diferencaConciliacao === 0;
+  const descricaoDiferencaConciliacao = `Diferença entre DFC e caixa: ${diferencaConciliacao >= 0 ? '+' : '−'}${fmtBRL(Math.abs(diferencaConciliacao))}`;
 
   // Utilitário: percentual absoluto de `part` em relação a `whole`
   const pctOf = (part: number, whole: number) =>
@@ -3466,7 +3539,7 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
   const credPct         = fluxoOperAdj > 0 ? pctOf(d.ajusteCred, fluxoOperAdj) : 0;
 
   const operPositivo    = fluxoOperAdj > 0;
-  const operSustentavel = operPositivo && !queimouSignif && !atrasouSignif;
+  const operSustentavel = operPositivo && !queimouSignif && !atrasouSignif && caixaConciliado;
   const gerarCaixa      = d.fluxoTotal >= 0;
 
   // ── Semáforo ───────────────────────────────────────────────────────────────
@@ -3475,7 +3548,11 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
   let titulo: string;
   let descricao: string;
 
-  if (operSustentavel) {
+  if (!caixaConciliado) {
+    status    = 'yellow';
+    titulo    = 'Saúde do Fluxo: ATENÇÃO';
+    descricao = 'A variação calculada pela DFC não confere com a movimentação das contas de caixa selecionadas. Revise as classificações e a conciliação da DFC.';
+  } else if (operSustentavel) {
     status    = 'green';
     titulo    = 'Saúde do Fluxo: FORTE';
     descricao = 'A empresa gera caixa de forma sustentável a partir de suas operações principais, sem dependência de ajustes de capital de giro não recorrentes.';
@@ -3543,14 +3620,25 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
         : 'Financiamento ou venda de ativos sustentando o caixa',
     },
     {
+      ok: caixaConciliado,
+      warn: !caixaConciliado,
+      label: 'DFC conciliada com as contas de caixa selecionadas',
+      detail: caixaConciliado
+        ? 'A variação total da DFC confere com a movimentação das contas de caixa.'
+        : descricaoDiferencaConciliacao,
+    },
+    {
       ok: d.varCaixaReal >= 0,
-      label: 'Saldo de caixa aumentou (conferência com o balanço)',
+      label: 'Saldo das contas de caixa selecionadas aumentou',
       detail: `Variação real: ${d.varCaixaReal >= 0 ? '+' : '−'}${fmtBRL(d.varCaixaReal)}`,
     },
   ];
 
   return (
     <div className="space-y-6">
+      <p className="text-xs text-muted-foreground">
+        Valores baseados no FC Indireto e nas regras cadastradas em Emissão de Demonstrações Financeiras.
+      </p>
 
       {/* ── 1. Semáforo principal ─────────────────────────────── */}
       <Card className={cn('border-2', sc.border, sc.bg)}>
@@ -3580,7 +3668,7 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
 
       {/* ── 2. De onde veio o caixa? ──────────────────────────── */}
       <div>
-        <SectionTitle icon="🔍">De qual atividade veio o caixa?</SectionTitle>
+        <SectionTitle icon="🔍">Contribuição por atividade (FC Indireto)</SectionTitle>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {atividades.map((a) => {
             const isPos = a.value >= 0;
@@ -3621,10 +3709,12 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
                   <span className={cn('font-mono', fluxoOperAdj >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500')}>{fluxoOperAdj >= 0 ? '+' : '−'}{fmtBRL(fluxoOperAdj)}</span>
                 </div>
                 {[
-                  { label: 'Depreciação / Amortização (não-caixa)', value: d.deprec, pctVal: deprecPct, color: 'bg-blue-400', neutral: true, warn: false, note: 'Ajuste contábil — sempre positivo, mas não representa entrada real de dinheiro.' },
+                  { label: 'Resultado líquido do período', value: resultadoPeriodo, pctVal: pctOf(resultadoPeriodo, fluxoOperAdj), color: 'bg-slate-400', neutral: false, warn: false, note: 'Resultado contábil que inicia a composição do método indireto.' },
+                  { label: 'Depreciação / Amortização', value: d.deprec, pctVal: deprecPct, color: 'bg-blue-400', neutral: true, warn: false, note: 'Ajuste de itens sem efeito direto no caixa do período.' },
                   { label: 'Variação de Estoques', value: d.ajusteEstoque, pctVal: estoquePct, color: queimouSignif ? 'bg-amber-400' : 'bg-emerald-400', neutral: false, warn: queimouSignif, note: queimouEstoque ? `Redução de estoque (fonte de caixa). ${queimouSignif ? `Representa ${estoquePct}% do caixa oper. — sinal de queima de estoque.` : `${estoquePct}% do caixa oper. — patamar aceitável.`}` : 'Aumento de estoque (uso de caixa — empresa está investindo em produto).' },
-                  { label: 'Variação de Fornecedores', value: d.ajusteFornec, pctVal: fornecPct, color: atrasouSignif ? 'bg-amber-400' : 'bg-emerald-400', neutral: false, warn: atrasouSignif, note: atrasouFornec ? `Aumento de fornecedores (postergação de pagamentos). ${atrasouSignif ? `${fornecPct}% do caixa oper. — atenção ao prazo prometido.` : `${fornecPct}% do caixa oper. — controlado.`}` : 'Redução de fornecedores (pagamentos realizados no período).' },
-                  { label: 'Créditos a Receber', value: d.ajusteCred, pctVal: credPct, color: d.ajusteCred >= 0 ? 'bg-emerald-400' : 'bg-red-400', neutral: false, warn: false, note: d.ajusteCred >= 0 ? 'Redução de créditos (recebimentos efetuados — bom sinal).' : 'Aumento de créditos (mais a receber, mas o caixa ainda não entrou).' },
+                  { label: 'Clientes e outros créditos', value: d.ajusteCred, pctVal: credPct, color: d.ajusteCred >= 0 ? 'bg-emerald-400' : 'bg-red-400', neutral: false, warn: false, note: d.ajusteCred >= 0 ? 'Redução de créditos (fonte de caixa).' : 'Aumento de créditos (uso de caixa).' },
+                  { label: 'Variação de Fornecedores', value: d.ajusteFornec, pctVal: fornecPct, color: atrasouSignif ? 'bg-amber-400' : 'bg-emerald-400', neutral: false, warn: atrasouSignif, note: atrasouFornec ? `Aumento de fornecedores (fonte de caixa por variação do passivo). ${atrasouSignif ? `${fornecPct}% do caixa oper. — sinal de atenção.` : `${fornecPct}% do caixa oper. — patamar controlado.`}` : 'Redução de fornecedores (uso de caixa).' },
+                  { label: 'Demais ajustes e variações', value: ajusteDemais, pctVal: pctOf(ajusteDemais, fluxoOperAdj), color: 'bg-violet-400', neutral: false, warn: false, note: 'Agrupa os demais ajustes ao resultado e variações de ativos e passivos operacionais da DFC.' },
                 ].filter(i => Math.abs(i.value) > 0).map((item, idx) => (
                   <div key={idx} className="mb-4">
                     <div className="flex justify-between items-center mb-1">

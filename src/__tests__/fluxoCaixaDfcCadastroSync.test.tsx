@@ -94,6 +94,9 @@ it('recarrega cadastro e regras DFC nas abas direta, indireta e evolução mensa
       expect(variacaoClientes).toHaveTextContent(/10/);
       expect(variacaoEstoques).toHaveTextContent(/20/);
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Diagnóstico Mês' }));
+    expect(await screen.findByText(/Variação total:/)).toHaveTextContent(/40/);
+    expect(await screen.findByText(/Contribuição por atividade \(FC Indireto\)/)).toBeInTheDocument();
   } finally {
     if (mesAnterior === null) localStorage.removeItem('fluxo_caixa_selected_month');
     else localStorage.setItem('fluxo_caixa_selected_month', mesAnterior);
