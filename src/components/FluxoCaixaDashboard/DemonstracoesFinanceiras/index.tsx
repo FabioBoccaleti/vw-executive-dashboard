@@ -52,7 +52,6 @@ type EditorCaptacao = {
 type LinhaDfcIndiretoTabela = {
   id: string;
   nome: string;
-  codigo?: string;
   tipo: 'titulo' | 'grupo' | 'conta' | 'subtotal' | 'total';
 };
 
@@ -521,22 +520,22 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   ];
   const linhasDfcIndiretoTabela: LinhaDfcIndiretoTabela[] = [
     { id: 'titulo-operacional', nome: 'ATIVIDADES OPERACIONAIS', tipo: 'titulo' },
-    { id: 'RES', nome: 'Resultado líquido do período (lucro + / prejuízo –)', codigo: 'RES', tipo: 'conta' },
+    { id: 'RES', nome: 'Resultado líquido do período (lucro + / prejuízo –)', tipo: 'conta' },
     { id: 'grupo-ajustes', nome: 'Ajustes ao resultado', tipo: 'grupo' },
-    ...DFC_INDIRETO_AJUSTES.map(({ codigo, nome }) => ({ id: codigo, nome, codigo, tipo: 'conta' as const })),
+    ...DFC_INDIRETO_AJUSTES.map(({ codigo, nome }) => ({ id: codigo, nome, tipo: 'conta' as const })),
     { id: 'resultado-ajustado', nome: 'Resultado ajustado', tipo: 'subtotal' },
     { id: 'grupo-variacoes', nome: 'Variações de ativos e passivos operacionais', tipo: 'grupo' },
-    ...DFC_INDIRETO_VARIACOES.map(({ codigo, nome }) => ({ id: codigo, nome, codigo, tipo: 'conta' as const })),
+    ...DFC_INDIRETO_VARIACOES.map(({ codigo, nome }) => ({ id: codigo, nome, tipo: 'conta' as const })),
     { id: 'variacoes-capital-giro', nome: 'Variações do capital de giro', tipo: 'subtotal' },
     { id: 'dfc-operacional', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS', tipo: 'total' },
     { id: 'titulo-investimento', nome: 'ATIVIDADES DE INVESTIMENTO', tipo: 'titulo' },
     ...linhas.filter(linha => linhaPai(linha) === 'dfc-investimento').map(linha => ({
-      id: linha.id, nome: linha.nome, codigo: linha.id.replace(/^dfc-/, '').toUpperCase(), tipo: 'conta' as const,
+      id: linha.id, nome: linha.nome, tipo: 'conta' as const,
     })),
     { id: 'dfc-investimento', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO', tipo: 'total' },
     { id: 'titulo-financiamento', nome: 'ATIVIDADES DE FINANCIAMENTO', tipo: 'titulo' },
     ...linhas.filter(linha => linhaPai(linha) === 'dfc-financiamento').map(linha => ({
-      id: linha.id, nome: linha.nome, codigo: linha.id.replace(/^dfc-/, '').toUpperCase(), tipo: 'conta' as const,
+      id: linha.id, nome: linha.nome, tipo: 'conta' as const,
     })),
     { id: 'dfc-financiamento', nome: 'CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO', tipo: 'total' },
     { id: 'dfc-total', nome: 'VARIAÇÃO DE CAIXA PELA DFC', tipo: 'total' },
@@ -773,7 +772,6 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                                   aria-expanded={expandido} onClick={() => alternarExpandido(linha.id, setGruposExpandidos)}>
                                   {expandido ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
                                 </button>}
-                                {linha.codigo && <span className="mr-2 font-mono text-xs text-muted-foreground">{linha.codigo}</span>}
                                 {linha.nome}
                               </th>
                               {colunas.map((_, index) => {

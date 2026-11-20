@@ -139,7 +139,9 @@ it('permite alternar para o DFC Indireto e confere o subtotal operacional com o 
 
   const resultado = await screen.findByRole('row', { name: /Resultado líquido do período/ });
   expect(within(resultado).getByRole('cell')).toHaveTextContent('400');
-  expect(screen.getByRole('rowheader', { name: /AJ06/ })).toBeInTheDocument();
+  expect(screen.getByRole('rowheader', { name: /Outros itens de resultado de investimento\/financiamento/ })).toBeInTheDocument();
+  const tabelaIndireta = screen.getByRole('table', { name: /DFC Indireto/ });
+  expect(within(tabelaIndireta).queryByText(/^(?:RES|AJ\d{2}|V\d{2})$/)).not.toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Conferência da DFC indireta' })).toHaveTextContent('OK — métodos convergem');
 
   fireEvent.click(screen.getByRole('tab', { name: 'Cadastros' }));
