@@ -2,7 +2,7 @@ import { kvCompareAndSet, kvGet } from '@/lib/kvClient';
 import { extractAccounts } from '../balanceteParser';
 import { loadFluxoCaixaRaw } from '../fluxoCaixaStorage';
 import {
-  cadastroSchema, cadastroVazio, chavePeriodo, rotuloPeriodo, validarCadastro,
+  aplicarModeloDfcPadrao, cadastroSchema, cadastroVazio, chavePeriodo, rotuloPeriodo, validarCadastro,
   type CadastroDemonstracoes, type DadosDemonstracoes, type PeriodoDemonstracao,
 } from './modelo';
 
@@ -10,12 +10,13 @@ const KEY = 'fluxo_caixa_demonstracoes_cadastro';
 
 export async function loadCadastroDemonstracoes(): Promise<CadastroDemonstracoes> {
   const data = await kvGet<unknown>(KEY, { throwOnError: true });
-  if (data === null) return cadastroVazio();
+  if (data === null) return aplicarModeloDfcPadrao(cadastroVazio());
   const parsed = cadastroSchema.safeParse(data);
   if (!parsed.success) throw new Error('O cadastro salvo de demonstrações está inválido.');
-  const erro = validarCadastro(parsed.data);
+  const cadastro = aplicarModeloDfcPadrao(parsed.data);
+  const erro = validarCadastro(cadastro);
   if (erro) throw new Error(erro);
-  return parsed.data;
+  return cadastro;
 }
 
 export async function saveCadastroDemonstracoes(cadastro: CadastroDemonstracoes): Promise<CadastroDemonstracoes> {
@@ -29,15 +30,15 @@ export async function saveCadastroDemonstracoes(cadastro: CadastroDemonstracoes)
 export async function loadDadosDemonstracoes(
   principal: PeriodoDemonstracao,
   comparacoes: PeriodoDemonstracao | PeriodoDemonstracao[],
-  escopo: 'dre' | 'patrimonial' | 'cadastros' = 'dre',
-  acumuladoDre = true,
+  escopo: 'dre' | 'dfc' | 'patrimonial' | 'cadastros' = 'dre',
+  acumulado = true,
 ): Promise<DadosDemonstracoes> {
   const periodos = new Map<string, PeriodoDemonstracao>();
   const periodosComparacao = Array.isArray(comparacoes) ? comparacoes : [comparacoes];
-  const adicionais = escopo === 'dre'
+  const adicionais = escopo === 'dre' || escopo === 'dfc'
     ? principal.mes === 0
       ? periodosComparacao
-      : periodosComparacao.flatMap(periodo => acumuladoDre
+      : periodosComparacao.flatMap(periodo => acumulado
         ? Array.from({ length: periodo.mes }, (_, index) => ({ ano: periodo.ano, mes: index + 1 }))
         : [periodo])
     : escopo === 'patrimonial' ? periodosComparacao : [];

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TIPOS, MESES, calcularConta, calcularLinhas, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas,
+  TIPOS, MESES, calcularConta, calcularLinhas, captacaoSchema, chavePeriodo, rotuloPeriodo, validarLinhas, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcNaoMapeadas,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
@@ -17,6 +17,7 @@ const titulosDemonstracoes: Record<TipoDemonstracao, string> = {
   dre: 'Demonstração do Resultado do Exercício',
   ativo: 'Balanço Patrimonial — Ativo',
   passivo: 'Balanço Patrimonial — Passivo',
+  dfc: 'Demonstração dos Fluxos de Caixa — Método Direto',
   endividamento: 'Demonstrativo de Endividamento',
 };
 const selectClass = 'h-10 rounded-md border border-input bg-background px-3 text-sm';
@@ -60,7 +61,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [anosComparados, setAnosComparados] = useState<number[] | null>(null);
   const [anoAdicionar, setAnoAdicionar] = useState(String(selectedYear - 1));
   const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
+  const [periodoDfc, setPeriodoDfc] = useState<'mes' | 'acumulado'>('mes');
   const [naoClassificadasAberto, setNaoClassificadasAberto] = useState(false);
+  const [dfcNaoMapeadasAberto, setDfcNaoMapeadasAberto] = useState(false);
   const [editor, setEditor] = useState<LinhaDemonstracao | null>(null);
   const [editorCaptacao, setEditorCaptacao] = useState<EditorCaptacao | null>(null);
   const [erroCaptacao, setErroCaptacao] = useState('');
@@ -72,7 +75,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [tipoCadastro, setTipoCadastro] = useState<TipoDemonstracao>('dre');
   const [cadastrosExpandidos, setCadastrosExpandidos] = useState<Set<string>>(new Set());
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(new Set());
-  const escopoDados = aba === 'dre' || aba === 'cadastros' ? aba : 'patrimonial';
+  const escopoDados = aba === 'cadastros' ? 'cadastros' : aba === 'dre' || aba === 'dfc' ? aba : 'patrimonial';
   const periodosComparados = useMemo(
     () => (anosComparados ?? [selectedYear]).map(ano => ({ ano, mes: selectedMonth })),
     [anosComparados, selectedYear, selectedMonth],
@@ -83,6 +86,8 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     [chaveAnosComparados, selectedMonth],
   );
   const acumuladoDre = aba === 'dre' && selectedMonth > 0 && periodoDre === 'acumulado';
+  const acumuladoDfc = aba === 'dfc' && selectedMonth > 0 && periodoDfc === 'acumulado';
+  const acumuladoDados = acumuladoDre || acumuladoDfc;
 
   useEffect(() => {
     let ativo = true;
@@ -98,11 +103,11 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     setDados(null);
     setErroDados('');
     const principal = periodosParaCarregar[0] ?? { ano: selectedYear, mes: selectedMonth };
-    loadDadosDemonstracoes(principal, periodosParaCarregar, escopoDados, acumuladoDre).then(value => {
+    loadDadosDemonstracoes(principal, periodosParaCarregar, escopoDados, acumuladoDados).then(value => {
       if (ativo) setDados(value);
     }).catch(error => { if (ativo) setErroDados(mensagem(error)); });
     return () => { ativo = false; };
-  }, [selectedYear, selectedMonth, periodosParaCarregar, tentativaDados, escopoDados, acumuladoDre]);
+  }, [selectedYear, selectedMonth, periodosParaCarregar, tentativaDados, escopoDados, acumuladoDados]);
 
   const catalogo = useMemo(() => {
     const contas = new Map<string, string>();
@@ -322,7 +327,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
 
   function selecionar(referencia: string, marcado: boolean) {
     if (!alvoEditor) return;
-    if (marcado && alvoEditor.tipo === 'contas' && contasIncompletas.has(referencia)) {
+    if (marcado && alvoEditor.tipo === 'contas' && alvoEditor.demonstracao !== 'dfc' && contasIncompletas.has(referencia)) {
       setErroEditor(`A conta ${referencia} está incompleta ou é agrupadora. Selecione uma conta completa.`);
       return;
     }
@@ -349,16 +354,21 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
 
   const principal = { ano: selectedYear, mes: selectedMonth };
   const linhas = cadastro?.linhas.filter(item => item.demonstracao === aba) ?? [];
-  const linhasTabela = linhas.filter(linha => !linhaPai(linha))
+  const linhasTabela = linhas.filter(linha => !linhaPai(linha) && !(aba === 'dfc' && linha.foraDfc))
     .flatMap(linha => [linha, ...linhas.filter(filha => linhaPai(filha) === linha.id)]);
+  const linhasForaTabela = aba === 'dfc'
+    ? linhas.filter(linha => linha.foraDfc && !linhaPai(linha))
+      .flatMap(linha => [linha, ...linhas.filter(filha => linhaPai(filha) === linha.id)])
+    : [];
+  const acumuladoSelecionado = aba === 'dre' ? periodoDre === 'acumulado' : periodoDfc === 'acumulado';
   const colunas = selectedMonth === 0
     ? periodosComparados.map(periodo => ({ titulo: `Ano/${periodo.ano}`, periodos: [periodo] }))
-    : aba === 'dre'
+    : aba === 'dre' || aba === 'dfc'
       ? periodosComparados.map(periodo => ({
-        titulo: periodoDre === 'mes'
+        titulo: !acumuladoSelecionado
           ? rotuloPeriodo(periodo)
           : `Jan–${MESES[periodo.mes]}/${String(periodo.ano).slice(-2)}`,
-        periodos: periodoDre === 'mes'
+        periodos: !acumuladoSelecionado
           ? [periodo]
           : Array.from({ length: periodo.mes }, (_, index) => ({ ano: periodo.ano, mes: index + 1 })),
       }))
@@ -371,14 +381,22 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     return { periodos, incompletas: identificarContasIncompletas(periodos) };
   }) : [];
   const faltantes = [...new Map(colunas.flatMap(coluna => coluna.periodos).filter(periodo => dados && !dados[chavePeriodo(periodo)]).map(periodo => [chavePeriodo(periodo), periodo])).values()];
-  const contasAusentes = aba !== 'cadastros' && dados
+  const contasAusentes = aba !== 'cadastros' && aba !== 'dfc' && dados
     ? [...new Set(linhas.filter(linha => linha.tipo === 'contas').flatMap(linha => linha.itens.map(item => item.referencia)))]
       .filter(codigo => colunas.some(coluna => coluna.periodos.some(periodo => dados[chavePeriodo(periodo)] && !dados[chavePeriodo(periodo)]?.[codigo])))
     : [];
   const contasNaoClassificadas = aba === 'dre' && cadastro && dados
     ? identificarContasNaoClassificadas(cadastro.linhas, detalhesColunas.map(detalhe => detalhe.periodos))
     : [];
-  const contasIncompletasVinculadas = linhas.filter(linha => linha.tipo === 'contas')
+  const contasDfcNaoMapeadas = aba === 'dfc' && cadastro && dados
+    ? identificarContasDfcNaoMapeadas(cadastro.linhas, detalhesColunas.map(detalhe => detalhe.periodos))
+    : [];
+  const periodosDetalhamento = detalhesColunas.flatMap(detalhe => detalhe.periodos);
+  const contasDfcPorLinha = aba === 'dfc'
+    ? new Map(linhas.filter(linha => linha.tipo === 'contas')
+      .map(linha => [linha.id, listarContasDfcDaLinha(cadastro?.linhas ?? [], linha.id, periodosDetalhamento)]))
+    : new Map<string, ItemDemonstracao[]>();
+  const contasIncompletasVinculadas = linhas.filter(linha => aba !== 'dfc' && linha.tipo === 'contas')
     .flatMap(linha => linha.itens).filter(item => contasIncompletas.has(item.referencia));
   const linhasDisponiveisEditor = editor && cadastro
     ? cadastro.linhas.filter(item => item.id !== editor.id && item.demonstracao === editor.demonstracao && !linhaPai(item))
@@ -389,7 +407,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     const disponiveis = [...cadastro.linhas.filter(linha => linhaPai(linha) !== editor.id && linha.id !== editor.id), ...(bancosEditor ?? [])];
     return disponiveis.find(linha =>
       linha.id !== alvoEditor.id && linha.demonstracao === alvoEditor.demonstracao && linha.tipo === 'contas' &&
-      linha.itens.some(item => mesmaHierarquia(item.referencia, referencia)));
+      linha.itens.some(item => alvoEditor.demonstracao === 'dfc'
+        ? item.referencia === referencia
+        : mesmaHierarquia(item.referencia, referencia)));
   }
 
   return (
@@ -443,7 +463,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </label>
                     <Button onClick={() => abrirEditor()}>Adicionar linha</Button>
                   </div>
-                  <p className="text-sm text-muted-foreground">Cadastre grupos de contas e totalizações das linhas desejadas. Use as setas para definir a posição de cada linha na demonstração; a posição não altera o cálculo.</p>
+                  <p className="text-sm text-muted-foreground">{tipoCadastro === 'dfc'
+                    ? 'A DFC usa prefixos: o mais longo cadastrado prevalece. O efeito de cada conta é Crédito − Débito. Edite as linhas para reclassificar prefixos; use “Contas fora da DFC” para guardar contas de apoio.'
+                    : 'Cadastre grupos de contas e totalizações das linhas desejadas. Use as setas para definir a posição de cada linha na demonstração; a posição não altera o cálculo.'}</p>
                   <div className="space-y-2">
                     {cadastro.linhas.filter(item => item.demonstracao === tipoCadastro && !linhaPai(item)).map((linha, index, lista) => {
                       const filhas = cadastro.linhas.filter(item => linhaPai(item) === linha.id);
@@ -451,7 +473,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                       const expandido = cadastrosExpandidos.has(linha.id);
                       return <div key={linha.id} className="rounded border p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div><p className="font-medium">{linha.nome}</p><p className="text-xs text-muted-foreground">{filhas.length ? `${linha.itens.length} ${linha.demonstracao === 'endividamento' ? 'bancos ou dívidas' : 'sublinhas'}` : `${linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · ${linha.itens.length} itens`}</p></div>
+                          <div><p className="font-medium">{linha.nome}{linha.foraDfc ? ' · Fora da DFC' : ''}</p><p className="text-xs text-muted-foreground">{filhas.length ? `${linha.itens.length} ${linha.demonstracao === 'endividamento' ? 'bancos ou dívidas' : 'sublinhas'}` : `${linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · ${linha.itens.length} itens`}</p></div>
                           <div className="flex flex-wrap gap-1">
                             {podeExpandir && <Button variant="outline" size="sm" aria-expanded={expandido} onClick={() => alternarExpandido(linha.id, setCadastrosExpandidos)}>{expandido ? 'Ocultar' : 'Exibir'} contas de {linha.nome}</Button>}
                             <Button variant="outline" size="sm" aria-label={`Subir ${linha.nome}`} disabled={index === 0} onClick={() => moverLinha(linha.id, -1)}>↑</Button>
@@ -500,9 +522,18 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     Acumulado (Jan–{MESES[selectedMonth]}/{String(selectedYear).slice(-2)})
                   </Button>
                 </div>}
+                {aba === 'dfc' && selectedMonth !== 0 && <div role="group" aria-label="Período da DFC" className="flex flex-wrap items-center gap-2 rounded border bg-muted/30 p-3">
+                  <span className="mr-2 text-sm font-medium">Período da DFC:</span>
+                  <Button variant={periodoDfc === 'mes' ? 'default' : 'outline'} aria-pressed={periodoDfc === 'mes'} onClick={() => setPeriodoDfc('mes')}>
+                    Mês ({rotuloPeriodo(principal)})
+                  </Button>
+                  <Button variant={periodoDfc === 'acumulado' ? 'default' : 'outline'} aria-pressed={periodoDfc === 'acumulado'} onClick={() => setPeriodoDfc('acumulado')}>
+                    Acumulado (Jan–{MESES[selectedMonth]}/{String(selectedYear).slice(-2)})
+                  </Button>
+                </div>}
                 <div className="space-y-3 rounded border bg-muted/30 p-3">
                   <p className="text-sm font-medium">{selectedMonth === 0 ? 'Comparação anual' : 'Comparação por ano'} — inclua até três anos e ajuste a ordem das colunas.</p>
-                  {aba !== 'dre' && <p className="text-xs text-muted-foreground">Os valores patrimoniais são saldos na data correspondente de cada ano; não são acumulados.</p>}
+                  {['ativo', 'passivo', 'endividamento'].includes(aba) && <p className="text-xs text-muted-foreground">Os valores patrimoniais são saldos na data correspondente de cada ano; não são acumulados.</p>}
                   <div className="flex flex-wrap items-end gap-3">
                     <label className="space-y-1 text-sm"><span className="block">Ano para adicionar</span>
                       <Input aria-label="Ano para adicionar à comparação" type="number" min={1900} max={9999} value={anoAdicionar} onChange={event => setAnoAdicionar(event.target.value)} className="w-32" />
@@ -533,6 +564,11 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 {contasIncompletasVinculadas.length > 0 && <p role="alert" className="text-sm text-amber-800">Existem contas incompletas/agrupadoras vinculadas: {contasIncompletasVinculadas.map(item => item.referencia).join(', ')}. Substitua-as por contas completas em Cadastros. Os valores afetados ficam indisponíveis.</p>}
                 {contasNaoClassificadas.length > 0 && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                   {contasNaoClassificadas.length === 1 ? 'Existe 1 conta de resultado' : `Existem ${contasNaoClassificadas.length} contas de resultado`} com movimento que não {contasNaoClassificadas.length === 1 ? 'está' : 'estão'} em nenhum grupo da DRE. Veja o quadro "Contas com movimento não classificadas" abaixo da tabela.
+                </p>}
+                {aba === 'dfc' && dados && !erroDados && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  {contasDfcNaoMapeadas.length === 0
+                    ? 'Nenhuma conta analítica sem prefixo de classificação no balancete carregado.'
+                    : `${contasDfcNaoMapeadas.length} ${contasDfcNaoMapeadas.length === 1 ? 'conta analítica' : 'contas analíticas'} sem prefixo de classificação. Veja “Contas não mapeadas” abaixo.`}
                 </p>}
                 {!dados && !erroDados ? <p role="status">Carregando balancetes...</p> : !erroDados && (
                   <div className="overflow-x-auto">
@@ -573,7 +609,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                             </td>;
                           })}
                         </tr>
-                        {linha.tipo === 'contas' && gruposExpandidos.has(linha.id) && linha.itens.map(item => <tr key={item.referencia} className="border-b bg-muted/20">
+                        {linha.tipo === 'contas' && gruposExpandidos.has(linha.id) && (aba === 'dfc' ? contasDfcPorLinha.get(linha.id) ?? [] : linha.itens).map(item => <tr key={item.referencia} className="border-b bg-muted/20">
                           <th scope="row" className={`p-3 text-left font-normal text-muted-foreground ${linhaPai(linha) ? 'pl-16' : 'pl-12'}`}>{descricaoConta(item)}</th>
                           {colunas.map((_, index) => {
                             const detalhe = detalhesColunas[index];
@@ -582,7 +618,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                           })}
                         </tr>)}
                         </Fragment>)}
-                        {linhas.length === 0 && <tr><td colSpan={colunas.length + 1} className="p-6 text-center text-muted-foreground">Nenhum grupo cadastrado. Configure as linhas na aba Cadastros.</td></tr>}
+                        {linhasTabela.length === 0 && <tr><td colSpan={colunas.length + 1} className="p-6 text-center text-muted-foreground">Nenhum grupo cadastrado. Configure as linhas na aba Cadastros.</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -614,9 +650,62 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </table>
                   </div>}
                 </section>}
+                {aba === 'dfc' && linhasForaTabela.length > 0 && <section aria-label="Contas fora da DFC" className="space-y-3 rounded border p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold">Contas fora da DFC</h3>
+                      <p className="text-sm text-muted-foreground">Caixa, PL e compensações ficam visíveis para conferência, mas não entram nos totais das atividades.</p>
+                    </div>
+                    <Button variant="outline" onClick={() => { setTipoCadastro('dfc'); setAba('cadastros'); }}>Editar contas fora da DFC</Button>
+                  </div>
+                  {linhasForaTabela.filter(linha => !linhaPai(linha)).map(raiz => (
+                    <div key={raiz.id} className="space-y-2">
+                      <h4 className="font-medium">{raiz.nome}</h4>
+                      {linhasForaTabela.filter(linha => linhaPai(linha) === raiz.id).map(grupo => {
+                        const contas = contasDfcPorLinha.get(grupo.id) ?? [];
+                        return <details key={grupo.id} className="rounded border px-3">
+                          <summary className="cursor-pointer py-2 text-sm font-medium">{grupo.nome} ({contas.length} {contas.length === 1 ? 'conta' : 'contas'})</summary>
+                          {contas.length === 0 ? <p className="pb-3 text-sm text-muted-foreground">Nenhuma conta correspondente no balancete carregado.</p>
+                            : <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Conta</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
+                                <tbody>{contas.map(item => <tr key={item.referencia} className="border-b">
+                                  <th scope="row" className="p-3 text-left font-normal">{descricaoConta(item)}</th>
+                                  {colunas.map((_, index) => {
+                                    const detalhe = detalhesColunas[index];
+                                    const valor = detalhe ? calcularConta(item, 'dfc', detalhe.periodos, detalhe.incompletas) : null;
+                                    return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>;
+                                  })}
+                                </tr>)}</tbody>
+                              </table>
+                            </div>}
+                        </details>;
+                      })}
+                    </div>
+                  ))}
+                </section>}
+                {aba === 'dfc' && contasDfcNaoMapeadas.length > 0 && <section aria-label="Contas não mapeadas" className="rounded border border-amber-300">
+                  <button type="button" aria-expanded={dfcNaoMapeadasAberto} onClick={() => setDfcNaoMapeadasAberto(value => !value)}
+                    className="flex w-full items-center gap-2 bg-amber-50 p-3 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
+                    {dfcNaoMapeadasAberto ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+                    Contas não mapeadas ({contasDfcNaoMapeadas.length})
+                  </button>
+                  {dfcNaoMapeadasAberto && <div className="overflow-x-auto">
+                    <p className="p-3 text-xs text-muted-foreground">Contas analíticas sem nenhum prefixo correspondente. Elas não entram nos totais da DFC; classifique-as em Cadastros → DFC, seja em uma linha da demonstração ou em “Contas fora da DFC”.</p>
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Conta</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
+                      <tbody>{contasDfcNaoMapeadas.map(conta => <tr key={conta.conta} className="border-b">
+                        <th scope="row" className="p-3 text-left font-normal">{conta.conta} — {conta.desc}</th>
+                        {conta.valores.map((valor, index) => <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>)}
+                      </tr>)}</tbody>
+                    </table>
+                  </div>}
+                </section>}
                 <p className="text-xs text-muted-foreground">{aba === 'dre'
                   ? `DRE: movimento líquido (créditos − débitos), preservando o sinal contábil e os estornos; ${selectedMonth === 0 || periodoDre === 'acumulado' ? 'acumulado de janeiro até o mês selecionado' : 'somente o mês selecionado'}. Grupos e totalizações somam os valores com seus sinais automaticamente.`
-                  : 'Patrimonial: valor absoluto do saldo atual de cada conta em cada data, sem somar saldos mensais. O sinal de cada conta é definido por Somar/Subtrair no cadastro.'}</p>
+                  : aba === 'dfc'
+                    ? `DFC Direto: cada conta analítica usa Crédito − Débito; ${selectedMonth === 0 || periodoDfc === 'acumulado' ? 'acumulado de janeiro até o mês selecionado' : 'somente o mês selecionado'}. A linha é definida pelo prefixo cadastrado mais longo.`
+                    : 'Patrimonial: valor absoluto do saldo atual de cada conta em cada data, sem somar saldos mensais. O sinal de cada conta é definido por Somar/Subtrair no cadastro.'}</p>
                 {cadastro.assinantes.length > 0 && <div className="grid gap-8 pt-12 sm:grid-cols-2">
                   {cadastro.assinantes.map(assinante => <div key={assinante.id} className="border-t pt-2 text-center text-sm">
                     <p className="font-medium">{assinante.nome}</p><p>{assinante.cargo}</p>{assinante.registro && <p>{assinante.registro}</p>}
@@ -707,19 +796,22 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 </div>}
               </div>}
               {alvoEditor && <>{alvoEditor.tipo === 'contas' ? <>
-                <p className="text-xs text-muted-foreground">Selecione apenas contas completas (analíticas). Contas incompletas/agrupadoras ficam desabilitadas para evitar dupla contagem. Uma conta não pode pertencer a dois grupos da mesma demonstração. {editor.demonstracao === 'dre'
-                  ? 'O sinal segue o movimento da conta no balancete, inclusive estornos, sem escolha manual.'
-                  : 'Os sinais são aplicados aos valores absolutos das contas.'}</p>
+                <p className="text-xs text-muted-foreground">{editor.demonstracao === 'dfc'
+                  ? 'Configure prefixos para classificar as contas. Se houver mais de um prefixo correspondente, vence o mais longo. O efeito é sempre Crédito − Débito.'
+                  : `Selecione apenas contas completas (analíticas). Contas incompletas/agrupadoras ficam desabilitadas para evitar dupla contagem. Uma conta não pode pertencer a dois grupos da mesma demonstração. ${editor.demonstracao === 'dre'
+                    ? 'O sinal segue o movimento da conta no balancete, inclusive estornos, sem escolha manual.'
+                    : 'Os sinais são aplicados aos valores absolutos das contas.'}`}</p>
                 <Input aria-label="Pesquisar contas" placeholder="Pesquisar por código ou descrição" value={busca} onChange={event => setBusca(event.target.value)} />
                 <div className="h-[45vh] min-h-64 space-y-1 overflow-y-auto rounded border p-2">
                   {catalogo.filter(conta => `${conta.codigo} ${conta.descricao}`.toLocaleLowerCase().includes(busca.toLocaleLowerCase())).map(conta => {
                     const grupoExistente = grupoDaConta(conta.codigo);
                     const incompleta = contasIncompletas.has(conta.codigo);
-                    const indisponivel = incompleta || Boolean(grupoExistente);
+                    const incompletaNaoSelecionavel = incompleta && editor.demonstracao !== 'dfc';
+                    const indisponivel = incompletaNaoSelecionavel || Boolean(grupoExistente);
                     return (
                       <label key={conta.codigo} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-3 py-2 text-base hover:bg-muted">
                         <input type="checkbox" className="size-5 shrink-0" disabled={indisponivel} checked={alvoEditor.itens.some(item => item.referencia === conta.codigo)} onChange={event => selecionar(conta.codigo, event.target.checked)} />
-                        <span className={indisponivel ? 'text-muted-foreground' : ''}>{conta.codigo} — {conta.descricao}{incompleta
+                        <span className={indisponivel ? 'text-muted-foreground' : ''}>{conta.codigo} — {conta.descricao}{incompletaNaoSelecionavel
                           ? ' (incompleta/agrupadora — não selecionável)'
                           : grupoExistente ? ` (já vinculada ao grupo "${grupoExistente.nome}")` : ''}</span>
                       </label>
@@ -735,7 +827,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                 <h4 className="text-sm font-semibold">Itens selecionados ({alvoEditor.itens.length})</h4>
                 {alvoEditor.itens.map(item => <div key={item.referencia} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-sm">
                   <span>{alvoEditor.tipo === 'contas' ? `${item.referencia} — ${catalogo.find(conta => conta.codigo === item.referencia)?.descricao ?? 'Conta não encontrada nos períodos carregados'}` : cadastro?.linhas.find(linha => linha.id === item.referencia)?.nome}</span>
-                  <div className="flex gap-2">{editor.demonstracao !== 'dre' && operacao(item)}<Button variant="outline" size="sm" aria-label={`Remover item ${item.referencia}`} onClick={() => selecionar(item.referencia, false)}>Remover</Button></div>
+                  <div className="flex gap-2">{editor.demonstracao !== 'dre' && editor.demonstracao !== 'dfc' && operacao(item)}<Button variant="outline" size="sm" aria-label={`Remover item ${item.referencia}`} onClick={() => selecionar(item.referencia, false)}>Remover</Button></div>
                 </div>)}
               </div>
               </>}

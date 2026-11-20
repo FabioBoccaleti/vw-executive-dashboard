@@ -92,6 +92,66 @@ it('detalha valores da DRE por conta para cada ano e no acumulado, preservando a
   expect(screen.queryByRole('row', { name: /3\.1 — Receita/ })).not.toBeInTheDocument();
 });
 
+it('exibe DFC Direto por mês e no acumulado de janeiro até o mês selecionado', async () => {
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+    if (ano !== 2026) return null;
+    if (mes === 1) return { rawText: [
+      'A;3.1;Receita;0;0;1000;-1000',
+      'A;4.1;Custo;0;300;0;300',
+      'A;1.1;Caixa;100;50;0;150',
+      'P;2.1;Fornecedores;10;0;30;40',
+    ].join('\n') };
+    if (mes === 2) return { rawText: [
+      'A;3.1;Receita;-1000;0;500;-1500',
+      'A;4.1;Custo;300;100;0;400',
+      'A;1.1;Caixa;150;25;0;175',
+      'P;2.1;Fornecedores;40;0;10;50',
+    ].join('\n') };
+    return null;
+  });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'fluxo', nome: 'Fluxo operacional', demonstracao: 'dfc', tipo: 'contas', itens: [
+      { referencia: '3.1', operacao: 1 }, { referencia: '4.1', operacao: 1 },
+      { referencia: '1.1', operacao: 1 }, { referencia: '2.1', operacao: 1 },
+    ] },
+  ] };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  await screen.findByRole('rowheader', { name: 'Fluxo operacional' });
+  expect(screen.getByRole('columnheader', { name: 'Fev/26' })).toBeInTheDocument();
+  expect(within(screen.getByRole('row', { name: /Fluxo operacional/ })).getByRole('cell')).toHaveTextContent('385');
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Fluxo operacional' }));
+  expect(within(await screen.findByRole('row', { name: /3\.1 — Receita/ })).getByRole('cell')).toHaveTextContent('500');
+  expect(within(screen.getByRole('row', { name: /4\.1 — Custo/ })).getByRole('cell')).toHaveTextContent('(100)');
+  fireEvent.click(screen.getByRole('button', { name: 'Acumulado (Jan–Fev/26)' }));
+  await waitFor(() => {
+    expect(within(screen.getByRole('row', { name: /Fluxo operacional/ })).getByRole('cell')).toHaveTextContent('1.065');
+    expect(within(screen.getByRole('row', { name: /1\.1 — Caixa/ })).getByRole('cell')).toHaveTextContent('(75)');
+  });
+});
+
+it('pré-carrega o mapeamento DFC, mostra contas fora da DFC e destaca contas sem prefixo', async () => {
+  mocks.raw.mockResolvedValue({ rawText: [
+    'A;3.1.1;Receita detalhada;0;0;100;0',
+    'A;1.1.1.01.01.001;Caixa;0;20;10;0',
+    'A;9.9.9;Conta sem regra;0;5;0;0',
+  ].join('\n') });
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  await screen.findByRole('rowheader', { name: 'Atividades Operacionais' });
+  expect(screen.getByRole('rowheader', { name: 'Recebimentos de clientes' })).toBeInTheDocument();
+  expect(within(screen.getByRole('row', { name: /Atividades Operacionais/ })).getAllByRole('cell')[0]).toHaveTextContent('100');
+  expect(screen.queryByRole('rowheader', { name: 'Contas fora da DFC' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Recebimentos de clientes' }));
+  expect(await screen.findByRole('row', { name: /3\.1\.1 — Receita detalhada/ })).toBeInTheDocument();
+  const foraDfc = screen.getByRole('region', { name: 'Contas fora da DFC' });
+  fireEvent.click(within(foraDfc).getByText('Caixa (1 conta)'));
+  expect(await screen.findByRole('row', { name: /1\.1\.1\.01\.01\.001 — Caixa/ })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Contas não mapeadas (1)' }));
+  expect(screen.getByRole('row', { name: /9\.9\.9 — Conta sem regra/ })).toBeInTheDocument();
+});
+
 it('marca como indisponível o detalhe de uma conta agrupadora vinculada em cadastro antigo', async () => {
   mocks.raw.mockResolvedValue({ rawText: 'S;3.1;Conta agrupadora;0;0;100;0\nA;3.1.1;Conta analítica;0;0;100;0' });
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
@@ -178,7 +238,8 @@ it('permite transformar uma linha da DRE em sublinhas e voltar sem perder suas c
   fireEvent.click(edicao.getByRole('button', { name: 'Aplicar linha' }));
   fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
   await screen.findByText('Cadastro salvo com sucesso.');
-  expect(persistido?.linhas).toHaveLength(2);
+  expect(persistido?.linhas.filter(linha => linha.demonstracao === 'dre')).toHaveLength(2);
+  expect(persistido?.linhas.filter(linha => linha.demonstracao === 'dfc')).toHaveLength(25);
   fireEvent.click(screen.getByRole('tab', { name: 'DRE' }));
   await waitFor(() => expect(within(screen.getByRole('row', { name: /Resultado/ })).getByRole('cell')).toHaveTextContent('1.200'));
 });
@@ -253,7 +314,8 @@ it.each([
   fireEvent.click(edicao.getByRole('button', { name: 'Aplicar linha' }));
   fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
   await screen.findByText('Cadastro salvo com sucesso.');
-  expect(persistido?.linhas).toHaveLength(2);
+  expect(persistido?.linhas.filter(linha => linha.demonstracao === demonstracao)).toHaveLength(2);
+  expect(persistido?.linhas.filter(linha => linha.demonstracao === 'dfc')).toHaveLength(25);
   fireEvent.click(screen.getByRole('tab', { name: titulo }));
   await waitFor(() => expect(within(screen.getByRole('row', { name: /Total geral/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(80)', '(40)']));
 });
@@ -373,7 +435,7 @@ it('cadastra Endividamento separadamente do Passivo e compara os saldos após re
     { id: 'passivo', nome: 'Obrigações', demonstracao: 'passivo', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }] },
   ] };
   const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
-  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['DRE', 'Ativo', 'Passivo', 'Endividamento', 'Cadastros']);
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['DRE', 'Ativo', 'Passivo', 'DFC', 'Endividamento', 'Cadastros']);
   await abrirCadastros();
   fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'endividamento' } });
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));

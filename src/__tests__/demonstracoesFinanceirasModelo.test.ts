@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
-import { calcularLinhas, identificarContasIncompletas, identificarContasNaoClassificadas, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { aplicarModeloDfcPadrao, calcularLinhas, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 
 const grupo = (id: string, conta: string, operacao: 1 | -1 = 1): LinhaDemonstracao => ({
   id, nome: id, demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: conta, operacao }],
@@ -61,6 +61,89 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     const anterior = extractAccounts('A;1.1;Caixa;90,00;80,00;20,00;150,00', { strict: true });
     expect(calcularLinhas([linha], 'ativo', [atual]).get('Caixa')).toBe(160);
     expect(calcularLinhas([linha], 'ativo', [anterior]).get('Caixa')).toBe(150);
+  });
+
+  it('calcula DFC Direto mensal e acumulado pelo movimento Crédito − Débito', () => {
+    const sublinhas: LinhaDemonstracao[] = [
+      ...[
+        ['Receita', '3.1', 1],
+        ['Custo', '4.1', 1],
+        ['Caixa', '1.1', 1],
+        ['Fornecedores', '2.1', 1],
+      ].map(([id, referencia, operacao]) => ({
+        ...grupo(String(id), String(referencia), Number(operacao) as 1 | -1),
+        demonstracao: 'dfc' as const,
+        sublinhaDe: 'Fluxo',
+      })),
+    ];
+    const linhas: LinhaDemonstracao[] = [
+      { ...total('Fluxo', sublinhas.map(linha => linha.id)), demonstracao: 'dfc' },
+      ...sublinhas,
+    ];
+    const jan = extractAccounts([
+      'A;3.1;Receita;0;0;1000;-1000',
+      'A;4.1;Custo;0;300;0;300',
+      'A;1.1;Caixa;100;50;0;150',
+      'P;2.1;Fornecedores;10;0;30;40',
+    ].join('\n'), { strict: true });
+    const fev = extractAccounts([
+      'A;3.1;Receita;-1000;0;500;-1500',
+      'A;4.1;Custo;300;100;0;400',
+      'A;1.1;Caixa;150;25;0;175',
+      'P;2.1;Fornecedores;40;0;10;50',
+    ].join('\n'), { strict: true });
+
+    expect(validarLinhas(linhas)).toBeNull();
+    expect([...calcularLinhas(linhas, 'dfc', [fev]).values()]).toEqual([385, 500, -100, -25, 10]);
+    expect([...calcularLinhas(linhas, 'dfc', [jan, fev]).values()]).toEqual([1065, 1500, -400, -75, 40]);
+  });
+
+  it('semeia o modelo DFC uma vez, preservando uma configuração salva mesmo quando removida', () => {
+    const inicial = aplicarModeloDfcPadrao(cadastroVazio());
+    const linhasDfc = inicial.linhas.filter(linha => linha.demonstracao === 'dfc');
+    expect(linhasDfc).toHaveLength(25);
+    expect(linhasDfc.filter(linha => linha.tipo === 'contas' && !linha.foraDfc)).toHaveLength(18);
+    expect(linhasDfc.filter(linha => linha.tipo === 'contas').reduce((total, linha) => total + linha.itens.length, 0)).toBe(189);
+    expect(validarLinhas(inicial.linhas)).toBeNull();
+
+    const personalizada = {
+      ...inicial,
+      linhas: inicial.linhas.map(linha => linha.id === 'dfc-op01' ? { ...linha, nome: 'Receita ajustada pelo usuário' } : linha),
+    };
+    expect(aplicarModeloDfcPadrao(personalizada)).toBe(personalizada);
+
+    const removida = { ...inicial, linhas: inicial.linhas.filter(linha => linha.demonstracao !== 'dfc') };
+    expect(aplicarModeloDfcPadrao(removida).linhas.some(linha => linha.demonstracao === 'dfc')).toBe(false);
+  });
+
+  it('classifica pelo prefixo mais longo, mantém contas fora dos totais e lista contas não mapeadas', () => {
+    const principal: LinhaDemonstracao = { ...total('Atividades Operacionais', ['Linha ampla', 'Linha específica']), demonstracao: 'dfc' };
+    const ampla: LinhaDemonstracao = {
+      ...grupo('Linha ampla', '1.1'), demonstracao: 'dfc', sublinhaDe: principal.id,
+    };
+    const especifica: LinhaDemonstracao = {
+      ...grupo('Linha específica', '1.1.1'), demonstracao: 'dfc', sublinhaDe: principal.id,
+    };
+    const fora: LinhaDemonstracao = {
+      ...total('Contas fora da DFC', ['Caixa']), demonstracao: 'dfc', foraDfc: true,
+    };
+    const caixa: LinhaDemonstracao = {
+      ...grupo('Caixa', '2.3'), demonstracao: 'dfc', sublinhaDe: fora.id, foraDfc: true,
+    };
+    const linhas = [principal, ampla, especifica, fora, caixa];
+    const contas = extractAccounts([
+      'A;1.1.1.01.01.001;Caixa;0;20;10;0',
+      'A;1.1.2.01.01.001;Cliente;0;20;70;0',
+      'A;2.3.1.01;PL;0;25;0;0',
+      'A;9.9.1;Sem prefixo;0;5;0;0',
+    ].join('\n'), { strict: true });
+
+    expect(validarLinhas(linhas)).toBeNull();
+    expect([...calcularLinhas(linhas, 'dfc', [contas]).values()]).toEqual([40, 50, -10, -25, -25]);
+    expect(listarContasDfcDaLinha(linhas, 'Linha específica', [contas]).map(item => item.referencia)).toEqual(['1.1.1.01.01.001']);
+    expect(identificarContasDfcNaoMapeadas(linhas, [[contas]])).toEqual([
+      { conta: '9.9.1', desc: 'Sem prefixo', valores: [-5] },
+    ]);
   });
 
   it('preserva centavos e ignora operações manuais antigas tanto nas contas quanto nas totalizações da DRE', () => {

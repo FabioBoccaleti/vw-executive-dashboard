@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { ContaBalancete } from '../balanceteParser';
+import { DFC_LINHAS_PADRAO, DFC_PREFIXOS_PADRAO, DFC_SECOES_PADRAO } from './dfcModeloPadrao';
 
-export const TIPOS = { dre: 'DRE', ativo: 'Ativo', passivo: 'Passivo', endividamento: 'Endividamento' } as const;
+export const TIPOS = { dre: 'DRE', ativo: 'Ativo', passivo: 'Passivo', dfc: 'DFC', endividamento: 'Endividamento' } as const;
 export type TipoDemonstracao = keyof typeof TIPOS;
 export const MESES = ['Anual', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -23,11 +24,12 @@ export type Captacao = z.infer<typeof captacaoSchema>;
 const linhaSchema = z.object({
   id: z.string().min(1),
   nome: z.string().trim().min(1),
-  demonstracao: z.enum(['dre', 'ativo', 'passivo', 'endividamento']),
+  demonstracao: z.enum(['dre', 'ativo', 'passivo', 'dfc', 'endividamento']),
   tipo: z.enum(['contas', 'total']),
   itens: z.array(itemSchema).min(1),
   bancoDe: z.string().min(1).optional(),
   sublinhaDe: z.string().min(1).optional(),
+  foraDfc: z.boolean().optional(),
   captacao: captacaoSchema.optional(),
 });
 export const cadastroSchema = z.object({
@@ -35,6 +37,7 @@ export const cadastroSchema = z.object({
   empresa: z.object({ nome: z.string(), cnpj: z.string(), nire: z.string() }),
   linhas: z.array(linhaSchema),
   assinantes: z.array(z.object({ id: z.string(), nome: z.string(), cargo: z.string(), registro: z.string() })),
+  dfcModeloInicializado: z.boolean().optional(),
 });
 export type CadastroDemonstracoes = z.infer<typeof cadastroSchema>;
 export type LinhaDemonstracao = z.infer<typeof linhaSchema>;
@@ -69,7 +72,7 @@ export function identificarContasIncompletas(periodos: Array<ContasBalancete | n
 }
 
 export function validarContasCompletas(linhas: LinhaDemonstracao[], incompletas: Set<string>): string | null {
-  const conta = linhas.filter(linha => linha.tipo === 'contas')
+  const conta = linhas.filter(linha => linha.tipo === 'contas' && linha.demonstracao !== 'dfc')
     .flatMap(linha => linha.itens).find(item => incompletas.has(item.referencia));
   return conta ? `A conta ${conta.referencia} está incompleta ou é agrupadora. Selecione apenas contas completas (analíticas).` : null;
 }
@@ -110,7 +113,73 @@ export function identificarContasNaoClassificadas(
 }
 
 export function cadastroVazio(): CadastroDemonstracoes {
-  return { version: '', empresa: { nome: '', cnpj: '', nire: '' }, linhas: [], assinantes: [] };
+  return { version: '', empresa: { nome: '', cnpj: '', nire: '' }, linhas: [], assinantes: [], dfcModeloInicializado: false };
+}
+
+export function criarLinhasDfcPadrao(): LinhaDemonstracao[] {
+  const linhas: LinhaDemonstracao[] = [];
+  for (const secao of DFC_SECOES_PADRAO) {
+    const sublinhas = DFC_LINHAS_PADRAO.filter(linha => linha.secao === secao.id);
+    const idSecao = `dfc-${secao.id}`;
+    linhas.push({
+      id: idSecao,
+      nome: secao.nome,
+      demonstracao: 'dfc',
+      tipo: 'total',
+      itens: sublinhas.map(linha => ({ referencia: `dfc-${linha.codigo.toLowerCase()}`, operacao: 1 })),
+    });
+    for (const linha of sublinhas) {
+      linhas.push({
+        id: `dfc-${linha.codigo.toLowerCase()}`,
+        nome: linha.nome,
+        demonstracao: 'dfc',
+        tipo: 'contas',
+        sublinhaDe: idSecao,
+        itens: DFC_PREFIXOS_PADRAO
+          .filter(prefixo => prefixo.linha === linha.codigo)
+          .map(prefixo => ({ referencia: prefixo.referencia, operacao: 1 })),
+      });
+    }
+  }
+
+  const gruposFora = [
+    { codigo: 'CAIXA', id: 'dfc-fora-caixa', nome: 'Caixa' },
+    { codigo: 'PL', id: 'dfc-fora-pl', nome: 'Patrimônio Líquido' },
+    { codigo: 'COMP', id: 'dfc-fora-compensacoes', nome: 'Compensações' },
+  ] as const;
+  const idFora = 'dfc-fora';
+  linhas.push({
+    id: idFora,
+    nome: 'Contas fora da DFC',
+    demonstracao: 'dfc',
+    tipo: 'total',
+    foraDfc: true,
+    itens: gruposFora.map(grupo => ({ referencia: grupo.id, operacao: 1 })),
+  });
+  for (const grupo of gruposFora) {
+    linhas.push({
+      id: grupo.id,
+      nome: grupo.nome,
+      demonstracao: 'dfc',
+      tipo: 'contas',
+      sublinhaDe: idFora,
+      foraDfc: true,
+      itens: DFC_PREFIXOS_PADRAO
+        .filter(prefixo => prefixo.linha === grupo.codigo)
+        .map(prefixo => ({ referencia: prefixo.referencia, operacao: 1 })),
+    });
+  }
+  return linhas;
+}
+
+export function aplicarModeloDfcPadrao(cadastro: CadastroDemonstracoes): CadastroDemonstracoes {
+  if (cadastro.dfcModeloInicializado) return cadastro;
+  const jaConfigurada = cadastro.linhas.some(linha => linha.demonstracao === 'dfc');
+  return {
+    ...cadastro,
+    linhas: jaConfigurada ? cadastro.linhas : [...cadastro.linhas, ...criarLinhasDfcPadrao()],
+    dfcModeloInicializado: true,
+  };
 }
 
 export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
@@ -130,7 +199,10 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
       if (referencias.has(item.referencia)) return `Referência repetida em "${linha.nome}".`;
       referencias.add(item.referencia);
       if (linha.tipo === 'contas') {
-        const duplicada = contas.find(conta => conta.demonstracao === linha.demonstracao && mesmaHierarquia(conta.conta, item.referencia));
+        const duplicada = contas.find(conta => conta.demonstracao === linha.demonstracao
+          && (linha.demonstracao === 'dfc'
+            ? conta.conta === item.referencia
+            : mesmaHierarquia(conta.conta, item.referencia)));
         if (duplicada) return `A conta ${item.referencia} se sobrepõe à conta ${duplicada.conta}, no grupo "${duplicada.grupo}". Não selecione uma conta totalizadora junto com suas subcontas.`;
         contas.push({ conta: item.referencia, grupo: linha.nome, demonstracao: linha.demonstracao });
       }
@@ -144,6 +216,7 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
     const demonstracao = linha.demonstracao;
     if ((linha.bancoDe && linha.sublinhaDe) || (linha.bancoDe ? demonstracao !== 'endividamento' : demonstracao === 'endividamento')
       || linha.tipo !== 'contas' || principal?.demonstracao !== demonstracao
+      || (demonstracao === 'dfc' && Boolean(linha.foraDfc) !== Boolean(principal?.foraDfc))
       || linhaPai(principal) || principal.tipo !== 'total' || !principal.itens.every(item => {
         const filha = porId.get(item.referencia);
         return filha && linhaPai(filha) === principal.id && item.operacao === 1;
@@ -164,7 +237,8 @@ export function validarLinhas(linhas: LinhaDemonstracao[]): string | null {
     else {
       for (const item of linha.itens) {
         const origem = porId.get(item.referencia);
-        if (!origem || origem.demonstracao !== linha.demonstracao || (linhaPai(origem) && linhaPai(origem) !== linha.id)) {
+        if (!origem || origem.demonstracao !== linha.demonstracao || (linhaPai(origem) && linhaPai(origem) !== linha.id)
+          || (linha.demonstracao === 'dfc' && Boolean(origem.foraDfc) !== Boolean(linha.foraDfc))) {
           return `A totalização "${linha.nome}" deve usar somente linhas cadastradas na mesma demonstração.`;
         }
         const erro = resolverComposicao(origem);
@@ -200,6 +274,13 @@ export function calcularConta(
   incompletas = identificarContasIncompletas(periodos),
 ): number | null {
   if (!periodos.length || periodos.some(periodo => periodo === null) || incompletas.has(item.referencia)) return null;
+  if (demonstracao === 'dfc') {
+    const movimento = periodos.reduce((total, periodo) => {
+      const conta = periodo?.[item.referencia];
+      return total + (conta?.valCred ?? 0) - (conta?.valDeb ?? 0);
+    }, 0);
+    return Math.round(movimento * 100) / 100;
+  }
   let valor = 0;
   for (const periodo of periodos) {
     const conta = periodo?.[item.referencia];
@@ -211,6 +292,68 @@ export function calcularConta(
     : Math.round(Math.abs(valor) * 100) * item.operacao / 100;
 }
 
+interface ContasDfcDistribuidas {
+  porLinha: Map<string, ContaBalancete[]>;
+  naoMapeadas: ContaBalancete[];
+}
+
+function distribuirContasDfc(linhas: LinhaDemonstracao[], periodos: Array<ContasBalancete | null>): ContasDfcDistribuidas {
+  const regras = linhas.filter(linha => linha.demonstracao === 'dfc' && linha.tipo === 'contas')
+    .flatMap(linha => linha.itens.map(item => ({ prefixo: item.referencia, linha: linha.id })))
+    .sort((a, b) => b.prefixo.length - a.prefixo.length);
+  const incompletas = identificarContasIncompletas(periodos);
+  const contas = new Map<string, ContaBalancete>();
+  for (const periodo of periodos) {
+    for (const conta of Object.values(periodo ?? {})) {
+      if (!incompletas.has(conta.conta)) contas.set(conta.conta, conta);
+    }
+  }
+
+  const porLinha = new Map<string, ContaBalancete[]>();
+  const naoMapeadas: ContaBalancete[] = [];
+  for (const conta of contas.values()) {
+    const regra = regras.find(({ prefixo }) => conta.conta === prefixo || conta.conta.startsWith(`${prefixo}.`));
+    if (!regra) {
+      naoMapeadas.push(conta);
+      continue;
+    }
+    const grupo = porLinha.get(regra.linha) ?? [];
+    grupo.push(conta);
+    porLinha.set(regra.linha, grupo);
+  }
+  const ordenar = (a: ContaBalancete, b: ContaBalancete) =>
+    a.conta.localeCompare(b.conta, undefined, { numeric: true });
+  for (const contasDaLinha of porLinha.values()) contasDaLinha.sort(ordenar);
+  naoMapeadas.sort(ordenar);
+  return { porLinha, naoMapeadas };
+}
+
+export function listarContasDfcDaLinha(
+  linhas: LinhaDemonstracao[],
+  linhaId: string,
+  periodos: Array<ContasBalancete | null>,
+): ItemDemonstracao[] {
+  return (distribuirContasDfc(linhas, periodos).porLinha.get(linhaId) ?? [])
+    .map(conta => ({ referencia: conta.conta, operacao: 1 }));
+}
+
+export function identificarContasDfcNaoMapeadas(
+  linhas: LinhaDemonstracao[],
+  colunas: Array<Array<ContasBalancete | null>>,
+): ContaNaoClassificada[] {
+  const distribuidas = distribuirContasDfc(linhas, colunas.flat());
+  return distribuidas.naoMapeadas.map(conta => ({
+    conta: conta.conta,
+    desc: conta.desc,
+    valores: colunas.map(periodos => periodos.length === 0 || periodos.some(periodo => periodo === null)
+      ? null
+      : Math.round(periodos.reduce((total, periodo) => {
+        const item = periodo?.[conta.conta];
+        return total + (item?.valCred ?? 0) - (item?.valDeb ?? 0);
+      }, 0) * 100) / 100),
+  }));
+}
+
 export function calcularLinhas(
   linhas: LinhaDemonstracao[],
   demonstracao: TipoDemonstracao,
@@ -218,6 +361,36 @@ export function calcularLinhas(
 ): Map<string, number | null> {
   const erro = validarLinhas(linhas);
   if (erro) throw new Error(erro);
+  if (demonstracao === 'dfc') {
+    const distribuidas = distribuirContasDfc(linhas, periodos);
+    const linhasDfc = linhas.filter(item => item.demonstracao === 'dfc');
+    const porId = new Map(linhasDfc.map(linha => [linha.id, linha]));
+    const resultado = new Map<string, number | null>();
+    function calcular(linha: LinhaDemonstracao): number | null {
+      if (resultado.has(linha.id)) return resultado.get(linha.id) ?? null;
+      let total = 0;
+      let disponivel = periodos.length > 0 && periodos.every(periodo => periodo !== null);
+      if (linha.tipo === 'total') {
+        for (const item of linha.itens) {
+          const origem = porId.get(item.referencia);
+          const valor = origem ? calcular(origem) : null;
+          if (valor === null || valor === undefined) disponivel = false;
+          else total += Math.round(valor * 100);
+        }
+      } else {
+        for (const conta of distribuidas.porLinha.get(linha.id) ?? []) {
+          for (const periodo of periodos) {
+            const atual = periodo?.[conta.conta];
+            total += Math.round(((atual?.valCred ?? 0) - (atual?.valDeb ?? 0)) * 100);
+          }
+        }
+      }
+      const valor = disponivel ? total / 100 : null;
+      resultado.set(linha.id, valor);
+      return valor;
+    }
+    return new Map(linhasDfc.map(linha => [linha.id, calcular(linha)]));
+  }
   const incompletas = identificarContasIncompletas(periodos);
   const linhasDemonstracao = linhas.filter(item => item.demonstracao === demonstracao);
   const porId = new Map(linhasDemonstracao.map(linha => [linha.id, linha]));
