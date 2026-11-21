@@ -5,7 +5,7 @@ import {
   calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasIncompletas, identificarContasNaoClassificadas, linhaPai, listarContasDaLinha,
   type CadastroDemonstracoes, type DadosDemonstracoes, type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
-import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
+import { criarLinhasDfcIndiretoTabela, deveExibirLinhaDfc } from './dfcTabela';
 import type { EscopoNotaDfc, NotaDfc } from './storage';
 import type { ConferenciasExportacao } from './conferenciasDados';
 import type { ContaConferencia, EstadoConferencia } from './conferenciasModelo';
@@ -556,6 +556,7 @@ function adicionarPlanilhaFluxo(
     const valores = colunas.map((_, index) => linha.ocultarValores ? null : metodo === 'indireto'
       ? resultadosIndiretos?.[index].valores.get(linha.id) ?? null
       : resultadosDiretos[index].get(linha.id) ?? null);
+    if (linha.estilo === 'normal' && !deveExibirLinhaDfc(valores)) continue;
     adicionarLinhaDados(ws, linha.nome, valores, linha.estilo, 'recuo' in linha ? linha.recuo : false);
   }
 

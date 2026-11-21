@@ -2,6 +2,10 @@ import type { LinhaDemonstracao } from './modelo';
 import { linhaPai } from './modelo';
 import { DFC_INDIRETO_AJUSTES, DFC_INDIRETO_VARIACOES } from './dfcMetodoIndireto';
 
+export function deveExibirLinhaDfc(valores: ReadonlyArray<number | null | undefined>): boolean {
+  return valores.length === 0 || valores.some(valor => valor !== 0);
+}
+
 export type LinhaDfcIndiretoTabela = {
   id: string;
   nome: string;

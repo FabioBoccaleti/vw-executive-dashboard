@@ -11,7 +11,88 @@ import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/Dem
 import type { ConferenciasExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
 
 describe('Exportação Excel das demonstrações financeiras', () => {
-  it('exporta somente variações de detalhes elegíveis e preserva a célula percentual de 12%', async () => {
+  it('oculta detalhes zerados da DFC nos dois métodos, conserva períodos com valores e não altera o cadastro', async () => {
+    const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
+    const ids = cadastro.linhas.map(linha => linha.id);
+    const dados: DadosDemonstracoes = {};
+    for (const ano of [2026, 2025]) {
+      for (const mes of [1, 2]) {
+        dados[chavePeriodo({ ano, mes })] = extractAccounts([
+          `R;3.1.01;Receita;0;${mes === 2 ? 100 : 0};${mes === 1 ? 100 : 0};0`,
+          `D;5.1.3.04.01;Depreciação;0;${ano === 2025 && mes === 1 ? '0,01' : 0};0;0`,
+        ].join('\n'), { strict: true });
+      }
+    }
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados, anos: [2026, 2025], mesLimite: 2, incluirNotasAnuais: false, notas: [],
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    const direto = reopened.getWorksheet('DFC Direto')!;
+    expect(direto.getColumn(1).values).not.toContain('Pagamentos a empregados');
+    expect(direto.getColumn(1).values).toContain('Recebimentos de clientes');
+    const receita = direto.getColumn(1).values.indexOf('Recebimentos de clientes');
+    expect([2, 3, 4].map(coluna => direto.getCell(receita, coluna).value)).toEqual([100, -100, 0]);
+    expect(direto.getColumn(1).values).toContain('Atividades de Investimento');
+    expect(direto.getColumn(1).values).toContain('CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO');
+    const indireto = reopened.getWorksheet('DFC Indireto')!;
+    expect(indireto.getColumn(1).values).not.toContain('(–) Ganho / (+) perda na venda de imobilizado');
+    expect(indireto.getColumn(1).values).toContain('(+) Depreciação e amortização');
+    expect(indireto.getColumn(1).values).toContain('Ajustes ao resultado');
+    expect(indireto.getColumn(1).values).toContain('Resultado ajustado');
+    const depreciacao = indireto.getColumn(1).values.indexOf('(+) Depreciação e amortização');
+    expect(indireto.getCell(depreciacao, 5).value).toBe(0.01);
+    expect(cadastro.linhas.map(linha => linha.id)).toEqual(ids);
+  });
+
+  it('mantém detalhes da DFC no Excel quando há período indisponível', async () => {
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro: aplicarModeloDfcPadrao(cadastroVazio()),
+      dados: { [chavePeriodo({ ano: 2026, mes: 2 })]: extractAccounts('R;3.1.01;Receita;0;0;0;0', { strict: true }) },
+      anos: [2026], mesLimite: 2, incluirNotasAnuais: false, notas: [],
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    expect(reopened.getWorksheet('DFC Direto')!.getColumn(1).values).toContain('Pagamentos a empregados');
+    expect(reopened.getWorksheet('DFC Indireto')!.getColumn(1).values).toContain('(+) Depreciação e amortização');
+  });
+
+  it('exporta a diferença da DFC zerada em janeiro e outubro com variação real e soma das seções numéricas', async () => {
+    const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
+    const config = CONFERENCIAS_CONFIG_PADRAO;
+    const dados: DadosDemonstracoes = {};
+    const conferencias: ConferenciasExportacao[] = [[1, 579874.62], [10, 51247.34]].map(([mes, fluxo]) => {
+      const decimal = (valor: number) => valor.toFixed(2).replace('.', ',');
+      const contas = extractAccounts(`A;1.1.1.01;Caixa;1000000;${decimal(fluxo)};0;${decimal(1000000 + fluxo)}\nR;3.1.01;Receita;0;0;${decimal(fluxo)};${decimal(-fluxo)}\nP;2.3.1.01;Capital;-1000000;0;0;-1000000`, { strict: true });
+      dados[chavePeriodo({ ano: 2026, mes })] = contas;
+      const resultados = construirConferencias({
+        ano: 2026, mes, atual: contas, anterior: null, proximo: null, acumulado: [contas],
+        mesesDoAno: [], mesesAnteriores: [], cadastro, config,
+      });
+      expect(resultados.find(item => item.id === 'caixa-dfc')!.estado).toBe('ok');
+      return { ano: 2026, mes, resultados, config, snapshots: [], comparacoes: [] };
+    });
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados, anos: [2026], mesLimite: 10, incluirNotasAnuais: false, notas: [], conferencias,
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    const ws = reopened.getWorksheet('Conferências')!;
+    const valores: ExcelJS.CellValue[][] = [];
+    ws.eachRow(row => {
+      if (row.getCell(1).value === 'DFC — seções − variação de caixa') {
+        valores.push([2, 3, 4].map(coluna => row.getCell(coluna).value));
+        expect(row.getCell(4).numFmt).toContain('#,##0.00');
+      }
+    });
+    expect(valores).toEqual([[579874.62, 579874.62, 0], [51247.34, 51247.34, 0]]);
+    expect(ws.getColumn(1).values).not.toContain('DFC — seções − variação de caixa − itens fora DFC');
+  });
+
+  it.each([
+    { valorAtual: 22400000, percentual: 0.12, linhasAlertadas: ['Receita'] },
+    { valorAtual: 34620000, percentual: 0.731, linhasAlertadas: ['Receita', 'Estoque'] },
+  ])('exporta somente detalhes elegíveis e formata a variação $percentual como percentual com uma casa decimal', async ({ valorAtual, percentual, linhasAlertadas }) => {
     const cadastro = {
       ...cadastroVazio(),
       linhas: [
@@ -23,14 +104,14 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     };
     const periodo = (valor: number) => extractAccounts(`A;1.1.2.01;Estoque;0;0;0;${valor}\nR;3.1.01;Receita;0;0;${valor};0`, { strict: true });
     const anterior = periodo(20000000);
-    const atual = periodo(22400000);
+    const atual = periodo(valorAtual);
     const config = CONFERENCIAS_CONFIG_PADRAO;
     const resultados = construirConferencias({
       ano: 2026, mes: 4, atual, anterior, proximo: null, acumulado: [atual],
       mesesDoAno: [], mesesAnteriores: [1, 2, 3].map(mes => ({ ano: 2026, mes, contas: anterior })),
       cadastro, config,
     });
-    expect(resultados.find(item => item.id === 'alertas')!.variacoesAtipicas!.map(item => item.linha)).toEqual(['Receita']);
+    expect(resultados.find(item => item.id === 'alertas')!.variacoesAtipicas!.map(item => item.linha)).toEqual(linhasAlertadas);
     const workbook = criarWorkbookDemonstracoesFinanceiras({
       cadastro, dados: { [chavePeriodo({ ano: 2026, mes: 4 })]: atual },
       anos: [2026], mesLimite: 4, incluirNotasAnuais: false, notas: [],
@@ -41,9 +122,9 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     const ws = reopened.getWorksheet('Conferências')!;
     const indice = ws.getColumn(2).values.indexOf('Receita — Variação superior ao limite absoluto.');
     expect(indice).toBeGreaterThan(0);
-    expect([3, 4, 5, 6].map(coluna => ws.getCell(indice, coluna).value)).toEqual([22400000, 20000000, 2400000, 0.12]);
-    expect(ws.getCell(indice, 6).numFmt).toContain('%');
-    expect(ws.getColumn(3).values.filter(valor => valor === 'Valor do mês')).toHaveLength(1);
+    expect([3, 4, 5, 6].map(coluna => ws.getCell(indice, coluna).value)).toEqual([valorAtual, 20000000, valorAtual - 20000000, percentual]);
+    expect(ws.getCell(indice, 6).numFmt).toMatch(/^0\.0%/);
+    expect(ws.getColumn(3).values.filter(valor => valor === 'Valor do mês')).toHaveLength(linhasAlertadas.length);
   });
 
   it('exporta os efeitos das contas sem linha e o resíduo do item 6 separadamente por método', async () => {
@@ -157,12 +238,8 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     expect(valor('Passivo + PL - Abertura', '2.1.2.01 — Encargos a incorrer')).toBe(-20);
     expect(valor('Passivo + PL', 'Ativo – (Passivo + PL)')).toBe(0);
     const ws = reopened.getWorksheet('Conferências')!;
-    const linhaMaior = ws.getColumn(2).values.indexOf('Débitos por devolução — Esperada devedora · Acima do limite de destaque');
-    const linhaMenor = ws.getColumn(2).values.indexOf('Créditos a identificar — Esperada devedora');
-    expect(linhaMaior).toBeGreaterThan(0);
-    expect(linhaMenor).toBeGreaterThan(0);
-    expect(ws.getCell(linhaMaior, 1).fill).toMatchObject({ fgColor: { argb: 'FFFEF3C7' } });
-    expect(ws.getCell(linhaMenor, 1).fill).not.toMatchObject({ fgColor: { argb: 'FFFEF3C7' } });
+    expect(ws.getColumn(2).values.some(valor => typeof valor === 'string'
+      && /^(Débitos por devolução|Créditos a identificar) — (Esperada|Sugestão)/.test(valor))).toBe(false);
   });
 
   it('preserva sinais importados de amortizações 1.5.7.02 na demonstração, abertura e total do Ativo', async () => {

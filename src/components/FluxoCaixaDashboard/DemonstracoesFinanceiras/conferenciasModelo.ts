@@ -12,7 +12,7 @@ import {
   type LinhaDemonstracao,
   type ResultadoDfcIndireto,
 } from './modelo';
-import type { ConferenciasConfig } from './conferenciasStorage';
+import { PREFIXOS_COMPENSACAO, type ConferenciasConfig } from './conferenciasStorage';
 import { LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID } from './modelo';
 import { DFC_INDIRETO_AJUSTES, DFC_INDIRETO_VARIACOES } from './dfcMetodoIndireto';
 
@@ -223,7 +223,7 @@ function classificarContas(
   conciliacoesDfc: NonNullable<ResultadoConferencia['conciliacoesDfc']>;
 } {
   const contas = contasAnaliticas(atual).filter(conta =>
-    !algumPrefixo(conta.conta, ['1.3', '1.9', '2.4', '2.9'])
+    !algumPrefixo(conta.conta, PREFIXOS_COMPENSACAO)
     && (centavos(conta.saldoAtual) !== 0 || centavos(conta.valDeb) !== 0 || centavos(conta.valCred) !== 0));
   const demos = [
     { id: 'Ativo', codigo: 'ativo' as const, filtro: (conta: string) => isGrupo(conta, '1') },
@@ -408,11 +408,14 @@ function analisarBalancete(periodo: ContasBalancete | null, toleranciaCentavos: 
 }
 
 function naturezaEsperada(conta: ContasBalancete[string], config: ConferenciasConfig): 'devedora' | 'credora' | null {
-  const excluida = config.prefixosExcluidosSinal.some(prefixo => prefixoDe(conta.conta, prefixo));
-  if (excluida) return null;
+  if (algumPrefixo(conta.conta, PREFIXOS_COMPENSACAO)) return null;
   const excecao = [...config.naturezaExcecoes]
     .sort((a, b) => b.prefixo.length - a.prefixo.length)
     .find(item => prefixoDe(conta.conta, item.prefixo));
+  const exclusao = [...config.prefixosExcluidosSinal]
+    .sort((a, b) => b.length - a.length)
+    .find(prefixo => prefixoDe(conta.conta, prefixo));
+  if (exclusao && (!excecao || exclusao.length >= excecao.prefixo.length)) return null;
   let natureza = excecao?.natureza ?? config.naturezaPorGrupo[conta.conta.split('.')[0]] ?? null;
   if (!natureza) return null;
   if (!excecao && config.palavrasRedutoras.some(palavra => normalizarTexto(conta.desc).includes(normalizarTexto(palavra)))) {
@@ -435,19 +438,18 @@ function conferirNatureza(
   const divergentes: ContaConferencia[] = [];
   const semNatureza: ContaConferencia[] = [];
   const redutorasSugeridas: ContaConferencia[] = [];
-  const prefixosRedutoresConfigurados = config.naturezaExcecoes
-    .filter(item => item.natureza === 'credora' && isGrupo(item.prefixo, '1'))
-    .map(item => item.prefixo);
+  const prefixosComNaturezaConfigurada = config.naturezaExcecoes.map(item => item.prefixo);
   for (const conta of analiticas) {
     const natureza = naturezaEsperada(conta, config);
     const saldoAnterior = anterior?.[conta.conta]?.saldoAtual ?? 0;
-    if (!natureza && !config.prefixosExcluidosSinal.some(prefixo => prefixoDe(conta.conta, prefixo))) {
-      if (conta.conta.startsWith('6.') && !['6.1', '6.2', '6.3', '6.5'].some(prefixo => prefixoDe(conta.conta, prefixo))) {
+    if (!natureza) {
+      if (!config.prefixosExcluidosSinal.some(prefixo => prefixoDe(conta.conta, prefixo))
+        && conta.conta.startsWith('6.') && !['6.1', '6.2', '6.3', '6.5'].some(prefixo => prefixoDe(conta.conta, prefixo))) {
         semNatureza.push(montarConta(conta, 'Natureza a definir'));
       }
       continue;
     }
-    if (natureza && centavos(conta.saldoAtual) !== 0
+    if (centavos(conta.saldoAtual) !== 0
       && contaComSinalInvertido(conta, natureza)) {
       const destaque = Math.abs(centavos(conta.saldoAtual)) > config.limiteSinalCentavos;
       divergentes.push({
@@ -458,7 +460,7 @@ function conferirNatureza(
     }
     const correspondePalavraRedutora = config.palavrasRedutoras.some(palavra =>
       normalizarTexto(conta.desc).includes(normalizarTexto(palavra)));
-    if (correspondePalavraRedutora && !prefixosRedutoresConfigurados.some(prefixo => prefixoDe(conta.conta, prefixo))) {
+    if (correspondePalavraRedutora && !prefixosComNaturezaConfigurada.some(prefixo => prefixoDe(conta.conta, prefixo))) {
       redutorasSugeridas.push(montarConta(conta, 'Sugestão de conta redutora'));
     }
   }
@@ -589,7 +591,6 @@ function conferirGrupos(
   cadastro: CadastroDemonstracoes,
   atual: ContasBalancete | null,
   periodosDre: Array<ContasBalancete | null>,
-  config: ConferenciasConfig,
 ) {
   if (!atual) return [];
   const linhasAtivo = cadastro.linhas.filter(linha => linha.demonstracao === 'ativo');
@@ -609,12 +610,9 @@ function conferirGrupos(
     ? null
     : gruposDfc.reduce<number>((total, valor) => total + centavos(valor ?? 0), 0) / 100;
   const caixa = calcularSaldosCaixaEquivalentes(cadastro.dfcContasCaixaEquivalentes ?? ['1.1.1'], [atual]);
-  const foraDfc = cadastro.linhas.filter(linha => linha.demonstracao === 'dfc' && linha.tipo === 'contas' && linha.foraDfc)
-    .reduce((total, linha) => total + centavos(valoresDfc.get(linha.id) ?? 0), 0) / 100;
-  const debitosCreditos = analisarBalancete(atual, config.toleranciaConferenciaCentavos);
-  const diferencaDfc = totalDfc === null || caixa.variacaoReal === null || !debitosCreditos
+  const diferencaDfc = totalDfc === null || caixa.variacaoReal === null
     ? null
-    : reais(centavos(totalDfc) - centavos(caixa.variacaoReal) - centavos(foraDfc) - centavos(debitosCreditos.diferencaDebitosCreditos));
+    : reais(centavos(totalDfc) - centavos(caixa.variacaoReal));
   const somaLinhaAtivo = valorAtivo;
   const ativoGrupo = somarSaldos(atual, conta => isGrupo(conta, '1'), conta => isGrupo(conta, '1.3') || isGrupo(conta, '1.9'));
   const ativoCirculante = somarSaldos(atual, conta => isGrupo(conta, '1.1'));
@@ -632,7 +630,7 @@ function conferirGrupos(
     { nome: 'PL sem resultado — −2.3', esperado: plSemResultado === null ? null : -plSemResultado, somaLinhas: valorLinhasPorGrupo(cadastro.linhas, atual, conta => isGrupo(conta, '2.3'), linha => linha.demonstracao === 'passivo'), diferenca: null, contas: montarContasDeSaldo(atual, conta => isGrupo(conta, '2.3')) },
     { nome: 'Resultado do período — −(3+4+5+6)', esperado: saldoResultado === null ? null : -saldoResultado, somaLinhas: resultadoPeriodo, diferenca: null, contas: montarContasDeSaldo(atual, conta => ['3', '4', '5', '6'].some(grupo => isGrupo(conta, grupo))) },
     { nome: 'DRE — lucro líquido vs grupos 3 a 6', esperado: movimentosDre, somaLinhas: totalRaizes(cadastro.linhas.filter(linha => linha.demonstracao === 'dre'), valoresDre), diferenca: null, modoContas: 'movimentos', contas: montarContasDeMovimento(periodosDre, conta => ['3', '4', '5', '6'].some(grupo => isGrupo(conta, grupo))) },
-    { nome: 'DFC — seções − variação de caixa − itens fora DFC', esperado: debitosCreditos?.diferencaDebitosCreditos ?? null, somaLinhas: diferencaDfc === null ? null : (debitosCreditos?.diferencaDebitosCreditos ?? 0) + diferencaDfc, diferenca: diferencaDfc, modoContas: 'movimentos', contas: montarContasDeMovimento([atual], conta => /^[1-6](?:\.|$)/.test(conta)) },
+    { nome: 'DFC — seções − variação de caixa', esperado: caixa.variacaoReal, somaLinhas: totalDfc, diferenca: diferencaDfc, modoContas: 'movimentos', contas: montarContasDeMovimento([atual], conta => /^[1-6](?:\.|$)/.test(conta)) },
   ];
   for (const grupo of grupos) {
     if (grupo.diferenca === null && grupo.esperado !== null && grupo.somaLinhas !== null) {
@@ -917,7 +915,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
   const contasNovas = identificarContasNovas(atual, anterior);
   const contasNovasSemNatureza = contasNovas.filter(conta => {
     const registro = atual?.[conta.conta];
-    if (!registro || naturezaEsperada(registro, config)
+    if (!registro || algumPrefixo(conta.conta, PREFIXOS_COMPENSACAO) || naturezaEsperada(registro, config)
       || config.prefixosExcluidosSinal.some(prefixo => prefixoDe(conta.conta, prefixo))) return false;
     return !['6.1', '6.2', '6.3', '6.5'].some(prefixo => prefixoDe(conta.conta, prefixo));
   });
@@ -926,7 +924,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
   }, config.toleranciaConferenciaCentavos);
   const classificacaoNaoExplicada = classes.conciliacoesDfc.some(item =>
     item.naoExplicado !== null && Math.abs(centavos(item.naoExplicado)) > config.toleranciaConferenciaCentavos);
-  const grupos = conferirGrupos(cadastro, atual, acumulado, config);
+  const grupos = conferirGrupos(cadastro, atual, acumulado);
   const variacoesAtipicas = analisarVariacoes(cadastro, atual, mesesAnteriores, config);
   const movimentos6 = verificarNaturezaGrupo6(atual, mes);
   const arrendamentos = analisarArrendamentos(atual, cadastro, [

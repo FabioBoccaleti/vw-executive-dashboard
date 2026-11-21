@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
 import { aplicarModeloBalancoSorana, aplicarModeloDfcPadrao, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasDfcPendentes, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDaLinha, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { deveExibirLinhaDfc } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/dfcTabela';
 
 const grupo = (id: string, conta: string, operacao: 1 | -1 = 1): LinhaDemonstracao => ({
   id, nome: id, demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: conta, operacao }],
@@ -12,6 +13,16 @@ const janeiro = extractAccounts('R;3.1;Receita;0,00;0,00;1.000,00;10.000,00\nD;3
 const fevereiro = extractAccounts('R;3.1;Receita;0,00;100,00;0,00;9.900,00\nD;3.2;Custo;0,00;50,00;0,00;2.050,00', { strict: true });
 
 describe('Demonstrações financeiras — cálculo e integridade', () => {
+  it.each([
+    { valores: [0, 0, 0], exibir: false },
+    { valores: [0, -0.01, 0], exibir: true },
+    { valores: [0, 0, 100], exibir: true },
+    { valores: [0, null, 0], exibir: true },
+    { valores: [0, undefined, 0], exibir: true },
+  ])('filtra a DFC apenas quando todos os valores exibidos e acumulados são zero: $valores', ({ valores, exibir }) => {
+    expect(deveExibirLinhaDfc(valores)).toBe(exibir);
+  });
+
   it('lista contas de resultado com movimento que não estão em grupos da DRE, por coluna', () => {
     const balancete = (texto: string) => extractAccounts(texto, { strict: true });
     const mes1 = balancete([

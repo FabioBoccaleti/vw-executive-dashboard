@@ -3,7 +3,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { aplicarModeloDfcPadrao, cadastroVazio } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { ConferenciasTab } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/ConferenciasTab';
 import { carregarConferenciasExportacao, carregarConferenciasPeriodosExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
-import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasStorage';
+import { CONFERENCIAS_CONFIG_PADRAO, loadConferenciasConfig, saveConferenciasConfig } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasStorage';
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -41,6 +41,54 @@ describe('ConferenciasTab', () => {
 
   afterEach(cleanup);
 
+  it('atualiza parâmetros antigos de sinal sem perder ajustes e preserva a versão para salvar', async () => {
+    const antigos = {
+      ...CONFERENCIAS_CONFIG_PADRAO,
+      version: 'config-antiga',
+      versaoRegrasSinal: undefined,
+      naturezaExcecoes: [
+        { prefixo: '7.1', natureza: 'credora' as const },
+        { prefixo: '1.1.3.01.03.003', natureza: 'devedora' as const },
+      ],
+      prefixosExcluidosSinal: ['1.1.4', '9.1', '1.1.3.01.03.003'],
+      limiteVariacaoPercentual: 65,
+    };
+    mocks.get.mockResolvedValue(antigos);
+    const config = await loadConferenciasConfig();
+    expect(config).toMatchObject({ version: 'config-antiga', versaoRegrasSinal: 1, limiteVariacaoPercentual: 65 });
+    expect(config.naturezaExcecoes).toContainEqual({ prefixo: '7.1', natureza: 'credora' });
+    expect(config.naturezaExcecoes.filter(item => item.prefixo === '1.1.3.01.03.003')).toEqual([
+      { prefixo: '1.1.3.01.03.003', natureza: 'credora' },
+    ]);
+    expect(config.prefixosExcluidosSinal).toEqual(['1.1.4', '9.1', '1.3', '1.9', '2.4', '2.9']);
+    const salva = await saveConferenciasConfig(config);
+    expect(mocks.compareAndSet).toHaveBeenCalledWith('fluxo_caixa_demonstracoes_conferencias', salva, 'config-antiga');
+    const editada = { ...salva, naturezaExcecoes: [{ prefixo: '7.1', natureza: 'devedora' as const }] };
+    mocks.get.mockResolvedValue(editada);
+    expect(await loadConferenciasConfig()).toEqual(editada);
+  });
+
+  it('aplica redutoras a parâmetros antigos na tela, sem sugestões para encargos ou compensações', async () => {
+    mocks.get.mockImplementation(async (key: string) => key === 'fluxo_caixa_demonstracoes_conferencias'
+      ? { ...CONFERENCIAS_CONFIG_PADRAO, versaoRegrasSinal: undefined, naturezaExcecoes: [], prefixosExcluidosSinal: ['1.1.4'] }
+      : null);
+    mocks.raw.mockImplementation(async (ano: number, mes: number) => ano === 2026 && mes === 1 ? { rawText: [
+      'A;1.1.4.02.01.003;Obrigações SCP – redutoras;0;0;0;-100',
+      'P;2.1.2.03.02.099;Encargos financeiros a incorrer;0;0;0;100',
+      'A;1.9.1.01.01.001;Compensações;0;0;0;-100',
+      'P;2.9.1.01.01.001;Compensações;0;0;0;100',
+      'P;2.2.1.06.01.001;Outras contingências;0;0;0;50',
+      'D;4.1.1.01.01.002;CMV Audi;0;0;0;-10',
+    ].join('\n') } : null);
+    render(<ConferenciasTab selectedYear={2026} selectedMonth={1} cadastro={cadastroVazio()} />);
+    const titulo = await screen.findByText('12. Alertas de sinal, PL, variação e arrendamento');
+    const tabela = within(within(titulo.closest('details')!).getAllByRole('table')[0]);
+    expect(tabela.getByText('2.2.1.06.01.001')).toBeInTheDocument();
+    expect(tabela.getByText('4.1.1.01.01.002')).toBeInTheDocument();
+    expect(tabela.getAllByRole('row')).toHaveLength(3);
+    expect(tabela.queryByText(/Sugestão de conta redutora/)).not.toBeInTheDocument();
+  });
+
   it('carrega o balancete e exibe as conferências com semáforo', async () => {
     render(<ConferenciasTab selectedYear={2026} selectedMonth={1} cadastro={cadastroVazio()} />);
 
@@ -60,7 +108,18 @@ describe('ConferenciasTab', () => {
     expect(fechamento.getByText('Erro')).toBeInTheDocument();
   });
 
-  it.each([[22400000, '12%'], [22500000, '12,5%']] as const)('exibe a variação de %s como percentual %s, não como fração', async (valorAtual, percentual) => {
+  it('mostra variação de caixa e soma das seções iguais no item 11 quando o item 6 está OK', async () => {
+    mocks.raw.mockImplementation(async (ano: number, mes: number) => ano === 2026 && mes === 1
+      ? { rawText: 'A;1.1.1.01;Caixa;1.000.000,00;579.874,62;0;1.579.874,62\nR;3.1.01;Receita;0;0;579.874,62;-579.874,62\nP;2.3.1.01;Capital;-1.000.000,00;0;0;-1.000.000,00' } : null);
+    render(<ConferenciasTab selectedYear={2026} selectedMonth={1} cadastro={aplicarModeloDfcPadrao(cadastroVazio())} />);
+    const titulo = await screen.findByText('6. DFC, variação real e caixa do balanço');
+    expect(within(titulo.closest('details')!).getByText('OK')).toBeInTheDocument();
+    const grupo = screen.getByText('DFC — seções − variação de caixa · diferença R$ 0,00');
+    expect(within(grupo.closest('details')!).getByText('Balancete: R$ 579.874,62 · Linhas: R$ 579.874,62'))
+      .toBeInTheDocument();
+  });
+
+  it.each([[22400000, '12%'], [22500000, '12,5%'], [34620000, '73,1%']] as const)('exibe a variação de %s como percentual %s, não como fração', async (valorAtual, percentual) => {
     const cadastro = {
       ...cadastroVazio(),
       linhas: [{
@@ -97,11 +156,11 @@ describe('ConferenciasTab', () => {
   it('mostra sinais invertidos abaixo do limite e destaca os maiores sem ocultar os saldos originais', async () => {
     mocks.get.mockImplementation(async (key: string) => key === 'fluxo_caixa_demonstracoes_conferencias'
       ? { ...CONFERENCIAS_CONFIG_PADRAO, limiteSinalCentavos: 200 } : null);
-    mocks.raw.mockResolvedValue({ rawText: 'A;1.1.3.01.03.003;Débitos por devolução;-1,05;0;0;-1,05\nP;2.1.4.01;Contingência devedora;2,50;0;0;2,50' });
+    mocks.raw.mockResolvedValue({ rawText: 'A;1.1.3.01.03.007;Cliente com saldo invertido;-1,05;0;0;-1,05\nP;2.1.4.01;Contingência devedora;2,50;0;0;2,50' });
     render(<ConferenciasTab selectedYear={2026} selectedMonth={1} cadastro={cadastroVazio()} />);
     const titulo = await screen.findByText('12. Alertas de sinal, PL, variação e arrendamento');
     const alertas = within(titulo.closest('details')!);
-    expect(await alertas.findByText('1.1.3.01.03.003')).toBeInTheDocument();
+    expect(await alertas.findByText('1.1.3.01.03.007')).toBeInTheDocument();
     expect(alertas.getByText('2.1.4.01')).toBeInTheDocument();
     expect(alertas.getByText('Esperada credora · Acima do limite de destaque')).toBeInTheDocument();
     expect(alertas.getByText('Esperada devedora')).toBeInTheDocument();

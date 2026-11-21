@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { DemonstracoesFinanceiras } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras';
 import {
-  aplicarModeloBalancoSorana, calcularLinhas, cadastroVazio, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID,
+  aplicarModeloBalancoSorana, aplicarModeloDfcPadrao, calcularLinhas, cadastroVazio, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID,
   type CadastroDemonstracoes, type TipoDemonstracao,
 } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasStorage';
@@ -425,6 +425,66 @@ it('exibe percentuais da DRE por padrão e permite ocultá-los', async () => {
   expect(within(contaCustos).queryByText(/%/)).not.toBeInTheDocument();
 });
 
+it('oculta detalhes zerados da DFC nos dois métodos, considera o acumulado mensal e reapresenta linhas com valor', async () => {
+  persistido = { ...aplicarModeloDfcPadrao(cadastroVazio()), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
+  const idsCadastros = persistido.linhas.map(linha => linha.id);
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+    if (ano !== 2026 || mes < 1 || mes > 3) return null;
+    return { rawText: [
+      `R;3.1.01;Receita;0;0;${mes === 1 ? 100 : 0};0`,
+      `D;5.1.1.01;Empregados;0;${mes === 3 ? 5 : 0};0;0`,
+      `D;5.1.3.04.01;Depreciação;0;${mes === 3 ? '0,01' : 0};0;0`,
+    ].join('\n') };
+  });
+  const { rerender } = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  const recebimentos = await screen.findByRole('rowheader', { name: 'Recebimentos de clientes' });
+  expect(within(recebimentos.closest('tr')!).getByRole('cell')).toHaveTextContent('0');
+  expect(screen.queryByRole('rowheader', { name: 'Pagamentos a empregados' })).not.toBeInTheDocument();
+  expect(screen.getByRole('rowheader', { name: 'Atividades de Investimento' })).toBeInTheDocument();
+  expect(screen.getByRole('rowheader', { name: 'CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Indireto' }));
+  expect(await screen.findByRole('rowheader', { name: /Resultado líquido do período/ })).toBeInTheDocument();
+  expect(screen.queryByRole('rowheader', { name: '(+) Depreciação e amortização' })).not.toBeInTheDocument();
+  expect(screen.getByRole('rowheader', { name: 'Ajustes ao resultado' })).toBeInTheDocument();
+  expect(screen.getByRole('rowheader', { name: 'Resultado ajustado' })).toBeInTheDocument();
+  rerender(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={3} />);
+  expect(await screen.findByRole('rowheader', { name: '(+) Depreciação e amortização' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Direto' }));
+  expect(await screen.findByRole('rowheader', { name: 'Pagamentos a empregados' })).toBeInTheDocument();
+  expect(persistido.linhas.map(linha => linha.id)).toEqual(idsCadastros);
+  expect(mocks.cas).not.toHaveBeenCalled();
+});
+
+it('mantém detalhes com acumulado indisponível na DFC em vez de tratar o período ausente como zero', async () => {
+  persistido = { ...aplicarModeloDfcPadrao(cadastroVazio()), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
+  mocks.raw.mockImplementation(async (ano: number, mes: number) =>
+    ano === 2026 && mes === 2 ? { rawText: 'R;3.1.01;Receita;0;0;0;0' } : null);
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  expect(await screen.findByRole('rowheader', { name: 'Pagamentos a empregados' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Indireto' }));
+  expect(await screen.findByRole('rowheader', { name: '(+) Depreciação e amortização' })).toBeInTheDocument();
+});
+
+it.each([0, 2])('mantém detalhes da DFC com valor em outro ano comparado, na seleção de mês %s', async mes => {
+  persistido = { ...aplicarModeloDfcPadrao(cadastroVazio()), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
+  mocks.raw.mockImplementation(async (ano: number) => ({
+    rawText: `R;3.1.01;Receita;0;0;${ano === 2025 ? 10 : 0};0`,
+  }));
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={mes} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'DFC' }));
+  await screen.findByRole('rowheader', { name: 'Atividades Operacionais' });
+  expect(screen.queryByRole('rowheader', { name: 'Recebimentos de clientes' })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Ano para adicionar à comparação'), { target: { value: '2025' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Recebimentos de clientes/ }))
+    .getAllByRole('cell').map(cell => cell.textContent)).toEqual(['0', '10']));
+  fireEvent.click(screen.getByRole('button', { name: 'Indireto' }));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Resultado líquido do período/ }))
+    .getAllByRole('cell').map(cell => cell.textContent)).toEqual(['0', '10']));
+});
+
 it('exibe DFC Direto por mês e no acumulado de janeiro até o mês selecionado', async () => {
   mocks.raw.mockImplementation(async (ano: number, mes: number) => {
     if (ano !== 2026) return null;
@@ -472,7 +532,7 @@ it('permite alternar para o DFC Indireto e confere o subtotal operacional com o 
 
   const resultado = await screen.findByRole('row', { name: /Resultado líquido do período/ });
   expect(within(resultado).getByRole('cell')).toHaveTextContent('400');
-  expect(screen.getByRole('rowheader', { name: /Outros itens de resultado de investimento\/financiamento/ })).toBeInTheDocument();
+  expect(screen.queryByRole('rowheader', { name: /Outros itens de resultado de investimento\/financiamento/ })).not.toBeInTheDocument();
   const tabelaIndireta = screen.getByRole('table', { name: /DFC Indireto/ });
   expect(within(tabelaIndireta).queryByText(/^(?:RES|AJ\d{2}|V\d{2})$/)).not.toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Conferência da DFC indireta' })).toHaveTextContent('OK — métodos convergem');

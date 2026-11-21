@@ -15,7 +15,7 @@ import {
   type ContaDfcPendente, type LinhaDemonstracao, type PeriodoDemonstracao, type RegraDfcIndireto, type TipoDemonstracao,
 } from './modelo';
 import { DFC_INDIRETO_CATEGORIAS_MAPEAVEIS } from './dfcMetodoIndireto';
-import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
+import { criarLinhasDfcIndiretoTabela, deveExibirLinhaDfc } from './dfcTabela';
 import { ConferenciasTab } from './ConferenciasTab';
 import { carregarConferenciasPeriodosExportacao } from './conferenciasDados';
 import type { ImportActor } from '../importHistoryStorage';
@@ -143,7 +143,7 @@ export function DemonstracoesFinanceiras({
     [chaveAnosComparados, selectedMonth],
   );
   const acumuladoDre = aba === 'dre' && selectedMonth > 0 && periodoDre === 'acumulado';
-  const acumuladoDfc = aba === 'dfc' && selectedMonth > 0 && periodoDfc === 'acumulado';
+  const acumuladoDfc = aba === 'dfc' && selectedMonth > 0;
   const acumuladoDados = acumuladoDre || acumuladoDfc;
   const escopoNotaDfc = useMemo(() => ({
     ano: selectedYear,
@@ -694,6 +694,24 @@ export function DemonstracoesFinanceiras({
       coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null),
     ))
     : [];
+  const periodosDfcAcumulados = aba === 'dfc' && dados
+    ? periodosComparados.map(periodo => periodo.mes === 0
+      ? [dados[chavePeriodo(periodo)] ?? null]
+      : Array.from({ length: periodo.mes }, (_, index) =>
+        dados[chavePeriodo({ ano: periodo.ano, mes: index + 1 })] ?? null))
+    : [];
+  const valoresDfcAcumulados = aba === 'dfc' && cadastro && dados
+    ? acumuladoSelecionado || selectedMonth === 0 ? valores
+      : periodosDfcAcumulados.map(periodos => calcularLinhas(cadastro.linhas, 'dfc', periodos))
+    : [];
+  const resultadosDfcIndiretoAcumulados = aba === 'dfc' && metodoDfc === 'indireto' && cadastro && dados
+    ? acumuladoSelecionado || selectedMonth === 0 ? resultadosDfcIndireto
+      : periodosDfcAcumulados.map(periodos => calcularDfcIndireto(cadastro.linhas, cadastro.dfcIndiretoRegras ?? [], periodos))
+    : [];
+  const linhasTabelaVisiveis = aba === 'dfc'
+    ? linhasTabela.filter(({ linha, subtotal }) => subtotal || linha.tipo !== 'contas' || Boolean(linha.dfcSubtotalNome)
+      || deveExibirLinhaDfc([...valores, ...valoresDfcAcumulados].map(resultado => resultado.get(linha.id))))
+    : linhasTabela;
   const periodosDetalhamento = detalhesColunas.flatMap(detalhe => detalhe.periodos);
   const contasDfcPorLinha = aba === 'dfc'
     ? new Map(linhas.filter(linha => linha.tipo === 'contas')
@@ -724,6 +742,9 @@ export function DemonstracoesFinanceiras({
     { nome: 'Variação real de caixa (balancete)', valores: conciliacoesCaixa.map(item => item.variacaoReal) },
   ];
   const linhasDfcIndiretoTabela = criarLinhasDfcIndiretoTabela(linhas);
+  const linhasDfcIndiretoVisiveis = linhasDfcIndiretoTabela.filter(linha => linha.tipo !== 'conta'
+    || deveExibirLinhaDfc([...resultadosDfcIndireto, ...resultadosDfcIndiretoAcumulados]
+      .map(resultado => resultado.valores.get(linha.id))));
   const linhasDisponiveisNotaDfc = metodoDfc === 'indireto'
     ? linhasDfcIndiretoTabela.filter(linha => linha.tipo !== 'titulo' && linha.tipo !== 'grupo')
       .map(({ id, nome }) => ({ id, nome }))
@@ -1034,7 +1055,7 @@ export function DemonstracoesFinanceiras({
                       <caption className="sr-only">DFC Indireto — {colunas.map(coluna => coluna.titulo).join(' e ')}</caption>
                       <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
                       <tbody>
-                        {linhasDfcIndiretoTabela.map(linha => {
+                        {linhasDfcIndiretoVisiveis.map(linha => {
                           const tipoLinha = linha.tipo === 'titulo' || linha.tipo === 'grupo';
                           const contas = linha.tipo === 'conta'
                             ? [...new Map(resultadosDfcIndireto.flatMap(resultado => resultado.contasPorLinha.get(linha.id) ?? [])
@@ -1080,7 +1101,7 @@ export function DemonstracoesFinanceiras({
                       <caption className="sr-only">{TIPOS[aba]} — {colunas.map(coluna => coluna.titulo).join(' e ')}</caption>
                       <thead><tr className="border-y bg-muted/50"><th scope="col" className="p-3 text-left">Descrição</th>{colunas.map((coluna, index) => <th key={index} scope="col" className="whitespace-nowrap p-3 text-right">{coluna.titulo}</th>)}</tr></thead>
                       <tbody>
-                        {linhasTabela.map(({ linha, subtotal }) => {
+                        {linhasTabelaVisiveis.map(({ linha, subtotal }) => {
                           const ocultarValor = aba === 'dfc' && Boolean(linha.dfcSubtotalNome) && !subtotal;
                           const contasPrefixadas = linha.contasPorPrefixo && dados
                             ? listarContasDaLinha(linha, detalhesColunas.flatMap(detalhe => detalhe.periodos))
@@ -1153,6 +1174,7 @@ export function DemonstracoesFinanceiras({
                           </Fragment>;
                         })}
                         {linhasTabela.length === 0 && <tr><td colSpan={colunas.length + 1} className="p-6 text-center text-muted-foreground">Nenhum grupo cadastrado. Configure as linhas na aba Cadastros.</td></tr>}
+                        {aba === 'dfc' && linhasTabela.length > 0 && linhasTabelaVisiveis.length === 0 && <tr><td colSpan={colunas.length + 1} className="p-6 text-center text-muted-foreground">Todas as linhas de detalhe estão zeradas nos períodos exibidos e no acumulado.</td></tr>}
                       </tbody>
                     </table>
                   </div>

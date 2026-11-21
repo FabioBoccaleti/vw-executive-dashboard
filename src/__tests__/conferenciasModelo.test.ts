@@ -47,6 +47,60 @@ function variacoesAtipicas(
 }
 
 describe('conferenciasModelo', () => {
+  it('zera a conciliação da DFC no item 11 nos 12 meses quando o item 6 confere, sem contar caixa duas vezes', () => {
+    const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
+    const fluxos = [579874.62, -200.45, 0, 150.01, 8765.43, -45.67, 2500, 999.99, -10.01, 51247.34, 123.45, -987.65];
+    for (const [indice, fluxo] of fluxos.entries()) {
+      const atual = {
+        '1.1.1.01': conta('1.1.1.01', 1000000, Math.max(fluxo, 0), Math.max(-fluxo, 0), 1000000 + fluxo),
+        '3.1.01': conta('3.1.01', 0, Math.max(-fluxo, 0), Math.max(fluxo, 0), -fluxo),
+        '2.3.1.01': conta('2.3.1.01', -1000000, 0, 0, -1000000),
+      };
+      const resultados = construirConferencias({
+        ano: 2026, mes: indice + 1, atual, anterior: null, proximo: null, acumulado: [atual],
+        mesesDoAno: [], mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+      });
+      expect(resultados.find(item => item.id === 'caixa-dfc')!.estado).toBe('ok');
+      expect(resultados.find(item => item.id === 'soma-linhas-grupos')!.grupos!.find(item => item.nome.startsWith('DFC')))
+        .toMatchObject({ nome: 'DFC — seções − variação de caixa', esperado: fluxo, somaLinhas: fluxo, diferenca: 0 });
+    }
+  });
+
+  it.each([false, true])('mantém a diferença real ou a indisponibilidade da DFC, sem forçar zero (seção ausente: %s)', ausente => {
+    const padrao = aplicarModeloDfcPadrao(cadastroVazio());
+    const cadastro = { ...padrao, linhas: ausente ? padrao.linhas.filter(linha =>
+      linha.id !== 'dfc-financiamento' && linha.sublinhaDe !== 'dfc-financiamento') : padrao.linhas };
+    const atual = {
+      '1.1.1.01': conta('1.1.1.01', 1000, 100, 0, 1090),
+      '3.1.01': conta('3.1.01', 0, 0, 100, -100),
+    };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: null, proximo: null, acumulado: [atual],
+      mesesDoAno: [], mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    expect(resultados.find(item => item.id === 'caixa-dfc')!.estado).toBe(ausente ? 'indisponivel' : 'erro');
+    expect(resultados.find(item => item.id === 'soma-linhas-grupos')!.grupos!.find(item => item.nome.startsWith('DFC')))
+      .toMatchObject({ esperado: 90, somaLinhas: ausente ? null : 100, diferenca: ausente ? null : 10 });
+  });
+
+  it('usa a seleção de caixa do item 6 e não mistura contas fora DFC nem o fechamento do balancete', () => {
+    const cadastro = { ...aplicarModeloDfcPadrao(cadastroVazio()), dfcContasCaixaEquivalentes: ['1.1.1.01'] };
+    const atual = {
+      '1.1.1.01': conta('1.1.1.01', 1000, 100, 0, 1100),
+      '1.1.1.02': conta('1.1.1.02', 300, 75, 0, 375),
+      '3.1.01': conta('3.1.01', 0, 0, 100, -100),
+      '1.8.99': conta('1.8.99', 0, 10, 0, 10),
+    };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: null, proximo: null, acumulado: [atual],
+      mesesDoAno: [], mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    expect(resultados.find(item => item.id === 'fechamento-balancete')!.estado).toBe('erro');
+    expect(resultados.find(item => item.id === 'caixa-dfc')!.estado).toBe('ok');
+    expect(resultados.find(item => item.id === 'soma-linhas-grupos')!.grupos!.find(item => item.nome.startsWith('DFC')))
+      .toMatchObject({ esperado: 100, somaLinhas: 100, diferenca: 0 });
+  });
+
   it.each([
     ['Pagamentos a fornecedores e floor plan', 'dfc', '4.1.1.01', 20000000, 22400000],
     ['Estoque', 'ativo', '1.1.2.01', 60000000, 63000000],
@@ -348,7 +402,54 @@ describe('conferenciasModelo', () => {
       .toContain('DFC Direta − caixa: R$ 0,00');
   });
 
-  it('concilia saldos contábeis com redutoras e lista inversões pequenas, destacando somente as maiores', () => {
+  it.each([1, -1])('aplica as naturezas das redutoras, exclui compensações e preserva alertas reais (fator %s)', fator => {
+    const redutoras = [
+      ['1.1.3.01.03.003', 'Débitos por devolução', -100],
+      ['1.1.3.01.03.006', 'Créditos/depósitos a identificar', -100],
+      ['1.1.5.01.01.009', 'Provisão despesa financeira', -100],
+      ['1.1.4.02.01.003', 'Obrigações SCP – redutoras', -100],
+      ['1.1.4.02.01.004', 'Obrigações SCP – redutoras', -100],
+      ['1.5.1.01.50.999', 'Provisão ajuste a valor presente', -100],
+      ['2.1.2.03.02.099', 'Encargos financeiros a incorrer', 100],
+      ['2.2.1.15.20.099', 'Encargos financeiros a incorrer', 100],
+      ['2.1.4.01.01.005', 'Devolução de compras Audi', 100],
+      ['4.1.5.01.03.098', '(-) Tempo improdutivo', -100],
+    ] as const;
+    const atual: ContasBalancete = Object.fromEntries(redutoras.map(([codigo, desc, saldo]) =>
+      [codigo, { ...conta(codigo, 0, 0, 0, saldo * fator), desc }]));
+    const compensacoes = ['1.3.1.01.01.001', '1.9.1.01.01.001', '2.4.1.01.01.001', '2.9.1.01.01.001'];
+    for (const codigo of compensacoes) {
+      atual[codigo] = { ...conta(codigo, 0, 0, 0, codigo.startsWith('1') ? -100 : 100), desc: '(-) Compensação' };
+    }
+    atual['2.2.1.06.01.001'] = { ...conta('2.2.1.06.01.001', 0, 0, 0, 50), desc: 'Outras contingências' };
+    atual['4.1.1.01.01.002'] = { ...conta('4.1.1.01.01.002', 0, 0, 0, -10), desc: 'CMV Audi' };
+    const antes = structuredClone(atual);
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: atual, proximo: null, acumulado: [atual],
+      mesesDoAno: [], mesesAnteriores: [], cadastro: cadastroVazio(),
+      config: {
+        ...CONFERENCIAS_CONFIG_PADRAO,
+        limiteSinalCentavos: 3000,
+        naturezaExcecoes: [
+          ...CONFERENCIAS_CONFIG_PADRAO.naturezaExcecoes,
+          ...compensacoes.map(prefixo => ({ prefixo, natureza: 'devedora' as const })),
+        ],
+      },
+    });
+    const alertas = resultados.find(item => item.id === 'alertas')!;
+    const sinais = alertas.contas!.filter(item => item.detalhe?.startsWith('Esperada'));
+    expect(sinais.map(item => item.conta).sort()).toEqual([
+      ...(fator === -1 ? redutoras.map(([codigo]) => codigo) : []),
+      '2.2.1.06.01.001', '4.1.1.01.01.002',
+    ].sort());
+    expect(alertas.contas!.some(item => item.detalhe === 'Sugestão de conta redutora')).toBe(false);
+    expect(alertas.contas!.some(item => compensacoes.includes(item.conta))).toBe(false);
+    expect(sinais.find(item => item.conta === '2.2.1.06.01.001')!.destaque).toBe(true);
+    expect(sinais.find(item => item.conta === '4.1.1.01.01.002')!.destaque).toBe(false);
+    expect(atual).toEqual(antes);
+  });
+
+  it('concilia saldos contábeis com redutoras e preserva alertas de outras contas devedoras no passivo', () => {
     const cadastro = aplicarModeloBalancoSorana({
       ...cadastroVazio(),
       linhas: [
@@ -383,9 +484,9 @@ describe('conferenciasModelo', () => {
     const grupos = resultados.find(item => item.id === 'soma-linhas-grupos')!.grupos!;
     expect(grupos.filter(grupo => /^(Ativo|Passivo|PL)/.test(grupo.nome)).every(grupo => grupo.diferenca === 0)).toBe(true);
     const sinais = resultados.find(item => item.id === 'alertas')!.contas!.filter(item => item.detalhe?.startsWith('Esperada'));
-    expect(sinais.map(item => item.conta)).toEqual(['1.1.3.01.03.003', '1.1.3.01.03.006', '2.1.4.01']);
-    expect(sinais.map(item => item.destaque)).toEqual([true, false, false]);
-    expect(sinais.map(item => item.saldoAtual)).toEqual([-30.25, -10.75, 5]);
+    expect(sinais.map(item => item.conta)).toEqual(['2.1.4.01']);
+    expect(sinais.map(item => item.destaque)).toEqual([false]);
+    expect(sinais.map(item => item.saldoAtual)).toEqual([5]);
     expect(atual['1.1.3.01.03.003'].saldoAtual).toBe(-30.25);
     expect(atual['2.1.4.01'].saldoAtual).toBe(5);
   });

@@ -6,6 +6,7 @@ const KEY = 'fluxo_caixa_demonstracoes_conferencias';
 const naturezaSchema = z.enum(['devedora', 'credora']);
 const conferenciaConfigSchema = z.object({
   version: z.string(),
+  versaoRegrasSinal: z.number().int().nonnegative().optional(),
   naturezaPorGrupo: z.record(z.string(), naturezaSchema),
   naturezaExcecoes: z.array(z.object({ prefixo: z.string().trim().min(1), natureza: naturezaSchema })),
   prefixosExcluidosSinal: z.array(z.string().trim().min(1)),
@@ -26,8 +27,20 @@ const conferenciaConfigSchema = z.object({
 
 export type ConferenciasConfig = z.infer<typeof conferenciaConfigSchema>;
 
+export const PREFIXOS_COMPENSACAO = ['1.3', '1.9', '2.4', '2.9'];
+
+const NOVAS_NATUREZAS_SINAL: ConferenciasConfig['naturezaExcecoes'] = [
+  ...[
+    '1.1.3.01.03.003', '1.1.3.01.03.006', '1.1.5.01.01.009',
+    '1.1.4.02.01.003', '1.1.4.02.01.004', '1.5.1.01.50.999', '4.1.5.01.03.098',
+  ].map(prefixo => ({ prefixo, natureza: 'credora' as const })),
+  ...['2.1.2.03.02.099', '2.2.1.15.20.099', '2.1.4.01.01.005']
+    .map(prefixo => ({ prefixo, natureza: 'devedora' as const })),
+];
+
 export const CONFERENCIAS_CONFIG_PADRAO: ConferenciasConfig = {
   version: '',
+  versaoRegrasSinal: 1,
   naturezaPorGrupo: {
     '1': 'devedora',
     '2': 'credora',
@@ -38,11 +51,12 @@ export const CONFERENCIAS_CONFIG_PADRAO: ConferenciasConfig = {
   naturezaExcecoes: [
     ...['1.1.8', '1.2.1.07', '1.2.4.02', '1.2.5.02', '1.5.5.02', '1.5.7.02', '1.5.8.02']
       .map(prefixo => ({ prefixo, natureza: 'credora' as const })),
-    ...['2.1.2.03.02.099', '2.2.1.15.20.099', '2.3.1.02', '2.3.3.02', '3.2', '3.3', '3.4.4', '3.5.9']
+    ...['2.3.1.02', '2.3.3.02', '3.2', '3.3', '3.4.4', '3.5.9']
       .map(prefixo => ({ prefixo, natureza: 'devedora' as const })),
     { prefixo: '6.4', natureza: 'devedora' },
+    ...NOVAS_NATUREZAS_SINAL,
   ],
-  prefixosExcluidosSinal: ['1.1.1', '1.1.3.01.02', '1.1.4', '1.4', '2.1.3.09', '2.3.3.01', '2.5'],
+  prefixosExcluidosSinal: ['1.1.1', '1.1.3.01.02', '1.1.4', '1.4', '2.1.3.09', '2.3.3.01', '2.5', ...PREFIXOS_COMPENSACAO],
   palavrasRedutoras: ['(-)', 'REDUTORA', 'ACUMULADA', 'A INCORRER'],
   limiteSinalCentavos: 1_000_000,
   toleranciaConferenciaCentavos: 100,
@@ -71,7 +85,20 @@ export async function loadConferenciasConfig(): Promise<ConferenciasConfig> {
   if (saved === null) return CONFERENCIAS_CONFIG_PADRAO;
   const parsed = conferenciaConfigSchema.safeParse(saved);
   if (!parsed.success) throw new Error('Os parâmetros salvos das conferências estão inválidos.');
-  return parsed.data;
+  const config = parsed.data;
+  if ((config.versaoRegrasSinal ?? 0) >= 1) return config;
+  return {
+    ...config,
+    versaoRegrasSinal: 1,
+    naturezaExcecoes: [
+      ...config.naturezaExcecoes.filter(item => !NOVAS_NATUREZAS_SINAL.some(nova => nova.prefixo === item.prefixo)),
+      ...NOVAS_NATUREZAS_SINAL,
+    ],
+    prefixosExcluidosSinal: [...new Set([
+      ...config.prefixosExcluidosSinal.filter(prefixo => !NOVAS_NATUREZAS_SINAL.some(nova => nova.prefixo === prefixo)),
+      ...PREFIXOS_COMPENSACAO,
+    ])],
+  };
 }
 
 export async function saveConferenciasConfig(config: ConferenciasConfig): Promise<ConferenciasConfig> {
