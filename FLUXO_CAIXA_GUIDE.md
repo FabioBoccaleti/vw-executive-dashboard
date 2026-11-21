@@ -117,6 +117,8 @@ Cada indicador mostra:
 
 Na aba **Emissão de Demonstrações Financeiras**, abra **Conferências** para revisar os balancetes e demonstrações do período. Cada verificação mostra um semáforo; expanda o item para consultar contas, linhas e diferenças que explicam o resultado.
 
+Os valores monetários dos resumos, detalhes e conferências no Excel são apresentados em **reais**, com separador de milhar e duas casas decimais (por exemplo, **R$ 5.796,00**). Diferenças, médias e movimentos agregados são convertidos de centavos para reais antes da exibição e da comparação com os limites; os saldos importados não são alterados.
+
 Em **Cadastros**, os botões **Excluir** das linhas solicitam confirmação com o nome da linha e avisam quando sublinhas ou bancos vinculados também serão removidos. **Cancelar** mantém o cadastro intacto; confirmar aplica a exclusão apenas ao cadastro em edição, sendo necessário **Salvar cadastro** para gravá-la. Exclusões que invalidariam totalizações continuam bloqueadas. Os balancetes importados não são excluídos.
 
 O grupo **Patrimônio Líquido** permite editar, mover e excluir como os demais grupos. No editor, é possível alterar nomes, adicionar/remover sublinhas e ajustar contas ou prefixos, preservando o sinal contábil dos saldos. A sublinha **Resultado do Período** permanece calculada automaticamente pelos grupos 3 a 6; seu nome pode ser alterado sem selecionar contas. Enquanto houver essa sublinha calculada, a linha principal deve permanecer com sublinhas, para não perder o cálculo automático. As alterações dependem de **Salvar cadastro**.

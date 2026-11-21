@@ -11,6 +11,39 @@ import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/Dem
 import type { ConferenciasExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
 
 describe('Exportação Excel das demonstrações financeiras', () => {
+  it('exporta resumos em reais e movimentos agregados numéricos sem multiplicar por 100', async () => {
+    const cadastro = aplicarModeloBalancoSorana({
+      ...cadastroVazio(),
+      linhas: [
+        { id: 'caixa', nome: 'Caixa', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.1.1.01', operacao: 1 }] },
+        { id: 'passivo', nome: 'Passivo', demonstracao: 'passivo', tipo: 'contas', itens: [{ referencia: '2.1.1.01', operacao: 1 }] },
+        { id: 'lucro', nome: 'Lucro Líquido do Exercício', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1.01', operacao: 1 }] },
+      ],
+    });
+    const contas = extractAccounts('A;1.1.1.01;Caixa;0;5.796,00;0;5.796,00\nR;3.1.01;Receita;0;0;12,34;0', { strict: true });
+    const config = CONFERENCIAS_CONFIG_PADRAO;
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual: contas, anterior: null, proximo: null, acumulado: [contas],
+      mesesDoAno: [], mesesAnteriores: [], cadastro, config,
+    });
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados: { [chavePeriodo({ ano: 2026, mes: 1 })]: contas },
+      anos: [2026], mesLimite: 1, incluirNotasAnuais: false, notas: [],
+      conferencias: [{ ano: 2026, mes: 1, resultados, config, snapshots: [], comparacoes: [] }],
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    const ws = reopened.getWorksheet('Conferências')!;
+    const balanco = ws.getColumn(1).values.indexOf('4. Ativo − (Passivo + PL)');
+    expect(balanco).toBeGreaterThan(0);
+    expect(String(ws.getCell(balanco, 3).value).replace(/\u00a0/g, ' ')).toBe('Diferença: R$ 5.796,00.');
+    const grupoDre = ws.getColumn(1).values.indexOf('DRE — lucro líquido vs grupos 3 a 6');
+    expect(grupoDre).toBeGreaterThan(0);
+    expect([2, 3, 4].map(coluna => ws.getCell(grupoDre, coluna).value)).toEqual([12.34, 12.34, 0]);
+    expect([4, 5].map(coluna => ws.getCell(grupoDre + 2, coluna).value)).toEqual([12.34, 12.34]);
+    expect(ws.getCell(grupoDre + 2, 4).numFmt).toBe(ws.getCell(grupoDre, 2).numFmt);
+  });
+
   it('exporta redutoras de contas a receber e Passivo devedor com sinais, subtotais e conciliação corretos', async () => {
     const cadastro = aplicarModeloBalancoSorana({
       ...cadastroVazio(),

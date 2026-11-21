@@ -94,7 +94,10 @@ export interface ComparacaoContaSnapshot {
 }
 
 const centavos = (valor: number) => Math.round(valor * 100);
-const reais = (valor: number) => centavos(valor) / 100;
+const reais = (valorCentavos: number) => Math.round(valorCentavos) / 100;
+const moedas = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatarMoeda = (valor: number | null | undefined) => valor === null || valor === undefined
+  ? 'indisponível' : moedas.format(valor);
 const prefixoDe = (conta: string, prefixo: string) => conta === prefixo || conta.startsWith(`${prefixo}.`);
 const algumPrefixo = (conta: string, prefixos: string[]) => prefixos.some(prefixo => prefixoDe(conta, prefixo));
 const movimentoConta = (conta: { valDeb: number; valCred: number }) => conta.valCred - conta.valDeb;
@@ -169,8 +172,8 @@ function valorContaNaLinha(
   linha: LinhaDemonstracao,
   conta: ContasBalancete[string],
 ): number {
-  if (linha.demonstracao === 'dfc' || linha.demonstracao === 'dre') return reais(movimentoConta(conta));
-  return reais(calcularSaldoPatrimonial(conta.saldoAtual, linha.demonstracao));
+  if (linha.demonstracao === 'dfc' || linha.demonstracao === 'dre') return reais(centavos(movimentoConta(conta)));
+  return reais(centavos(calcularSaldoPatrimonial(conta.saldoAtual, linha.demonstracao)));
 }
 
 function valorLinhasPorGrupo(
@@ -320,7 +323,7 @@ function montarConta(conta: ContasBalancete[string], detalhe?: string): ContaCon
     debitos: conta.valDeb,
     creditos: conta.valCred,
     saldoAtual: conta.saldoAtual,
-    movimento: reais(movimentoConta(conta)),
+    movimento: reais(centavos(movimentoConta(conta))),
     detalhe,
   };
 }
@@ -498,7 +501,7 @@ function conferirPatrimonioLiquido(
       ...montarConta(conta, movimento.grupo === '2.3.3'
         ? resultadoTransferido ? 'Esperado: encerramento do resultado' : 'Atenção: revisar distribuição ou ajuste de exercícios'
         : 'Informativo: confirmar alteração contratual ou deliberação dos sócios'),
-      detalhe: `Variação líquida do grupo ${movimento.grupo}: ${movimento.variacao}`,
+      detalhe: `Variação líquida do grupo ${movimento.grupo}: ${formatarMoeda(movimento.variacao)}`,
     })));
   const movimentosClassificados = movimentos.map(movimento => {
     if (balanceteFecha === false || balancoFecha === false) return { ...movimento, estado: 'Erro: movimento no PL sem contrapartida' };
@@ -525,7 +528,7 @@ function obterVariacoesCaixa(
   const fluxoIndireto = indireto.valores.get('dfc-total') ?? null;
   const diretoTotal = fluxoDireto.some(valor => valor === null)
     ? null
-    : reais(fluxoDireto.reduce<number>((total, valor) => total + centavos(valor ?? 0), 0) / 100);
+    : reais(fluxoDireto.reduce<number>((total, valor) => total + centavos(valor ?? 0), 0));
   const balancoCaixa = somarSaldos(atual, conta => algumPrefixo(conta, prefixos));
   const dreYtd = calcularLinhas(cadastro.linhas, 'dre', acumulado);
   const lucroDre = totalRaizes(cadastro.linhas.filter(linha => linha.demonstracao === 'dre'), dreYtd);
@@ -759,7 +762,7 @@ function analisarVariacoes(
         .slice(0, 5)
         .map(({ conta, variacaoConta }) => ({
           ...montarConta(conta),
-          detalhe: `Contribuição à variação: ${variacaoConta / 100}`,
+          detalhe: `Contribuição à variação: ${formatarMoeda(reais(variacaoConta))}`,
         }));
       alteracoes.push({
         demonstracao: demo.nome,
@@ -773,7 +776,7 @@ function analisarVariacoes(
           ? 'Variação superior ao limite absoluto.'
           : inverteSinal
             ? 'Inversão de sinal em relação à média.'
-            : `Variação acima dos limites de ${config.limiteVariacaoPercentual}% e R$ ${(limiteReais / 100).toLocaleString('pt-BR')}.`,
+            : `Variação acima dos limites de ${config.limiteVariacaoPercentual}% e ${formatarMoeda(reais(limiteReais))}.`,
       });
     }
   }
@@ -948,7 +951,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
       titulo: '1. Balancete fecha',
       estado: resumo ? resumo.fecha ? 'ok' : 'erro' : 'indisponivel',
       resumo: resumo
-        ? `Débitos ${resumo.debitos.toFixed(2)}; créditos ${resumo.creditos.toFixed(2)}; diferença ${resumo.diferencaDebitosCreditos.toFixed(2)}; soma dos saldos ${resumo.somaSaldos.toFixed(2)}.`
+        ? `Débitos ${formatarMoeda(resumo.debitos)}; créditos ${formatarMoeda(resumo.creditos)}; diferença ${formatarMoeda(resumo.diferencaDebitosCreditos)}; soma dos saldos ${formatarMoeda(resumo.somaSaldos)}.`
         : 'Balancete não disponível para o período.',
     },
     {
@@ -971,7 +974,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
       titulo: '4. Ativo − (Passivo + PL)',
       estado: diferencaBalanco === null ? 'indisponivel'
         : Math.abs(centavos(diferencaBalanco)) <= config.toleranciaConferenciaCentavos ? 'ok' : 'erro',
-      resumo: diferencaBalanco === null ? 'Não foi possível calcular o balanço.' : `Diferença: R$ ${diferencaBalanco.toFixed(2)}.`,
+      resumo: diferencaBalanco === null ? 'Não foi possível calcular o balanço.' : `Diferença: ${formatarMoeda(diferencaBalanco)}.`,
     },
     {
       id: 'resultado-dre',
@@ -982,7 +985,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
         ? `Não foi possível calcular a conferência${contaUsadaNoDre ? '' : ': verifique a linha Lucro Líquido do Exercício na DRE'}.`
         : !resultadoPorDre.contaLucro
           ? 'Cadastre a linha principal Lucro Líquido do Exercício para validar a conferência.'
-        : `DRE ${resultadoPorDre.valor?.toFixed(2)}; grupos 3 a 6 ${resultadoPorGrupo?.toFixed(2)}; diferença ${diferencaResultado.toFixed(2)}.`,
+        : `DRE ${formatarMoeda(resultadoPorDre.valor)}; grupos 3 a 6 ${formatarMoeda(resultadoPorGrupo)}; diferença ${formatarMoeda(diferencaResultado)}.`,
     },
     {
       id: 'caixa-dfc',
@@ -990,7 +993,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
       estado: [diferencaDfcDireta, diferencaDfcIndireta, diferencaCaixaBalanco].some(valor => valor !== null
         && Math.abs(centavos(valor)) > config.toleranciaConferenciaCentavos) ? 'erro'
         : diferencaDfcDireta === null || diferencaDfcIndireta === null || diferencaCaixaBalanco === null ? 'indisponivel' : 'ok',
-      resumo: `DFC Direta − caixa: ${diferencaDfcDireta?.toFixed(2) ?? 'indisponível'}; DFC Indireta − caixa: ${diferencaDfcIndireta?.toFixed(2) ?? 'indisponível'}; Caixa DFC − caixa do balanço: ${diferencaCaixaBalanco?.toFixed(2) ?? 'indisponível'}.`,
+      resumo: `DFC Direta − caixa: ${formatarMoeda(diferencaDfcDireta)}; DFC Indireta − caixa: ${formatarMoeda(diferencaDfcIndireta)}; Caixa DFC − caixa do balanço: ${formatarMoeda(diferencaCaixaBalanco)}.`,
     },
     {
       id: 'direto-indireto',
@@ -998,7 +1001,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
       estado: [diferencaOperacionalMes, diferencaOperacionalAcumulada].some(valor => valor !== null
         && Math.abs(centavos(valor)) > config.toleranciaConferenciaCentavos) ? 'erro'
         : diferencaOperacionalMes === null || diferencaOperacionalAcumulada === null ? 'indisponivel' : 'ok',
-      resumo: `Mês: ${diferencaOperacionalMes?.toFixed(2) ?? 'indisponível'}; acumulado: ${diferencaOperacionalAcumulada?.toFixed(2) ?? 'indisponível'}.`,
+      resumo: `Mês: ${formatarMoeda(diferencaOperacionalMes)}; acumulado: ${formatarMoeda(diferencaOperacionalAcumulada)}.`,
     },
     {
       id: 'acumulado-mensal',
@@ -1030,7 +1033,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
       titulo: '11. Soma das linhas = total dos grupos',
       estado: estadoGrupo,
       resumo: gruposErrados.length
-        ? `${gruposErrados.length} grupos apresentam diferença superior à tolerância de R$ ${(config.toleranciaConferenciaCentavos / 100).toFixed(2)}.`
+        ? `${gruposErrados.length} grupos apresentam diferença superior à tolerância de ${formatarMoeda(reais(config.toleranciaConferenciaCentavos))}.`
         : 'Os grupos e as linhas conferem dentro da tolerância configurada.',
       grupos,
     },
@@ -1061,14 +1064,14 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
         contasDireitoUso: arrendamentos.contasDireitoUso,
       },
       observacoes: [
-        `Todos os saldos não zero contrários à natureza esperada são listados. ${sinais.divergentes.filter(conta => conta.destaque).length} acima do limite de destaque de R$ ${(config.limiteSinalCentavos / 100).toFixed(2)}.`,
-        ...resultadoPL.movimentos.map(item => `${item.estado}: ${item.grupo}, variação líquida R$ ${item.variacao.toFixed(2)}.`),
+        `Todos os saldos não zero contrários à natureza esperada são listados. ${sinais.divergentes.filter(conta => conta.destaque).length} acima do limite de destaque de ${formatarMoeda(reais(config.limiteSinalCentavos))}.`,
+        ...resultadoPL.movimentos.map(item => `${item.estado}: ${item.grupo}, variação líquida ${formatarMoeda(item.variacao)}.`),
         ...variacoesAtipicas.map(item => `${item.demonstracao} · ${item.linha}: ${item.motivo}`),
         ...arrendamentos.candidatos.map(conta => `Possível conta de arrendamento para revisar: ${conta.conta} — ${conta.descricao}.`),
-        ...(aumentoArrendamentoSemCaixa ? [`Créditos em passivos de arrendamento: R$ ${(arrendamentos.aumentoPassivoCentavos / 100).toFixed(2)}; variação DFC direta das contas: R$ ${(arrendamentos.fluxoDfcCentavos / 100).toFixed(2)}.`] : []),
-        ...(arrendamentoSemAtivo ? [`Contrato sem ativo correspondente: variação líquida de direito de uso R$ ${(arrendamentos.variacaoDireitoUsoCentavos / 100).toFixed(2)}.`] : []),
-        ...arrendamentos.contasDireitoUso.map(conta => `Direito de uso ${conta.conta} — ${conta.desc}: saldo anterior ${conta.saldoAnt.toFixed(2)}, débito ${conta.valDeb.toFixed(2)}, crédito ${conta.valCred.toFixed(2)}, saldo atual ${conta.saldoAtual.toFixed(2)}.`),
-        ...variacoesAtipicas.map(item => `Variação ${item.demonstracao} · ${item.linha}: mês ${item.valorMes.toFixed(2)}, média ${item.mediaAnterior.toFixed(2)}, diferença ${item.variacao.toFixed(2)}, percentual ${item.variacaoPercentual?.toFixed(1) ?? 'n/a'}%.`),
+        ...(aumentoArrendamentoSemCaixa ? [`Créditos em passivos de arrendamento: ${formatarMoeda(reais(arrendamentos.aumentoPassivoCentavos))}; variação DFC direta das contas: ${formatarMoeda(reais(arrendamentos.fluxoDfcCentavos))}.`] : []),
+        ...(arrendamentoSemAtivo ? [`Contrato sem ativo correspondente: variação líquida de direito de uso ${formatarMoeda(reais(arrendamentos.variacaoDireitoUsoCentavos))}.`] : []),
+        ...arrendamentos.contasDireitoUso.map(conta => `Direito de uso ${conta.conta} — ${conta.desc}: saldo anterior ${formatarMoeda(conta.saldoAnt)}, débito ${formatarMoeda(conta.valDeb)}, crédito ${formatarMoeda(conta.valCred)}, saldo atual ${formatarMoeda(conta.saldoAtual)}.`),
+        ...variacoesAtipicas.map(item => `Variação ${item.demonstracao} · ${item.linha}: mês ${formatarMoeda(item.valorMes)}, média ${formatarMoeda(item.mediaAnterior)}, diferença ${formatarMoeda(item.variacao)}, percentual ${item.variacaoPercentual?.toFixed(1) ?? 'n/a'}%.`),
       ],
     },
   ];

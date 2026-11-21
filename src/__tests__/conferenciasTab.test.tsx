@@ -50,6 +50,16 @@ describe('ConferenciasTab', () => {
     expect(screen.getByText('12. Alertas de sinal, PL, variação e arrendamento')).toBeInTheDocument();
   });
 
+  it('exibe diferenças em reais com milhar e centavos nos resumos do painel', async () => {
+    mocks.raw.mockResolvedValue({ rawText: 'A;1.1.1.01;Caixa;0;5.796,00;0;0' });
+    render(<ConferenciasTab selectedYear={2026} selectedMonth={1} cadastro={cadastroVazio()} />);
+    const titulo = await screen.findByText('1. Balancete fecha');
+    const fechamento = within(titulo.closest('details')!);
+    expect(await fechamento.findByText('Débitos R$ 5.796,00; créditos R$ 0,00; diferença R$ 5.796,00; soma dos saldos R$ 0,00.'))
+      .toBeInTheDocument();
+    expect(fechamento.getByText('Erro')).toBeInTheDocument();
+  });
+
   it('mostra sinais invertidos abaixo do limite e destaca os maiores sem ocultar os saldos originais', async () => {
     mocks.get.mockImplementation(async (key: string) => key === 'fluxo_caixa_demonstracoes_conferencias'
       ? { ...CONFERENCIAS_CONFIG_PADRAO, limiteSinalCentavos: 200 } : null);
@@ -102,7 +112,7 @@ describe('ConferenciasTab', () => {
     const exportacao = await carregarConferenciasExportacao(2026, 0, cadastroVazio());
     expect(exportacao.mes).toBe(0);
     expect(exportacao.resultados.find(item => item.id === 'fechamento-balancete')).toMatchObject({
-      estado: 'erro', resumo: expect.stringContaining('soma dos saldos 10.00'),
+      estado: 'erro', resumo: expect.stringContaining('soma dos saldos R$\u00a010,00'),
     });
   });
 
