@@ -628,15 +628,23 @@ function adicionarPlanilhaConferencias(
   };
   const tabelaContas = (contas: ContaConferencia[], modo: 'saldos' | 'movimentos' = 'saldos') => {
     if (!contas.length) return;
-    cabecalho(modo === 'movimentos'
+    const mostrarEfeitoDfc = contas.some(conta => conta.efeitoDfc !== undefined);
+    const colunas = modo === 'movimentos'
       ? ['Conta', 'Descrição / motivo', 'Débitos', 'Créditos', 'Movimento']
-      : ['Conta', 'Descrição / motivo', 'Saldo anterior', 'Débitos', 'Créditos', 'Saldo atual', 'Movimento']);
+      : ['Conta', 'Descrição / motivo', 'Saldo anterior', 'Débitos', 'Créditos', 'Saldo atual', 'Movimento'];
+    if (mostrarEfeitoDfc) colunas.push('Efeito na diferença do item 6');
+    cabecalho(colunas);
     for (const conta of contas) {
       const descricao = `${conta.descricao}${conta.detalhe ? ` — ${conta.detalhe}` : ''}`;
-      const row = linha(modo === 'movimentos'
+      const valores: ExcelJS.CellValue[] = modo === 'movimentos'
         ? [conta.conta, descricao, conta.debitos, conta.creditos, conta.movimento]
-        : [conta.conta, descricao, conta.saldoAnterior, conta.debitos, conta.creditos, conta.saldoAtual, conta.movimento],
-      modo === 'movimentos' ? [3, 4, 5] : [3, 4, 5, 6, 7]);
+        : [conta.conta, descricao, conta.saldoAnterior, conta.debitos, conta.creditos, conta.saldoAtual, conta.movimento];
+      const colunasMoeda = modo === 'movimentos' ? [3, 4, 5] : [3, 4, 5, 6, 7];
+      if (mostrarEfeitoDfc) {
+        valores.push(conta.efeitoDfc ?? null);
+        colunasMoeda.push(valores.length);
+      }
+      const row = linha(valores, colunasMoeda);
       if (conta.destaque) row.eachCell(celula => {
         celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
       });
@@ -689,6 +697,12 @@ function adicionarPlanilhaConferencias(
       adicionarSecao(ws, resultado.titulo, ultimaColuna);
       texto(`${estados[resultado.estado].nome} · ${resultado.resumo}`);
       tabelaContas(resultado.contas ?? []);
+      if (resultado.conciliacoesDfc?.length) {
+        cabecalho(['Método DFC', 'Diferença do item 6', 'Efeitos das contas sem linha', 'Valor não explicado']);
+        for (const item of resultado.conciliacoesDfc) {
+          linha([item.metodo, item.diferenca, item.efeitoSemLinha, item.naoExplicado], [2, 3, 4]);
+        }
+      }
       if (resultado.contasMesSeguinte?.length) {
         adicionarSecao(ws, 'Divergências no saldo anterior do mês seguinte', ultimaColuna);
         tabelaContas(resultado.contasMesSeguinte);

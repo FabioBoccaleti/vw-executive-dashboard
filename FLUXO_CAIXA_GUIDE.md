@@ -137,7 +137,7 @@ O painel verifica:
 6. Variação da DFC e conciliação do caixa com o balanço.
 7. Caixa operacional pelos métodos direto e indireto, no mês e no acumulado.
 8. Acumulado da DRE/DFC em relação à soma dos meses disponíveis.
-9. Contas sem classificação ou classificadas em mais de uma linha.
+9. Contas analíticas com saldo atual **ou** débitos/créditos, sem classificação ou classificadas em mais de uma linha. A classificação reutiliza as regras que geram cada demonstração, inclusive o prefixo mais longo da DFC e os componentes calculados do método indireto. Compensações (`1.3`, `1.9`, `2.4`, `2.9`) são excluídas em todas; contas de balanço não são exigidas na DRE, e contas de resultado não são exigidas no balanço, pois compõem o Resultado do Período. Caixa (`1.1.1` e os prefixos de caixa equivalentes selecionados) e contas cadastradas fora da DFC não são exigidos na DFC. A lista de cada método fica vazia quando sua diferença no item 6 está dentro da tolerância; se o item 6 está OK, ambas ficam vazias. Quando há diferença, o painel e o Excel mostram o efeito de cada conta sem linha na diferença do item 6, sua soma e o valor não explicado, separadamente para Direta e Indireta. O valor não explicado é sinalizado para revisão, sem atribuí-lo artificialmente a contas.
 10. Contas novas no plano em relação ao período anterior.
 11. Soma das linhas em relação aos totais dos grupos do balancete.
 12. Sinais invertidos, movimentos no PL, variações atípicas e passivos de arrendamento.

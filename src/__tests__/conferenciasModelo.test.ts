@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cadastroVazio,
   aplicarModeloBalancoSorana,
+  aplicarModeloDfcPadrao,
   calcularLinhas,
   type CadastroDemonstracoes,
   type ContasBalancete,
@@ -33,6 +34,113 @@ function conta(
 }
 
 describe('conferenciasModelo', () => {
+  it('exige apenas analíticas com saldo ou débitos/créditos, respeitando escopo e prefixos de cada demonstração', () => {
+    const cadastro: CadastroDemonstracoes = {
+      ...cadastroVazio(),
+      linhas: [
+        { id: 'ativo', nome: 'Ativo', demonstracao: 'ativo', tipo: 'contas', contasPorPrefixo: true, itens: [{ referencia: '1.7', operacao: 1 }] },
+        { id: 'dre', nome: 'DRE', demonstracao: 'dre', tipo: 'contas', contasPorPrefixo: true, itens: [{ referencia: '3.1', operacao: 1 }] },
+      ],
+    };
+    const atual: ContasBalancete = {
+      '1.7': { ...conta('1.7', 0, 10, 0, 10), nivel: 'S' },
+      '1.7.01': conta('1.7.01', 0, 10, 0, 10),
+      '1.8.01': conta('1.8.01', 5, 0, 0, 5),
+      '1.8.02': conta('1.8.02', 0, 2, 2, 0),
+      '1.8.03': conta('1.8.03'),
+      '1.1.1.01': conta('1.1.1.01', 10, 0, 0, 10),
+      '3.1.01': conta('3.1.01', 0, 0, 10, -10),
+      '4.1.01': conta('4.1.01', 0, 10, 0, 10),
+      ...Object.fromEntries(['1.3', '1.9', '2.4', '2.9'].map(prefixo =>
+        [`${prefixo}.01`, conta(`${prefixo}.01`, 0, 50, 0, 50)])),
+    };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: null, proximo: null, acumulado: [atual],
+      mesesDoAno: [], mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    const classificacao = resultados.find(item => item.id === 'classificacao')!;
+    const pendentes = classificacao.contas!;
+    expect(pendentes.filter(item => item.detalhe?.startsWith('Ativo')).map(item => item.conta))
+      .toEqual(['1.8.01', '1.8.02', '1.1.1.01']);
+    expect(pendentes.filter(item => item.detalhe?.startsWith('DRE')).map(item => item.conta)).toEqual(['4.1.01']);
+    expect(pendentes.filter(item => item.detalhe?.startsWith('Passivo'))).toEqual([]);
+    expect(pendentes.some(item => ['1.7', '1.8.03'].includes(item.conta))).toBe(false);
+    expect(pendentes.some(item => /^(1\.3|1\.9|2\.4|2\.9)(?:\.|$)/.test(item.conta))).toBe(false);
+    expect(pendentes.filter(item => item.detalhe?.startsWith('DFC')).some(item => item.conta.startsWith('1.1.1.'))).toBe(false);
+  });
+
+  it.each([0, 5])('reutiliza prefixos e componentes indiretos, sem falsos sem linha com diferença de caixa %s', diferenca => {
+    const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
+    const atual: ContasBalancete = {
+      '1.1.1.01': conta('1.1.1.01', 100, 50, 0, 150 + diferenca),
+      '1.1.2.06.01': conta('1.1.2.06.01', 20, 10, 0, 30),
+      '3.1.01': conta('3.1.01', 0, 0, 100, -100),
+      '4.1.1.01': conta('4.1.1.01', 0, 40, 0, 40),
+      '2.3.1.01': conta('2.3.1.01', -120, 0, 0, -120),
+    };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: null, proximo: null, acumulado: [atual],
+      mesesDoAno: [], mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    expect(resultados.find(item => item.id === 'caixa-dfc')!.estado).toBe(diferenca === 0 ? 'ok' : 'erro');
+    const classificacao = resultados.find(item => item.id === 'classificacao')!;
+    expect(classificacao.contas!.filter(item => item.detalhe?.startsWith('DFC'))).toEqual([]);
+    expect(classificacao.conciliacoesDfc).toEqual([
+      { metodo: 'DFC Direta', diferenca: diferenca ? -diferenca : 0, efeitoSemLinha: 0, naoExplicado: diferenca ? -diferenca : 0 },
+      { metodo: 'DFC Indireta', diferenca: diferenca ? -diferenca : 0, efeitoSemLinha: 0, naoExplicado: diferenca ? -diferenca : 0 },
+    ]);
+    if (diferenca) expect(classificacao.estado).toBe('erro');
+  });
+
+  it.each([['direta', 0], ['indireta', 0], ['direta', 10], ['indireta', 10]] as const)('concilia conta patrimonial sem classificação %s e informa resíduo de R$ %s', (metodo, residuo) => {
+    const padrao = aplicarModeloDfcPadrao(cadastroVazio());
+    const cadastro: CadastroDemonstracoes = {
+      ...padrao,
+      linhas: metodo === 'direta' ? padrao.linhas.map(linha => ({
+        ...linha, itens: linha.itens.filter(item => !item.referencia.startsWith('1.1.2')),
+      })) : padrao.linhas,
+      dfcIndiretoRegras: metodo === 'indireta'
+        ? padrao.dfcIndiretoRegras!.filter(regra => regra.referencia !== '1.1.2') : padrao.dfcIndiretoRegras,
+    };
+    const atual = {
+      '1.1.1.01': conta('1.1.1.01', 100, 0, 25, 75 - residuo),
+      '1.1.2.01': conta('1.1.2.01', 0, 25, 0, 25),
+      '2.3.1.01': conta('2.3.1.01', -100, 0, 0, -100),
+    };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: null, proximo: null, acumulado: [atual],
+      mesesDoAno: [], mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    expect(resultados.find(item => item.id === 'caixa-dfc')!.estado).toBe('erro');
+    const classificacao = resultados.find(item => item.id === 'classificacao')!;
+    const contasDfc = classificacao.contas!.filter(item => item.detalhe?.startsWith('DFC'));
+    expect(contasDfc).toHaveLength(metodo === 'direta' ? 2 : 1);
+    expect(contasDfc.every(item => item.conta === '1.1.2.01' && item.efeitoDfc === 25 && item.movimento === -25)).toBe(true);
+    expect(classificacao.conciliacoesDfc).toEqual([
+      { metodo: 'DFC Direta', diferenca: (metodo === 'direta' ? 25 : 0) + residuo, efeitoSemLinha: metodo === 'direta' ? 25 : 0, naoExplicado: residuo },
+      { metodo: 'DFC Indireta', diferenca: 25 + residuo, efeitoSemLinha: 25, naoExplicado: residuo },
+    ]);
+    if (residuo) expect(classificacao.estado).toBe('erro');
+  });
+
+  it.each([0, 0.99, 1])('esvazia a lista da DFC quando o efeito líquido não mapeado de R$ %s está dentro da tolerância do item 6', diferenca => {
+    const padrao = aplicarModeloDfcPadrao(cadastroVazio());
+    const cadastro = { ...padrao, linhas: padrao.linhas.map(linha => ({
+      ...linha, itens: linha.itens.filter(item => item.referencia !== '3.1'),
+    })) };
+    const atual = {
+      '1.1.1.01': conta('1.1.1.01', 100, 0, 0, 100),
+      '3.1.01': conta('3.1.01', 0, 0, 10 + diferenca, -10 - diferenca),
+      '3.1.02': conta('3.1.02', 0, 10, 0, 10),
+    };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: null, proximo: null, acumulado: [atual],
+      mesesDoAno: [], mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    expect(resultados.find(item => item.id === 'caixa-dfc')!.estado).toBe('ok');
+    expect(resultados.find(item => item.id === 'classificacao')!.contas!.filter(item => item.detalhe?.startsWith('DFC'))).toEqual([]);
+  });
+
   it.each([
     [5796, 'R$ 5.796,00'],
     [27097066.37, 'R$ 27.097.066,37'],

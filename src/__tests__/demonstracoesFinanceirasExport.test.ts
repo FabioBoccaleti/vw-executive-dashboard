@@ -11,6 +11,38 @@ import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/Dem
 import type { ConferenciasExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
 
 describe('Exportação Excel das demonstrações financeiras', () => {
+  it('exporta os efeitos das contas sem linha e o resíduo do item 6 separadamente por método', async () => {
+    const padrao = aplicarModeloDfcPadrao(cadastroVazio());
+    const cadastro = { ...padrao, linhas: padrao.linhas.map(linha => ({
+      ...linha, itens: linha.itens.filter(item => !item.referencia.startsWith('1.1.2')),
+    })) };
+    const contas = extractAccounts('A;1.1.1.01;Caixa;100;0;25;65\nA;1.1.2.01;Estoques;0;25;0;25\nP;2.3.1.01;Capital;-100;0;0;-100', { strict: true });
+    const config = CONFERENCIAS_CONFIG_PADRAO;
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual: contas, anterior: null, proximo: null, acumulado: [contas],
+      mesesDoAno: [], mesesAnteriores: [], cadastro, config,
+    });
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados: { [chavePeriodo({ ano: 2026, mes: 1 })]: contas },
+      anos: [2026], mesLimite: 1, incluirNotasAnuais: false, notas: [],
+      conferencias: [{ ano: 2026, mes: 1, resultados, config, snapshots: [], comparacoes: [] }],
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    const ws = reopened.getWorksheet('Conferências')!;
+    for (const metodo of ['DFC Direta', 'DFC Indireta']) {
+      const indice = ws.getColumn(1).values.indexOf(metodo);
+      expect(indice).toBeGreaterThan(0);
+      expect([2, 3, 4].map(coluna => ws.getCell(indice, coluna).value)).toEqual([35, 25, 10]);
+      expect(ws.getCell(indice, 4).numFmt).toContain('[Red]');
+    }
+    const conta = ws.getColumn(2).values.indexOf('Estoques — DFC Direta — com movimento');
+    expect(conta).toBeGreaterThan(0);
+    expect(ws.getCell(conta, 7).value).toBe(-25);
+    expect(ws.getCell(conta, 8).value).toBe(25);
+    expect(ws.getCell(conta, 8).numFmt).toBe(ws.getCell(conta, 7).numFmt);
+  });
+
   it('exporta resumos em reais e movimentos agregados numéricos sem multiplicar por 100', async () => {
     const cadastro = aplicarModeloBalancoSorana({
       ...cadastroVazio(),

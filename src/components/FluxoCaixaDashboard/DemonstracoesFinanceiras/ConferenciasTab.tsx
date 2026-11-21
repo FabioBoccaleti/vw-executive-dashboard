@@ -73,6 +73,7 @@ function TabelaContas({
   modo?: 'saldos' | 'movimentos';
 }) {
   if (!contas.length) return <p className="text-sm text-muted-foreground">Nenhuma conta nesta conferência.</p>;
+  const mostrarEfeitoDfc = contas.some(conta => conta.efeitoDfc !== undefined);
   return <div className="overflow-x-auto">
     <table className={`w-full ${modo === 'movimentos' ? 'min-w-[560px]' : 'min-w-[820px]'} text-left text-xs`}>
       <thead><tr className="border-b text-muted-foreground">
@@ -81,6 +82,7 @@ function TabelaContas({
         <th className="p-2 text-right">Débitos</th><th className="p-2 text-right">Créditos</th>
         {modo === 'saldos' && <th className="p-2 text-right">Saldo atual</th>}
         <th className="p-2 text-right">Movimento</th>
+        {mostrarEfeitoDfc && <th className="p-2 text-right">Efeito na diferença do item 6</th>}
       </tr></thead>
       <tbody>{contas.map(conta => <tr key={`${conta.conta}-${conta.detalhe ?? ''}`} className={`border-b last:border-0 ${conta.destaque ? 'bg-amber-50 font-medium' : ''}`}>
         <td className="p-2 font-mono">{conta.conta}</td><td className="p-2">{conta.descricao}{conta.detalhe && <span className="block text-muted-foreground">{conta.detalhe}</span>}</td>
@@ -89,6 +91,7 @@ function TabelaContas({
         <td className="p-2 text-right tabular-nums">{moedas.format(conta.creditos)}</td>
         {modo === 'saldos' && <td className="p-2 text-right tabular-nums">{moedas.format(conta.saldoAtual)}</td>}
         <td className="p-2 text-right tabular-nums">{moedas.format(conta.movimento)}</td>
+        {mostrarEfeitoDfc && <td className="p-2 text-right tabular-nums">{conta.efeitoDfc === undefined ? '—' : moedas.format(conta.efeitoDfc)}</td>}
       </tr>)}</tbody>
     </table>
   </div>;
@@ -327,6 +330,16 @@ export function ConferenciasTab({ selectedYear, selectedMonth, cadastro, current
           <p className="mt-2 text-sm text-muted-foreground">Balancete: {grupo.esperado === null ? 'indisponível' : moedas.format(grupo.esperado)} · Linhas: {grupo.somaLinhas === null ? 'indisponível' : moedas.format(grupo.somaLinhas)}</p>
           {grupo.contas && <TabelaContas contas={grupo.contas} modo={grupo.modoContas} />}
         </details>)}
+      </div>;
+    }
+    if (resultado.id === 'classificacao') {
+      return <div className="space-y-3">
+        <TabelaContas contas={resultado.contas ?? []} />
+        {resultado.conciliacoesDfc?.map(item => <section key={item.metodo} className="space-y-1 rounded border p-3">
+          <h4 className="font-medium">{item.metodo} · conciliação com o item 6</h4>
+          <p className="text-sm">Diferença do item 6: {item.diferenca === null ? 'indisponível' : moedas.format(item.diferenca)} · efeitos das contas sem linha: {moedas.format(item.efeitoSemLinha)} · valor não explicado: {item.naoExplicado === null ? 'indisponível' : moedas.format(item.naoExplicado)}</p>
+        </section>)}
+        {resultado.observacoes?.length ? <ul className="list-disc space-y-1 pl-5 text-sm">{resultado.observacoes.map((item, index) => <li key={index}>{item}</li>)}</ul> : null}
       </div>;
     }
     if (resultado.id === 'alertas') {

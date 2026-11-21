@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { cadastroVazio } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { aplicarModeloDfcPadrao, cadastroVazio } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { ConferenciasTab } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/ConferenciasTab';
 import { carregarConferenciasExportacao, carregarConferenciasPeriodosExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
 import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasStorage';
@@ -58,6 +58,24 @@ describe('ConferenciasTab', () => {
     expect(await fechamento.findByText('Débitos R$ 5.796,00; créditos R$ 0,00; diferença R$ 5.796,00; soma dos saldos R$ 0,00.'))
       .toBeInTheDocument();
     expect(fechamento.getByText('Erro')).toBeInTheDocument();
+  });
+
+  it('mostra efeitos por conta e o valor não explicado por método da DFC no item 9', async () => {
+    const padrao = aplicarModeloDfcPadrao(cadastroVazio());
+    const cadastro = { ...padrao, linhas: padrao.linhas.map(linha => ({
+      ...linha, itens: linha.itens.filter(item => !item.referencia.startsWith('1.1.2')),
+    })) };
+    mocks.raw.mockResolvedValue({ rawText: 'A;1.1.1.01;Caixa;100;0;25;65\nA;1.1.2.01;Estoques;0;25;0;25\nP;2.3.1.01;Capital;-100;0;0;-100' });
+    render(<ConferenciasTab selectedYear={2026} selectedMonth={1} cadastro={cadastro} />);
+    const titulo = await screen.findByText('9. Contas sem classificação ou duplicadas');
+    const classificacao = within(titulo.closest('details')!);
+    expect(classificacao.getByText('Efeito na diferença do item 6')).toBeInTheDocument();
+    expect(classificacao.getAllByText('Diferença do item 6: R$ 35,00 · efeitos das contas sem linha: R$ 25,00 · valor não explicado: R$ 10,00'))
+      .toHaveLength(2);
+    const linha = within(classificacao.getByText('DFC Direta — com movimento').closest('tr')!);
+    expect(linha.getByText('1.1.2.01')).toBeInTheDocument();
+    expect(linha.getByText('-R$ 25,00')).toBeInTheDocument();
+    expect(classificacao.getByText('Erro')).toBeInTheDocument();
   });
 
   it('mostra sinais invertidos abaixo do limite e destaca os maiores sem ocultar os saldos originais', async () => {

@@ -3,11 +3,14 @@ import {
   calcularLinhas,
   calcularSaldoPatrimonial,
   calcularSaldosCaixaEquivalentes,
+  distribuirContasDfc,
   identificarContasIncompletas,
+  listarContasDaLinha,
   linhaPai,
   type CadastroDemonstracoes,
   type ContasBalancete,
   type LinhaDemonstracao,
+  type ResultadoDfcIndireto,
 } from './modelo';
 import type { ConferenciasConfig } from './conferenciasStorage';
 import { LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID } from './modelo';
@@ -25,6 +28,7 @@ export interface ContaConferencia {
   movimento: number;
   detalhe?: string;
   destaque?: boolean;
+  efeitoDfc?: number;
 }
 
 export interface GrupoConferencia {
@@ -47,6 +51,12 @@ export interface ResultadoConferencia {
   contasMesSeguinte?: ContaConferencia[];
   variacoesAtipicas?: AlteracaoAtipica[];
   movimentosPL?: Array<{ grupo: string; variacao: number; estado: string }>;
+  conciliacoesDfc?: Array<{
+    metodo: 'DFC Direta' | 'DFC Indireta';
+    diferenca: number | null;
+    efeitoSemLinha: number;
+    naoExplicado: number | null;
+  }>;
   arrendamentos?: {
     aumentoPassivoCentavos: number;
     variacaoDireitoUsoCentavos: number;
@@ -201,101 +211,90 @@ function valorLinhasPorGrupo(
   return total / 100;
 }
 
-function contaEmDemonstracao(
-  linhas: LinhaDemonstracao[],
-  demonstracao: 'dre' | 'ativo' | 'passivo' | 'dfc',
-  conta: string,
-): Array<{ linha: LinhaDemonstracao; descricao: string }> {
-  const correspondencias = linhas.filter(linha => linha.demonstracao === demonstracao && linha.tipo === 'contas')
-    .flatMap(linha => linhaCorrespondente(linha, conta).map(() => ({ linha, descricao: linha.nome })));
-  if (demonstracao === 'passivo' && ['3', '4', '5', '6'].some(grupo => isGrupo(conta, grupo))
-    && !correspondencias.some(item => item.linha.calculo === 'resultadoBalancete')) {
-    const resultado = linhas.find(linha => linha.id === LINHA_RESULTADO_PERIODO_ID);
-    if (resultado) correspondencias.push({ linha: resultado, descricao: resultado.nome });
-  }
-  return correspondencias;
-}
-
-function contaEmDfcIndireto(
-  cadastro: CadastroDemonstracoes,
-  conta: ContasBalancete[string],
-): Array<{ descricao: string }> {
-  const linhas = cadastro.linhas.filter(linha => linha.demonstracao === 'dfc');
-  const diretas = contaEmDemonstracao(linhas, 'dfc', conta.conta);
-  const linhaDireta = diretas.find(item => !item.linha.foraDfc)?.linha;
-  const raizDireta = linhaDireta ? linhas.find(linha => linha.id === (linhaPai(linhaDireta) ?? linhaDireta.id)) : undefined;
-  const codigo = conta.conta;
-  const resultado = /^(?:3|4|5)(?:\.|$)/.test(codigo) || /^6\.4(?:\.|$)/.test(codigo);
-  if (resultado) return [{ descricao: 'RES — Resultado do período' }];
-  if (diretas.some(item => item.linha.foraDfc)) return [{ descricao: 'Fora da DFC' }];
-  const regras = [...(cadastro.dfcIndiretoRegras ?? [])].sort((a, b) => b.referencia.length - a.referencia.length);
-  const regrasCorrespondentes = regras.filter(regra => prefixoDe(codigo, regra.referencia));
-  const regra = regrasCorrespondentes[0];
-  if (/^[12](?:\.|$)/.test(codigo)) {
-    if (raizDireta?.id !== 'dfc-operacional') {
-      return linhaDireta ? [{ descricao: `${linhaDireta.nome} — ${raizDireta?.nome ?? 'DFC indireta'}` }] : [];
-    }
-    return regra?.linha.startsWith('V') ? [{ descricao: `${regra.linha} — Variação patrimonial` }] : [];
-  }
-  if (linhaDireta && ['dfc-investimento', 'dfc-financiamento'].includes(raizDireta?.id ?? '')) {
-    if (regrasCorrespondentes.filter(item => item.linha.startsWith('AJ')).length > 1) {
-      return regrasCorrespondentes.filter(item => item.linha.startsWith('AJ')).map(item => ({ descricao: `${item.linha} — Ajuste indireto` }));
-    }
-    return [{ descricao: regra?.linha.startsWith('AJ') ? `${regra.linha} — Ajuste indireto` : 'AJ06 — Ajuste residual automático' }];
-  }
-  return [];
-}
-
 function classificarContas(
   atual: ContasBalancete | null,
   cadastro: CadastroDemonstracoes,
-): { naoClassificadas: ContaConferencia[]; duplicadas: ContaConferencia[] } {
-  if (!atual) return { naoClassificadas: [], duplicadas: [] };
-  const contas = contasAnaliticas(atual);
+  indireto: ResultadoDfcIndireto,
+  diferencasDfc: { direta: number | null; indireta: number | null },
+  toleranciaCentavos: number,
+): {
+  naoClassificadas: ContaConferencia[];
+  duplicadas: ContaConferencia[];
+  conciliacoesDfc: NonNullable<ResultadoConferencia['conciliacoesDfc']>;
+} {
+  const contas = contasAnaliticas(atual).filter(conta =>
+    !algumPrefixo(conta.conta, ['1.3', '1.9', '2.4', '2.9'])
+    && (centavos(conta.saldoAtual) !== 0 || centavos(conta.valDeb) !== 0 || centavos(conta.valCred) !== 0));
   const demos = [
     { id: 'Ativo', codigo: 'ativo' as const, filtro: (conta: string) => isGrupo(conta, '1') },
-    { id: 'Passivo + PL', codigo: 'passivo' as const, filtro: (conta: string) => isGrupo(conta, '2') || ['3', '4', '5', '6'].some(grupo => isGrupo(conta, grupo)) },
+    { id: 'Passivo + PL', codigo: 'passivo' as const, filtro: (conta: string) => isGrupo(conta, '2') },
     { id: 'DRE', codigo: 'dre' as const, filtro: (conta: string) => ['3', '4', '5', '6'].some(grupo => isGrupo(conta, grupo)) },
-    { id: 'DFC Direta', codigo: 'dfc' as const, filtro: (conta: string) => /^[1-6](?:\.|$)/.test(conta) },
   ];
+  const contasPorLinha = new Map(cadastro.linhas.filter(linha => linha.demonstracao !== 'dfc' && linha.tipo === 'contas' && !linha.calculo)
+    .map(linha => [linha.id, new Set(listarContasDaLinha(linha, [atual]).map(item => item.conta.conta))]));
+  const linhasDfc = cadastro.linhas.filter(linha => linha.demonstracao === 'dfc');
+  const distribuicao = distribuirContasDfc(linhasDfc, [atual]);
+  const diretas = new Set<string>();
+  const indiretas = new Set<string>();
+  const foraDfc = new Set<string>();
+  for (const linha of linhasDfc.filter(linha => linha.tipo === 'contas')) {
+    const codigos = (distribuicao.porLinha.get(linha.id) ?? []).map(conta => conta.conta);
+    if (linha.foraDfc) codigos.forEach(codigo => foraDfc.add(codigo));
+    else {
+      codigos.forEach(codigo => diretas.add(codigo));
+      if (['dfc-investimento', 'dfc-financiamento'].includes(linhaPai(linha) ?? linha.id)) {
+        codigos.forEach(codigo => indiretas.add(codigo));
+      }
+    }
+  }
+  for (const codigo of ['RES', ...DFC_INDIRETO_AJUSTES.map(item => item.codigo), ...DFC_INDIRETO_VARIACOES.map(item => item.codigo)]) {
+    (indireto.contasPorLinha.get(codigo) ?? []).forEach(conta => indiretas.add(conta.conta));
+  }
   const naoClassificadas: ContaConferencia[] = [];
   const duplicadas: ContaConferencia[] = [];
   for (const conta of contas) {
+    const movimento = centavos(conta.valDeb) !== 0 || centavos(conta.valCred) !== 0 ? 'com movimento' : 'sem movimento';
     for (const demo of demos) {
       if (!demo.filtro(conta.conta)) continue;
-      const correspondencias = contaEmDemonstracao(cadastro.linhas, demo.codigo, conta.conta);
+      const correspondencias = cadastro.linhas.filter(linha =>
+        linha.demonstracao === demo.codigo && contasPorLinha.get(linha.id)?.has(conta.conta));
       if (correspondencias.length === 0) {
-        naoClassificadas.push({
-          conta: conta.conta, descricao: conta.desc, saldoAnterior: conta.saldoAnt,
-          debitos: conta.valDeb, creditos: conta.valCred, saldoAtual: conta.saldoAtual,
-          movimento: movimentoConta(conta), detalhe: `${demo.id} — ${Math.abs(conta.valDeb) + Math.abs(conta.valCred) === 0 ? 'sem movimento' : 'com movimento'}`,
-        });
+        naoClassificadas.push(montarConta(conta, `${demo.id} — ${movimento}`));
       } else if (correspondencias.length > 1) {
-        duplicadas.push({
-          conta: conta.conta, descricao: conta.desc, saldoAnterior: conta.saldoAnt,
-          debitos: conta.valDeb, creditos: conta.valCred, saldoAtual: conta.saldoAtual,
-          movimento: movimentoConta(conta), detalhe: `${demo.id}: ${correspondencias.map(item => item.descricao).join('; ')}`,
-        });
+        duplicadas.push(montarConta(conta, `${demo.id}: ${correspondencias.map(item => item.nome).join('; ')}`));
       }
     }
-    if (/^[1-6](?:\.|$)/.test(conta.conta)) {
-      const indiretas = contaEmDfcIndireto(cadastro, conta);
-      if (indiretas.length === 0) {
+    if (!/^[1-6](?:\.|$)/.test(conta.conta)
+      || algumPrefixo(conta.conta, ['1.1.1', ...(cadastro.dfcContasCaixaEquivalentes ?? ['1.1.1'])])
+      || foraDfc.has(conta.conta)) continue;
+    for (const metodo of [
+      { nome: 'DFC Direta', classificadas: diretas, diferenca: diferencasDfc.direta, efeito: -centavos(movimentoConta(conta)) },
+      { nome: 'DFC Indireta', classificadas: indiretas, diferenca: diferencasDfc.indireta,
+        efeito: /^[12](?:\.|$)/.test(conta.conta)
+          ? centavos(conta.saldoAtual) - centavos(conta.saldoAnt) : -centavos(movimentoConta(conta)) },
+    ]) {
+      if (!metodo.classificadas.has(conta.conta)
+        && (metodo.diferenca === null || Math.abs(centavos(metodo.diferenca)) > toleranciaCentavos)) {
         naoClassificadas.push({
-          conta: conta.conta, descricao: conta.desc, saldoAnterior: conta.saldoAnt,
-          debitos: conta.valDeb, creditos: conta.valCred, saldoAtual: conta.saldoAtual,
-          movimento: movimentoConta(conta), detalhe: `DFC Indireta — ${Math.abs(conta.valDeb) + Math.abs(conta.valCred) === 0 ? 'sem movimento' : 'com movimento'}`,
-        });
-      } else if (indiretas.length > 1) {
-        duplicadas.push({
-          conta: conta.conta, descricao: conta.desc, saldoAnterior: conta.saldoAnt,
-          debitos: conta.valDeb, creditos: conta.valCred, saldoAtual: conta.saldoAtual,
-          movimento: movimentoConta(conta), detalhe: `DFC Indireta: ${indiretas.map(item => item.descricao).join('; ')}`,
+          ...montarConta(conta, `${metodo.nome} — ${movimento}`),
+          efeitoDfc: reais(metodo.efeito),
         });
       }
     }
   }
-  return { naoClassificadas, duplicadas };
+  const conciliacoesDfc = [
+    { metodo: 'DFC Direta' as const, diferenca: diferencasDfc.direta },
+    { metodo: 'DFC Indireta' as const, diferenca: diferencasDfc.indireta },
+  ].map(item => {
+    const efeitoCentavos = naoClassificadas.filter(conta => conta.detalhe?.startsWith(`${item.metodo} —`))
+      .reduce((total, conta) => total + centavos(conta.efeitoDfc ?? 0), 0);
+    return {
+      ...item,
+      efeitoSemLinha: reais(efeitoCentavos),
+      naoExplicado: item.diferenca === null ? null : reais(centavos(item.diferenca) - efeitoCentavos),
+    };
+  });
+  return { naoClassificadas, duplicadas, conciliacoesDfc };
 }
 
 function linhasAlvo(
@@ -545,6 +544,7 @@ function obterVariacoesCaixa(
     indiretoOperacionalYtd: indiretoYtd.valores.get('dfc-operacional') ?? null,
     lucroDre,
     indiretoYtd,
+    indireto,
   };
 }
 
@@ -917,7 +917,11 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
       || config.prefixosExcluidosSinal.some(prefixo => prefixoDe(conta.conta, prefixo))) return false;
     return !['6.1', '6.2', '6.3', '6.5'].some(prefixo => prefixoDe(conta.conta, prefixo));
   });
-  const classes = classificarContas(atual, cadastro);
+  const classes = classificarContas(atual, cadastro, variacoesCaixa.indireto, {
+    direta: diferencaDfcDireta, indireta: diferencaDfcIndireta,
+  }, config.toleranciaConferenciaCentavos);
+  const classificacaoNaoExplicada = classes.conciliacoesDfc.some(item =>
+    item.naoExplicado !== null && Math.abs(centavos(item.naoExplicado)) > config.toleranciaConferenciaCentavos);
   const grupos = conferirGrupos(cadastro, atual, acumulado, config);
   const variacoesAtipicas = analisarVariacoes(cadastro, atual, mesesAnteriores, config);
   const movimentos6 = verificarNaturezaGrupo6(atual, mes);
@@ -1017,9 +1021,17 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
     {
       id: 'classificacao',
       titulo: '9. Contas sem classificação ou duplicadas',
-      estado: classes.duplicadas.length ? 'erro' : classes.naoClassificadas.length ? 'atencao' : atual ? 'ok' : 'indisponivel',
-      resumo: `${classes.naoClassificadas.length} contas sem linha; ${classes.duplicadas.length} contas em mais de uma linha.`,
+      estado: classes.duplicadas.length || classificacaoNaoExplicada ? 'erro'
+        : classes.naoClassificadas.length ? 'atencao'
+          : !atual || classes.conciliacoesDfc.some(item => item.diferenca === null) ? 'indisponivel' : 'ok',
+      resumo: `${classes.naoClassificadas.length} contas sem linha; ${classes.duplicadas.length} contas em mais de uma linha.${classificacaoNaoExplicada ? ' Há diferença de caixa não explicada pelas contas sem linha.' : ''}`,
       contas: [...classes.naoClassificadas, ...classes.duplicadas],
+      conciliacoesDfc: classes.conciliacoesDfc,
+      observacoes: [
+        'Somente contas analíticas com saldo atual ou débitos/créditos. Compensações são excluídas; contas de balanço não são exigidas na DRE e contas de resultado entram no Resultado do Período do balanço.',
+        'A DFC reutiliza a classificação das demonstrações. Quando a diferença do método no item 6 está dentro da tolerância, sua lista fica vazia. Caixa e contas cadastradas fora da DFC não são exigidos.',
+        'Efeito na diferença = parcela da diferença do item 6 atribuível à conta sem linha. Valores não explicados exigem revisar o balancete, os saldos de caixa e a classificação, sem atribuição artificial a contas.',
+      ],
     },
     {
       id: 'contas-novas',

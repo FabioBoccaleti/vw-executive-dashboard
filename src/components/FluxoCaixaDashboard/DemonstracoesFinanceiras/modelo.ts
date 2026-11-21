@@ -714,7 +714,7 @@ interface ContasDfcDistribuidas {
   naoMapeadas: ContaBalancete[];
 }
 
-function distribuirContasDfc(linhas: LinhaDemonstracao[], periodos: Array<ContasBalancete | null>): ContasDfcDistribuidas {
+export function distribuirContasDfc(linhas: LinhaDemonstracao[], periodos: Array<ContasBalancete | null>): ContasDfcDistribuidas {
   const regras = linhas.filter(linha => linha.demonstracao === 'dfc' && linha.tipo === 'contas')
     .flatMap(linha => linha.itens.map(item => ({ prefixo: item.referencia, linha: linha.id })))
     .sort((a, b) => b.prefixo.length - a.prefixo.length);
