@@ -2,11 +2,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { DemonstracoesFinanceiras } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras';
 import { cadastroVazio, type CadastroDemonstracoes } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasStorage';
 import {
   loadCadastroDemonstracoes, loadDadosDemonstracoes, type DocumentoNotasDfc,
 } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/storage';
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), cas: vi.fn(), raw: vi.fn(), exportExcel: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), cas: vi.fn(), raw: vi.fn(), exportExcel: vi.fn(), conferencias: vi.fn() }));
+vi.mock('@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados', async importOriginal => ({
+  ...await importOriginal<typeof import('@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados')>(),
+  carregarConferenciasPeriodosExportacao: mocks.conferencias,
+}));
 vi.mock('@/lib/kvClient', () => ({ kvGet: mocks.get, kvCompareAndSet: mocks.cas }));
 vi.mock('@/components/FluxoCaixaDashboard/fluxoCaixaStorage', () => ({ loadFluxoCaixaRaw: mocks.raw }));
 vi.mock('@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/exportacaoExcel', () => ({
@@ -24,6 +29,10 @@ beforeEach(() => {
   mocks.cas.mockReset();
   mocks.raw.mockReset();
   mocks.exportExcel.mockReset().mockResolvedValue(undefined);
+  mocks.conferencias.mockReset().mockImplementation(async (anos: number[], mesLimite: number) =>
+    anos.flatMap(ano => Array.from({ length: mesLimite }, (_, indice) => ({
+      ano, mes: indice + 1, config: CONFERENCIAS_CONFIG_PADRAO, resultados: [], snapshots: [], comparacoes: [],
+    }))));
   persistido = null;
   persistidoNotas = {};
   mocks.get.mockImplementation(async (key: string) => key.startsWith('fluxo_caixa_dfc_notas_') ? persistidoNotas[key] ?? null : persistido);
@@ -74,12 +83,44 @@ it('exporta as demonstrações com anos comparativos, período e notas seleciona
     anos: [2026, 2025],
     mesLimite: 2,
     incluirNotasAnuais: false,
+    conferencias: [
+      expect.objectContaining({ ano: 2026, mes: 1 }),
+      expect.objectContaining({ ano: 2026, mes: 2 }),
+      expect.objectContaining({ ano: 2025, mes: 1 }),
+      expect.objectContaining({ ano: 2025, mes: 2 }),
+    ],
     notas: expect.arrayContaining([expect.objectContaining({
       escopo: { ano: 2026, mes: 1, periodo: 'mes', metodo: 'direto' },
       notas: [{ id: 'nota-1', linhaId: 'dfc-op01', linhaNome: 'Recebimentos de clientes', texto: 'Recebimento extraordinário.' }],
     })]),
   }), 'Demonstracoes_Financeiras_2026_Jan-Fev.xlsx');
   expect(await screen.findByText('Arquivo Excel gerado com sucesso.')).toBeInTheDocument();
+  expect(mocks.conferencias).toHaveBeenCalledWith([2026, 2025], 2, expect.objectContaining({ empresa: persistido.empresa }));
+});
+
+it('informa a falha de carga das conferências sem gerar um Excel parcial', async () => {
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
+  mocks.conferencias.mockRejectedValueOnce(new Error('Histórico indisponível'));
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={0} />);
+  await screen.findByRole('button', { name: 'Adicionar ano' });
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar Excel' }));
+  expect(await screen.findByText('Não foi possível exportar as demonstrações: Histórico indisponível')).toBeInTheDocument();
+  expect(mocks.conferencias).toHaveBeenCalledWith([2026], 12, expect.anything());
+  expect(mocks.exportExcel).not.toHaveBeenCalled();
+});
+
+it('exporta conferências de janeiro a dezembro na seleção anual', async () => {
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={0} />);
+  await screen.findByRole('button', { name: 'Adicionar ano' });
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar Excel' }));
+  await waitFor(() => expect(mocks.exportExcel).toHaveBeenCalledOnce());
+  expect(mocks.conferencias).toHaveBeenCalledWith([2026], 12, expect.anything());
+  const parametros = mocks.exportExcel.mock.calls[0][0];
+  expect(parametros.conferencias.map(({ mes }: { mes: number }) => mes)).toEqual(
+    Array.from({ length: 12 }, (_, indice) => indice + 1),
+  );
+  expect(parametros.incluirNotasAnuais).toBe(true);
 });
 
 it('expande em Cadastros os grupos e suas sublinhas, sem detalhar totalizações', async () => {

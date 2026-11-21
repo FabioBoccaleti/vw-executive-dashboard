@@ -134,6 +134,8 @@ O painel verifica:
 
 As comparações de continuidade e reimportação ignoram diferenças de até **R$ 1,00**. Os critérios de natureza, tolerâncias, limites de variação e prefixos de arrendamento podem ser ajustados em **Parâmetros das conferências**. Variações atípicas exigem pelo menos dois meses anteriores disponíveis; verificações que dependem de períodos ausentes aparecem como indisponíveis.
 
+O botão **Exportar Excel** inclui uma planilha **Conferências** de janeiro até o mês selecionado, para todos os anos comparados nas demais planilhas. Quando selecionado **Anual**, inclui janeiro a dezembro de cada ano comparado. A planilha começa com um resumo dos 12 semáforos por mês; os comentários das células explicam cada resultado. Em seguida, traz os detalhes completos separados por período: contas e linhas, comparações de versões e histórico de importações. Os parâmetros salvos aparecem uma única vez ao final. Meses sem balancete permanecem no relatório, com as verificações correspondentes indisponíveis, sem substituição por zeros. As leituras de balancetes são reutilizadas entre as conferências mensais. A exportação não marca versões como emitidas nem altera os parâmetros. Falhas ao carregar dados ou histórico interrompem a exportação e são informadas na tela.
+
 ## Upload de Arquivo
 
 ### Por Drag & Drop

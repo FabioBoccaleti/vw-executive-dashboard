@@ -17,6 +17,7 @@ import {
 import { DFC_INDIRETO_CATEGORIAS_MAPEAVEIS } from './dfcMetodoIndireto';
 import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
 import { ConferenciasTab } from './ConferenciasTab';
+import { carregarConferenciasPeriodosExportacao } from './conferenciasDados';
 import type { ImportActor } from '../importHistoryStorage';
 import {
   loadCadastroDemonstracoes, loadDadosDemonstracoes, loadNotasDfc, saveCadastroDemonstracoes, saveNotasDfc,
@@ -261,6 +262,7 @@ export function DemonstracoesFinanceiras({
     setErroAcao('');
     setAviso('');
     try {
+      const conferencias = await carregarConferenciasPeriodosExportacao(anos, mesLimite, cadastro);
       const periodos = anos.map(ano => ({ ano, mes: mesLimite }));
       const dadosExportacao = await loadDadosDemonstracoes(
         periodos[0] ?? { ano: selectedYear, mes: mesLimite },
@@ -295,6 +297,7 @@ export function DemonstracoesFinanceiras({
         mesLimite,
         incluirNotasAnuais: selectedMonth === 0,
         notas,
+        conferencias,
       }, nomeArquivo);
       setAviso('Arquivo Excel gerado com sucesso.');
     } catch (error) {

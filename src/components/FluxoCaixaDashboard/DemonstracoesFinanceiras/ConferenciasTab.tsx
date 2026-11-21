@@ -2,23 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { loadFluxoCaixaRaw } from '../fluxoCaixaStorage';
 import type { ImportActor, ImportSnapshot } from '../importHistoryStorage';
 import {
   loadImportSnapshots,
-  loadImportSnapshotText,
   markImportSnapshotEmitted,
 } from '../importHistoryStorage';
-import { extractAccounts } from '../balanceteParser';
 import type { CadastroDemonstracoes, ContasBalancete } from './modelo';
 import {
-  calcularDiferencaLinhasSnapshots,
-  compararSnapshotsBalancete,
   construirConferencias,
-  type ComparacaoContaSnapshot,
-  type EntradaConferencias,
   type ResultadoConferencia,
 } from './conferenciasModelo';
+import {
+  carregarDadosPainel, carregarComparacoesSnapshots,
+  type DadosPainelConferencias, type ComparacaoSnapshots,
+} from './conferenciasDados';
 import {
   loadConferenciasConfig,
   saveConferenciasConfig,
@@ -30,19 +27,6 @@ type Props = {
   selectedMonth: number;
   cadastro: CadastroDemonstracoes;
   currentUser?: ImportActor;
-};
-
-type DadosPainel = {
-  entrada: EntradaConferencias;
-  currentTimestamp: number | null;
-  currentSnapshotId: string | null;
-};
-
-type ComparacaoSnapshots = {
-  rotulo: string;
-  referencia: ImportSnapshot;
-  contas: ComparacaoContaSnapshot[];
-  linhas: ReturnType<typeof calcularDiferencaLinhasSnapshots>;
 };
 
 const moedas = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -74,80 +58,6 @@ function lerNaturezas(texto: string, campo: string): Array<{ prefixo: string; na
     }
     return { prefixo, natureza };
   });
-}
-
-function contaBalancete(rawText: string | null, periodo: string): ContasBalancete | null {
-  if (rawText === null) return null;
-  try {
-    const contas = extractAccounts(rawText, { strict: true });
-    if (Object.keys(contas).length === 0) throw new Error('Nenhuma conta válida foi encontrada.');
-    return contas;
-  } catch (error) {
-    throw new Error(`Balancete ${periodo}: ${mensagem(error)}`);
-  }
-}
-
-async function carregarDadosPainel(
-  selectedYear: number,
-  selectedMonth: number,
-  cadastro: CadastroDemonstracoes,
-  config: ConferenciasConfig,
-): Promise<DadosPainel> {
-  const mesesDoAno = Array.from({ length: 12 }, (_, index) => ({ ano: selectedYear, mes: index + 1 }));
-  const mesesAnteriores = selectedMonth > 0
-    ? Array.from({ length: 3 }, (_, index) => {
-      const offset = selectedMonth - 4 + index;
-      const date = new Date(selectedYear, offset, 1);
-      return { ano: date.getFullYear(), mes: date.getMonth() + 1 };
-    })
-    : [];
-  const periodoAnterior = selectedMonth > 0
-    ? (() => {
-      const date = new Date(selectedYear, selectedMonth - 2, 1);
-      return { ano: date.getFullYear(), mes: date.getMonth() + 1 };
-    })()
-    : { ano: selectedYear - 1, mes: 0 };
-  const periodoSeguinte = selectedMonth > 0
-    ? (() => {
-      const date = new Date(selectedYear, selectedMonth, 1);
-      return { ano: date.getFullYear(), mes: date.getMonth() + 1 };
-    })()
-    : null;
-  const periodosExtras = [periodoAnterior, ...(periodoSeguinte ? [periodoSeguinte] : []), ...mesesAnteriores];
-  const chaves = new Map<string, { ano: number; mes: number }>();
-  for (const periodo of [...mesesDoAno, ...periodosExtras, ...(selectedMonth === 0 ? [{ ano: selectedYear, mes: 0 }] : [])]) {
-    chaves.set(`${periodo.ano}_${periodo.mes}`, periodo);
-  }
-  const dados = new Map<string, ContasBalancete | null>();
-  const pares = await Promise.all([...chaves].map(async ([chave, periodo]) => {
-    const raw = await loadFluxoCaixaRaw(periodo.ano, periodo.mes, { throwOnError: true });
-    return [chave, contaBalancete(raw?.rawText ?? null, rotuloPeriodo(periodo.ano, periodo.mes))] as const;
-  }));
-  for (const [chave, contas] of pares) dados.set(chave, contas);
-  const obter = (ano: number, mes: number) => dados.get(`${ano}_${mes}`) ?? null;
-  const rawAtual = await loadFluxoCaixaRaw(selectedYear, selectedMonth, { throwOnError: true });
-  const atual = obter(selectedYear, selectedMonth);
-  const mesesDoAnoComContas = mesesDoAno.map(periodo => ({ ...periodo, contas: obter(periodo.ano, periodo.mes) }));
-  const mesesAnterioresComContas = mesesAnteriores.map(periodo => ({ ...periodo, contas: obter(periodo.ano, periodo.mes) }));
-
-  return {
-    entrada: {
-      ano: selectedYear,
-      mes: selectedMonth,
-      atual,
-      anterior: obter(periodoAnterior.ano, periodoAnterior.mes),
-      proximo: periodoSeguinte ? obter(periodoSeguinte.ano, periodoSeguinte.mes) : null,
-      acumulado: selectedMonth === 0
-        ? [atual]
-        : mesesDoAnoComContas.slice(0, selectedMonth).map(periodo => periodo.contas),
-      mesesDoAno: mesesDoAnoComContas,
-      mesesAnteriores: mesesAnterioresComContas,
-      cadastro,
-      config,
-    },
-    currentTimestamp: rawAtual?.timestamp ?? null,
-    currentSnapshotId: rawAtual?.snapshotId ?? null,
-  };
 }
 
 function formatarContaSnapshot(conta: ContasBalancete[string] | null, campo: 'saldoAnt' | 'valDeb' | 'valCred' | 'saldoAtual') {
@@ -203,7 +113,7 @@ function CampoLista({
 
 export function ConferenciasTab({ selectedYear, selectedMonth, cadastro, currentUser }: Props) {
   const [config, setConfig] = useState<ConferenciasConfig | null>(null);
-  const [dados, setDados] = useState<DadosPainel | null>(null);
+  const [dados, setDados] = useState<DadosPainelConferencias | null>(null);
   const [snapshots, setSnapshots] = useState<ImportSnapshot[]>([]);
   const [comparacoes, setComparacoes] = useState<ComparacaoSnapshots[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -282,38 +192,8 @@ export function ConferenciasTab({ selectedYear, selectedMonth, cadastro, current
     loadImportSnapshots(selectedYear, selectedMonth).then(async historico => {
       if (!ativo) return;
       setSnapshots(historico);
-      const importadas = historico.filter(item => item.status === 'imported');
-      const emitida = importadas.filter(item => item.emittedAt)
-        .sort((a, b) => (b.emittedAt ?? 0) - (a.emittedAt ?? 0))[0];
-      const importacaoAtual = historico.find(item => item.id === dados.currentSnapshotId) ?? importadas[0];
-      const importacaoAnterior = importadas.find(item => item.id !== importacaoAtual?.id);
-      const comparacaoSecundaria = importacaoAtual?.status === 'imported'
-        ? importacaoAnterior
-        : importadas.find(item => item.id !== importacaoAtual?.id) ?? importadas[0];
-      const candidatos = emitida
-        ? [{ rotulo: `Versão emitida · ${dataHora(emitida.emittedAt!)}`, referencia: emitida },
-          ...(comparacaoSecundaria && comparacaoSecundaria.id !== emitida.id
-            ? [{ rotulo: `Importação anterior · ${dataHora(comparacaoSecundaria.importedAt)}`, referencia: comparacaoSecundaria }]
-            : [])]
-        : comparacaoSecundaria
-          ? [{ rotulo: `Importação anterior · ${dataHora(comparacaoSecundaria.importedAt)}`, referencia: comparacaoSecundaria }]
-          : [];
-      const comparacoesCarregadas = await Promise.all(candidatos.map(async candidato => {
-        const [texto, atual] = await Promise.all([
-          loadImportSnapshotText(candidato.referencia),
-          Promise.resolve(dados.entrada.atual),
-        ]);
-        if (!atual) return null;
-        const contasReferencia = contaBalancete(texto, `snapshot ${dataHora(candidato.referencia.importedAt)}`);
-        if (!contasReferencia) return null;
-        return {
-          rotulo: candidato.rotulo,
-          referencia: candidato.referencia,
-          contas: compararSnapshotsBalancete(contasReferencia, atual, 100),
-          linhas: calcularDiferencaLinhasSnapshots(cadastro, contasReferencia, atual, 100),
-        };
-      }));
-      if (ativo) setComparacoes(comparacoesCarregadas.filter((item): item is ComparacaoSnapshots => item !== null));
+      const comparacoesCarregadas = await carregarComparacoesSnapshots(historico, dados, cadastro);
+      if (ativo) setComparacoes(comparacoesCarregadas);
     }).catch(error => { if (ativo) setErroHistorico(mensagem(error)); })
       .finally(() => { if (ativo) setCarregandoHistorico(false); });
     return () => { ativo = false; };

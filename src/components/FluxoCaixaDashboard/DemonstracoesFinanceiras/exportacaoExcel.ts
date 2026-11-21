@@ -7,6 +7,8 @@ import {
 } from './modelo';
 import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
 import type { EscopoNotaDfc, NotaDfc } from './storage';
+import type { ConferenciasExportacao } from './conferenciasDados';
+import type { ContaConferencia, EstadoConferencia } from './conferenciasModelo';
 
 const CORES = {
   verde: 'FF00843D',
@@ -49,6 +51,7 @@ export interface ParametrosExportacaoExcel {
   mesLimite: number;
   incluirNotasAnuais: boolean;
   notas: NotasDfcExportacao[];
+  conferencias?: ConferenciasExportacao[];
 }
 
 function criarColunas(anos: number[], mesLimite: number, acumulado: boolean): ColunaExportacao[] {
@@ -572,6 +575,216 @@ function adicionarPlanilhaFluxo(
   return ws;
 }
 
+function adicionarPlanilhaConferencias(
+  workbook: ExcelJS.Workbook,
+  cadastro: CadastroDemonstracoes,
+  periodos: ConferenciasExportacao[],
+) {
+  const ws = workbook.addWorksheet('Conferências', { properties: { tabColor: { argb: CORES.verde } } });
+  const ultimaColuna = 13;
+  ws.columns = [{ width: 48 }, { width: 50 }, ...Array.from({ length: 11 }, () => ({ width: 23 }))];
+  ws.views = [{ state: 'frozen', ySplit: 5 }];
+  ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  ws.headerFooter.oddFooter = 'Página &P de &N';
+
+  const texto = (valor: string) => {
+    const row = ws.addRow([valor]);
+    ws.mergeCells(row.number, 1, row.number, ultimaColuna);
+    row.getCell(1).font = { size: 10, color: { argb: CORES.texto } };
+    row.getCell(1).alignment = { vertical: 'middle', wrapText: true };
+    row.height = Math.max(20, Math.ceil(valor.length / 220) * 15);
+    return row;
+  };
+  adicionarSecao(ws, cadastro.empresa.nome || 'Demonstrações financeiras', ultimaColuna);
+  texto(`CNPJ: ${cadastro.empresa.cnpj || '—'}${cadastro.empresa.nire ? ` | NIRE: ${cadastro.empresa.nire}` : ''}`);
+  adicionarSecao(ws, 'Painel de conferências · Resumo por período', ultimaColuna);
+  texto('Todos os meses exportados dos anos comparados. Consulte os detalhes de cada período abaixo. Valores em R$; células vazias indicam informação indisponível, não saldo zero.');
+
+  const cabecalho = (valores: string[]) => {
+    const row = ws.addRow(valores);
+    row.eachCell(celula => {
+      celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CORES.verdeEscuro } };
+      celula.font = { bold: true, size: 10, color: { argb: CORES.branco } };
+      celula.alignment = { vertical: 'middle', wrapText: true };
+      celula.border = { bottom: BORDA_FINA };
+    });
+    row.height = 32;
+    return row;
+  };
+  const linha = (valores: ExcelJS.CellValue[], moedas: number[] = []) => {
+    const row = ws.addRow(valores);
+    let altura = 20;
+    row.eachCell({ includeEmpty: true }, (celula, indice) => {
+      celula.font = { size: 10, color: { argb: CORES.texto } };
+      celula.alignment = { vertical: 'middle', wrapText: true, horizontal: typeof celula.value === 'number' ? 'right' : 'left' };
+      celula.border = { bottom: BORDA_FINA };
+      if (moedas.includes(indice)) celula.numFmt = FORMATO_MOEDA;
+      if (celula.value instanceof Date) celula.numFmt = 'dd/mm/yyyy hh:mm';
+      if (typeof celula.value === 'string') {
+        const largura = ws.getColumn(indice).width ?? 23;
+        altura = Math.max(altura, Math.ceil(celula.value.length / largura) * 15);
+      }
+    });
+    row.height = altura;
+    return row;
+  };
+  const tabelaContas = (contas: ContaConferencia[], modo: 'saldos' | 'movimentos' = 'saldos') => {
+    if (!contas.length) return;
+    cabecalho(modo === 'movimentos'
+      ? ['Conta', 'Descrição / motivo', 'Débitos', 'Créditos', 'Movimento']
+      : ['Conta', 'Descrição / motivo', 'Saldo anterior', 'Débitos', 'Créditos', 'Saldo atual', 'Movimento']);
+    for (const conta of contas) {
+      const descricao = `${conta.descricao}${conta.detalhe ? ` — ${conta.detalhe}` : ''}`;
+      linha(modo === 'movimentos'
+        ? [conta.conta, descricao, conta.debitos, conta.creditos, conta.movimento]
+        : [conta.conta, descricao, conta.saldoAnterior, conta.debitos, conta.creditos, conta.saldoAtual, conta.movimento],
+      modo === 'movimentos' ? [3, 4, 5] : [3, 4, 5, 6, 7]);
+    }
+  };
+  const estados: Record<EstadoConferencia, { nome: string; cor: string }> = {
+    ok: { nome: 'OK', cor: 'FFDCFCE7' },
+    atencao: { nome: 'Atenção', cor: 'FFFEF3C7' },
+    erro: { nome: 'Erro', cor: 'FFFEE2E2' },
+    informativo: { nome: 'Informativo', cor: 'FFDBEAFE' },
+    indisponivel: { nome: 'Indisponível', cor: 'FFE2E8F0' },
+  };
+  const tituloPeriodo = (periodo: ConferenciasExportacao) =>
+    `${periodo.mes === 0 ? 'Anual' : String(periodo.mes).padStart(2, '0')}/${periodo.ano}`;
+  const aplicarEstado = (celula: ExcelJS.Cell, estado: EstadoConferencia) => {
+    celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: estados[estado].cor } };
+    celula.font = { bold: true, size: 10, color: { argb: CORES.texto } };
+  };
+  const itens = periodos[0].resultados;
+  const resumoPeriodos = cabecalho(['Período', ...itens.map(item => item.titulo)]);
+  resumoPeriodos.height = 80;
+  for (const periodo of periodos) {
+    const row = linha([tituloPeriodo(periodo)]);
+    for (const [indice, item] of itens.entries()) {
+      const resultado = periodo.resultados.find(resultado => resultado.id === item.id);
+      if (!resultado) throw new Error(`Conferência ${item.titulo} ausente em ${tituloPeriodo(periodo)}.`);
+      const celula = row.getCell(indice + 2);
+      celula.value = estados[resultado.estado].nome;
+      celula.note = resultado.resumo;
+      celula.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      aplicarEstado(celula, resultado.estado);
+    }
+    row.height = 30;
+  }
+
+  for (const conferencias of periodos) {
+    ws.addRow([]);
+    adicionarSecao(ws, `Painel de conferências · ${tituloPeriodo(conferencias)}`, ultimaColuna);
+    const resumo = cabecalho(['Conferência', 'Semáforo', 'Resumo']);
+    ws.mergeCells(resumo.number, 3, resumo.number, ultimaColuna);
+    for (const resultado of conferencias.resultados) {
+      const estado = estados[resultado.estado];
+      const row = linha([resultado.titulo, estado.nome, resultado.resumo]);
+      ws.mergeCells(row.number, 3, row.number, ultimaColuna);
+      aplicarEstado(row.getCell(2), resultado.estado);
+      row.height = Math.max(30, Math.ceil(resultado.titulo.length / 48) * 15, Math.ceil(resultado.resumo.length / 190) * 15);
+    }
+
+    for (const resultado of conferencias.resultados) {
+      adicionarSecao(ws, resultado.titulo, ultimaColuna);
+      texto(`${estados[resultado.estado].nome} · ${resultado.resumo}`);
+      tabelaContas(resultado.contas ?? []);
+      if (resultado.contasMesSeguinte?.length) {
+        adicionarSecao(ws, 'Divergências no saldo anterior do mês seguinte', ultimaColuna);
+        tabelaContas(resultado.contasMesSeguinte);
+      }
+      for (const grupo of resultado.grupos ?? []) {
+        cabecalho(['Grupo', 'Balancete', 'Soma das linhas', 'Diferença']);
+        linha([grupo.nome, grupo.esperado, grupo.somaLinhas, grupo.diferenca], [2, 3, 4]);
+        tabelaContas(grupo.contas ?? [], grupo.modoContas);
+      }
+      if (resultado.movimentosPL?.length) {
+        cabecalho(['Grupo do PL', 'Estado', 'Variação líquida']);
+        for (const movimento of resultado.movimentosPL) linha([movimento.grupo, movimento.estado, movimento.variacao], [3]);
+      }
+      for (const variacao of resultado.variacoesAtipicas ?? []) {
+        cabecalho(['Demonstração', 'Linha / motivo', 'Valor do mês', 'Média anterior', 'Variação', 'Variação percentual']);
+        const row = linha([variacao.demonstracao, `${variacao.linha} — ${variacao.motivo}`, variacao.valorMes,
+          variacao.mediaAnterior, variacao.variacao, variacao.variacaoPercentual === null ? null : variacao.variacaoPercentual / 100], [3, 4, 5]);
+        row.getCell(6).numFmt = FORMATO_PERCENTUAL;
+        tabelaContas(variacao.contas);
+      }
+      if (resultado.arrendamentos) {
+        const arrendamento = resultado.arrendamentos;
+        cabecalho(['Arrendamento', 'Aumento líquido do passivo', 'Variação do direito de uso', 'Movimento mapeado na DFC']);
+        linha(['Totais', arrendamento.aumentoPassivoCentavos / 100, arrendamento.variacaoDireitoUsoCentavos / 100, arrendamento.fluxoDfcCentavos / 100], [2, 3, 4]);
+        for (const [titulo, contas] of [
+          ['Contas do passivo de arrendamento', arrendamento.contasPassivo],
+          ['Contas do ativo de direito de uso', arrendamento.contasDireitoUso],
+        ] as const) {
+          adicionarSecao(ws, titulo, ultimaColuna);
+          tabelaContas(contas.map(conta => ({
+            conta: conta.conta, descricao: conta.desc, saldoAnterior: conta.saldoAnt, debitos: conta.valDeb,
+            creditos: conta.valCred, saldoAtual: conta.saldoAtual, movimento: conta.valCred - conta.valDeb,
+          })));
+        }
+      }
+      for (const observacao of resultado.observacoes ?? []) texto(observacao);
+      if (resultado.id === 'reimportacao') {
+        for (const comparacao of conferencias.comparacoes) {
+          adicionarSecao(ws, `Comparação com ${comparacao.rotulo}`, ultimaColuna);
+          texto(`${comparacao.contas.length} contas e ${comparacao.linhas.length} linhas tiveram alterações superiores a R$ 1,00.`);
+          if (comparacao.contas.length) {
+            cabecalho(['Conta', 'Descrição', 'Saldo ant. antes', 'Saldo ant. depois', 'Débitos antes', 'Débitos depois', 'Créditos antes', 'Créditos depois', 'Saldo atual antes', 'Saldo atual depois']);
+            for (const conta of comparacao.contas) {
+              linha([conta.conta, conta.descricao, conta.antes?.saldoAnt ?? null, conta.depois?.saldoAnt ?? null,
+                conta.antes?.valDeb ?? null, conta.depois?.valDeb ?? null, conta.antes?.valCred ?? null,
+                conta.depois?.valCred ?? null, conta.antes?.saldoAtual ?? null, conta.depois?.saldoAtual ?? null],
+              [3, 4, 5, 6, 7, 8, 9, 10]);
+            }
+          }
+          if (comparacao.linhas.length) {
+            cabecalho(['Demonstração', 'Linha', 'Antes', 'Depois', 'Diferença']);
+            for (const item of comparacao.linhas) linha([item.demonstracao, item.linha, item.antes, item.depois, item.diferenca], [3, 4, 5]);
+          }
+        }
+        if (!conferencias.comparacoes.length) texto('Ainda não há uma versão anterior ou emitida para comparar.');
+        adicionarSecao(ws, 'Histórico de importações', ultimaColuna);
+        cabecalho(['Arquivo', 'ID do snapshot', 'Importado em', 'Importado por', 'Estado', 'Emitido em', 'Emitido por']);
+        const status = { saving: 'Em gravação', imported: 'Importada', failed: 'Falhou' };
+        for (const snapshot of conferencias.snapshots) {
+          linha([snapshot.fileName ?? 'Balancete', snapshot.id, new Date(snapshot.importedAt),
+            snapshot.importedBy.name ?? snapshot.importedBy.username, status[snapshot.status],
+            snapshot.emittedAt ? new Date(snapshot.emittedAt) : null,
+            snapshot.emittedBy?.name ?? snapshot.emittedBy?.username ?? null]);
+        }
+        if (!conferencias.snapshots.length) texto('Nenhuma importação registrada para este período.');
+      }
+    }
+  }
+
+  adicionarSecao(ws, 'Parâmetros das conferências', ultimaColuna);
+  const config = periodos[0].config;
+  for (const [titulo, valor, moeda] of [
+    ['Sinal invertido (R$)', config.limiteSinalCentavos / 100, true],
+    ['Tolerância de conferência (R$)', config.toleranciaConferenciaCentavos / 100, true],
+    ['Tolerância de continuidade (R$)', config.toleranciaContinuidadeCentavos / 100, true],
+    ['Variação percentual (%)', config.limiteVariacaoPercentual, false],
+    ['Variação normal (R$)', config.limiteVariacaoCentavos / 100, true],
+    ['Variação absoluta (R$)', config.limiteVariacaoSempreCentavos / 100, true],
+    ['Capital de giro (R$)', config.limiteCapitalGiroCentavos / 100, true],
+    ['Aumento de arrendamento (R$)', config.limiteArrendamentoCentavos / 100, true],
+    ['Movimento de PL (R$)', config.limiteMovimentoPlCentavos / 100, true],
+  ] as const) linha([titulo, valor], moeda ? [2] : []);
+  for (const [titulo, valores] of [
+    ['Natureza padrão por grupo', Object.entries(config.naturezaPorGrupo).map(([grupo, natureza]) => `${grupo}=${natureza}`)],
+    ['Exceções de natureza', config.naturezaExcecoes.map(item => `${item.prefixo}=${item.natureza}`)],
+    ['Prefixos excluídos da checagem de sinal', config.prefixosExcluidosSinal],
+    ['Palavras que indicam contas redutoras', config.palavrasRedutoras],
+    ['Linhas de capital de giro', config.linhasCapitalGiro],
+    ['Prefixos do passivo de arrendamento', config.prefixosPassivoArrendamento],
+    ['Prefixos do ativo de direito de uso', config.prefixosAtivoDireitoUso],
+  ] as const) {
+    adicionarSecao(ws, titulo, ultimaColuna);
+    texto(valores.join('; ') || 'Nenhum parâmetro cadastrado.');
+  }
+  adicionarRodape(ws, ultimaColuna);
+}
+
 export function criarWorkbookDemonstracoesFinanceiras(parametros: ParametrosExportacaoExcel): ExcelJS.Workbook {
   if (!parametros.anos.length || new Set(parametros.anos).size !== parametros.anos.length) {
     throw new Error('Selecione ao menos um ano, sem duplicidades, para exportar.');
@@ -611,6 +824,7 @@ export function criarWorkbookDemonstracoesFinanceiras(parametros: ParametrosExpo
   criarAbaAbertura('DRE - Abertura', 'Demonstração do Resultado do Exercício — Abertura de contas', 'dre', colunasFluxo);
   criarAbaAbertura('Ativo - Abertura', 'Balanço Patrimonial — Ativo — Abertura de contas', 'ativo', colunasSaldo);
   criarAbaAbertura('Passivo + PL - Abertura', 'Balanço Patrimonial — Passivo + Patrimônio Líquido — Abertura de contas', 'passivo', colunasSaldo);
+  if (parametros.conferencias?.length) adicionarPlanilhaConferencias(workbook, parametros.cadastro, parametros.conferencias);
   return workbook;
 }
 

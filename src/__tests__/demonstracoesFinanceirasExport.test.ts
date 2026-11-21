@@ -6,8 +6,121 @@ import {
   type DadosDemonstracoes, type LinhaDemonstracao,
 } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { criarWorkbookDemonstracoesFinanceiras } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/exportacaoExcel';
+import { construirConferencias } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasModelo';
+import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasStorage';
+import type { ConferenciasExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
 
 describe('Exportação Excel das demonstrações financeiras', () => {
+  it('inclui resumo de todos os períodos e detalhes completos, com semáforos, valores numéricos e versões', async () => {
+    const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
+    const antes = extractAccounts('A;1.1.1.01;Caixa;100;20;0;120', { strict: true });
+    const depois = extractAccounts('A;1.1.1.01;Caixa;102;20;0;122', { strict: true });
+    const conta = {
+      conta: '1.1.1.01', descricao: 'Caixa', saldoAnterior: 102, debitos: 20, creditos: 0, saldoAtual: 122,
+      movimento: -20, detalhe: 'Conferir continuidade',
+    };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 3, atual: depois, anterior: antes, proximo: depois,
+      acumulado: [antes, antes, depois], mesesDoAno: [], mesesAnteriores: [],
+      cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+    }).map(resultado => resultado.id === 'alertas' ? {
+      ...resultado,
+      movimentosPL: [{ grupo: '2.3.3', variacao: 12.34, estado: 'Atenção: revisar' }],
+      variacoesAtipicas: [{
+        demonstracao: 'Ativo', linha: 'Caixa', valorMes: 122, mediaAnterior: 100,
+        variacao: 22, variacaoPercentual: 22, motivo: 'Variação de teste', contas: [conta],
+      }],
+      arrendamentos: {
+        aumentoPassivoCentavos: 12345, variacaoDireitoUsoCentavos: 23456, fluxoDfcCentavos: -100,
+        contasPassivo: Object.values(depois), contasDireitoUso: Object.values(antes),
+      },
+    } : resultado.id === 'continuidade-saldos' ? {
+      ...resultado, contas: [conta], contasMesSeguinte: [{ ...conta, detalhe: 'Mês seguinte' }],
+    } : resultado);
+    const actor = { userId: 'user-1', username: 'conferente' };
+    const referencia = {
+      id: '11111111-1111-4111-8111-111111111111', version: 'v1', year: 2026, month: 3,
+      importedAt: 1000, importedBy: actor, status: 'imported' as const, chunkCount: 1,
+      fileName: 'Balancete emitido.txt', emittedAt: 2000, emittedBy: actor,
+    };
+    const conferencias: ConferenciasExportacao = {
+      ano: 2026, mes: 3, config: CONFERENCIAS_CONFIG_PADRAO, resultados,
+      snapshots: [referencia],
+      comparacoes: [{
+        rotulo: 'Versão emitida', referencia,
+        contas: [
+          { conta: conta.conta, descricao: 'Caixa', antes: antes[conta.conta], depois: depois[conta.conta] },
+          { conta: '9.1', descricao: 'Conta removida', antes: antes[conta.conta], depois: null },
+        ],
+        linhas: [{ demonstracao: 'Ativo', linha: 'Caixa', antes: 120, depois: 122, diferenca: 2 }],
+      }],
+    };
+    const periodos = [2026, 2025].flatMap(ano => [1, 2, 3].map(mes =>
+      ano === 2026 && mes === 3 ? conferencias : {
+        ...conferencias, ano, mes, snapshots: [], comparacoes: [],
+        resultados: construirConferencias({
+          ano, mes, atual: null, anterior: null, proximo: null,
+          acumulado: [], mesesDoAno: [], mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+        }),
+      }));
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados: {}, anos: [2026, 2025], mesLimite: 3, incluirNotasAnuais: false, notas: [], conferencias: periodos,
+    });
+    const bytes = await workbook.xlsx.writeBuffer();
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(bytes);
+    const ws = reopened.getWorksheet('Conferências')!;
+    expect(ws).toBeDefined();
+    expect(ws.getColumn(1).values).toContain('Painel de conferências · 03/2026');
+    expect(ws.getColumn(1).values).toContain('Painel de conferências · 03/2025');
+    expect(ws.getColumn(1).values).not.toContain('Painel de conferências · 04/2026');
+    expect([6, 7, 8, 9, 10, 11].map(indice => ws.getCell(indice, 1).value)).toEqual(
+      ['01/2026', '02/2026', '03/2026', '01/2025', '02/2025', '03/2025'],
+    );
+    expect(ws.getCell('B6').value).toBe('Indisponível');
+    expect(ws.getCell('B6').fill).toMatchObject({ fgColor: { argb: 'FFE2E8F0' } });
+    expect(ws.getCell('B8').value).toBe('Erro');
+    expect(ws.getCell('B8').fill).toMatchObject({ fgColor: { argb: 'FFFEE2E2' } });
+    expect(ws.getCell('B8').note).toBe(resultados[0].resumo);
+    expect(ws.getCell('D8').value).toBe('Informativo');
+    expect(ws.getCell('D8').fill).toMatchObject({ fgColor: { argb: 'FFDBEAFE' } });
+    expect(ws.getCell('M5').value).toBe(resultados[11].titulo);
+    const inicioDetalhes = ws.getColumn(1).values.indexOf('Painel de conferências · 03/2026') + 2;
+    for (const [index, resultado] of resultados.entries()) {
+      const row = ws.getRow(index + inicioDetalhes);
+      expect(row.getCell(1).value).toBe(resultado.titulo);
+      expect(row.getCell(3).value).toBe(resultado.resumo);
+      expect(row.getCell(2).fill).toMatchObject({ type: 'pattern', pattern: 'solid' });
+    }
+    const rowWith = (coluna: number, valor: string) => {
+      const indice = ws.getColumn(coluna).values.indexOf(valor);
+      expect(indice).toBeGreaterThan(0);
+      return ws.getRow(indice);
+    };
+    const divergencia = rowWith(2, 'Caixa — Conferir continuidade');
+    expect(divergencia.getCell(3).value).toBe(102);
+    expect(divergencia.getCell(6).value).toBe(122);
+    expect(divergencia.getCell(7).value).toBe(-20);
+    expect(divergencia.getCell(6).numFmt).toContain('#,##0.00');
+    const variacao = rowWith(2, 'Caixa — Variação de teste');
+    expect(variacao.getCell(6).value).toBe(0.22);
+    expect(variacao.getCell(6).numFmt).toBe('0.0%;[Red]-0.0%;-');
+    const historico = rowWith(1, 'Balancete emitido.txt');
+    expect(historico.getCell(3).value).toEqual(new Date(1000));
+    expect(historico.getCell(4).value).toBe('conferente');
+    expect(historico.getCell(6).value).toEqual(new Date(2000));
+    const removida = rowWith(2, 'Conta removida');
+    expect(removida.getCell(9).value).toBe(120);
+    expect(removida.getCell(10).value).toBeNull();
+    const tolerancia = rowWith(1, 'Tolerância de conferência (R$)');
+    expect(tolerancia.getCell(2).value).toBe(1);
+    expect(ws.getColumn(1).values).toContain('Histórico de importações');
+    expect(ws.getColumn(1).values).toContain('Parâmetros das conferências');
+    expect(ws.getColumn(1).values.filter(valor => valor === 'Parâmetros das conferências')).toHaveLength(1);
+    expect(ws.getColumn(1).values).toContain('Divergências no saldo anterior do mês seguinte');
+    expect(reopened.getWorksheet('DRE')).toBeDefined();
+  });
+
   it('gera abas profissionais com meses, acumulados, saldos patrimoniais, conciliação e notas', async () => {
     const base = aplicarModeloDfcPadrao(cadastroVazio());
     const linhas: LinhaDemonstracao[] = [
