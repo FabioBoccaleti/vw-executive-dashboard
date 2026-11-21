@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { DemonstracoesFinanceiras } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras';
-import { cadastroVazio, type CadastroDemonstracoes } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { cadastroVazio, type CadastroDemonstracoes, type TipoDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasStorage';
 import {
   loadCadastroDemonstracoes, loadDadosDemonstracoes, type DocumentoNotasDfc,
@@ -65,6 +65,73 @@ async function adicionarGrupo(nome: string, conta: string) {
   fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 }
+
+it.each(['dre', 'endividamento'] as const)('confirma a exclusão de linhas de %s, preservando o cadastro ao cancelar', async demonstracao => {
+  persistido = {
+    ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+    linhas: [
+      { id: 'grupo', nome: 'Grupo para excluir', demonstracao, tipo: 'total', itens: [{ referencia: 'filha', operacao: 1 }] },
+      {
+        id: 'filha', nome: 'Linha vinculada', demonstracao, tipo: 'contas',
+        ...(demonstracao === 'endividamento' ? { bancoDe: 'grupo' } : { sublinhaDe: 'grupo' }),
+        itens: [{ referencia: demonstracao === 'endividamento' ? '2.1.1' : '3.1', operacao: 1 }],
+      },
+      { id: 'preservada', nome: 'Linha preservada', demonstracao, tipo: 'contas', itens: [{ referencia: '9.1', operacao: 1 }] },
+    ],
+  };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: demonstracao } });
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir Grupo para excluir' }));
+  const confirmacao = within(await screen.findByRole('alertdialog', { name: 'Excluir linha?' }));
+  expect(confirmacao.getByText(/Deseja excluir a linha “Grupo para excluir”/)).toHaveTextContent('sublinhas ou bancos vinculados');
+  expect(mocks.cas).not.toHaveBeenCalled();
+  expect(screen.queryByText(/Alterações não salvas/)).not.toBeInTheDocument();
+  fireEvent.click(confirmacao.getByRole('button', { name: 'Cancelar' }));
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Editar Grupo para excluir' })).toBeInTheDocument();
+  expect(screen.queryByText(/Alterações não salvas/)).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir Grupo para excluir' }));
+  fireEvent.keyDown(await screen.findByRole('alertdialog'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Editar Grupo para excluir' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir Grupo para excluir' }));
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Excluir linha' }));
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Editar Grupo para excluir' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Editar Linha preservada' })).toBeInTheDocument();
+  expect(screen.getByText(/Alterações não salvas/)).toBeInTheDocument();
+  expect(mocks.cas).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  expect(persistido?.linhas.some(linha => linha.id === 'grupo' || linha.id === 'filha')).toBe(false);
+  expect(persistido?.linhas.find(linha => linha.id === 'preservada')).toBeDefined();
+});
+
+it('mantém a confirmação aberta e informa o erro ao excluir uma linha usada em totalização', async () => {
+  const demonstracao: TipoDemonstracao = 'dre';
+  persistido = {
+    ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+    linhas: [
+      { id: 'receita', nome: 'Receita vinculada', demonstracao, tipo: 'contas', itens: [{ referencia: '3.1', operacao: 1 }] },
+      { id: 'total', nome: 'Total dependente', demonstracao, tipo: 'total', itens: [{ referencia: 'receita', operacao: 1 }] },
+    ],
+  };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir Receita vinculada' }));
+  const confirmacao = within(await screen.findByRole('alertdialog'));
+  expect(confirmacao.getByText(/Deseja excluir a linha/)).not.toHaveTextContent('sublinhas ou bancos vinculados');
+  fireEvent.click(confirmacao.getByRole('button', { name: 'Excluir linha' }));
+  expect(await confirmacao.findByRole('alert')).toHaveTextContent(/mesma demonstração/);
+  expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+  expect(mocks.cas).not.toHaveBeenCalled();
+  fireEvent.click(confirmacao.getByRole('button', { name: 'Cancelar' }));
+  expect(screen.getByRole('button', { name: 'Editar Receita vinculada' })).toBeInTheDocument();
+  expect(screen.queryByText(/Alterações não salvas/)).not.toBeInTheDocument();
+});
 
 it('exporta as demonstrações com anos comparativos, período e notas selecionados', async () => {
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
@@ -693,7 +760,10 @@ it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE c
   await waitFor(() => expect(screen.getByRole('row', { name: /Lucro Bruto/ })).toHaveTextContent('400'));
   await abrirCadastros();
   fireEvent.click(screen.getByRole('button', { name: 'Excluir Receita líquida' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent(/mesma demonstração/);
+  const confirmacao = within(await screen.findByRole('alertdialog'));
+  fireEvent.click(confirmacao.getByRole('button', { name: 'Excluir linha' }));
+  expect(await confirmacao.findByRole('alert')).toHaveTextContent(/mesma demonstração/);
+  fireEvent.click(confirmacao.getByRole('button', { name: 'Cancelar' }));
   expect(screen.getByRole('button', { name: 'Editar Receita líquida' })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Nome da empresa *'), { target: { value: 'Nome atualizado' } });
   fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));

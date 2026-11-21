@@ -117,6 +117,8 @@ Cada indicador mostra:
 
 Na aba **Emissão de Demonstrações Financeiras**, abra **Conferências** para revisar os balancetes e demonstrações do período. Cada verificação mostra um semáforo; expanda o item para consultar contas, linhas e diferenças que explicam o resultado.
 
+Em **Cadastros**, os botões **Excluir** das linhas solicitam confirmação com o nome da linha e avisam quando sublinhas ou bancos vinculados também serão removidos. **Cancelar** mantém o cadastro intacto; confirmar aplica a exclusão apenas ao cadastro em edição, sendo necessário **Salvar cadastro** para gravá-la. Exclusões que invalidariam totalizações continuam bloqueadas. Os balancetes importados não são excluídos.
+
 O painel verifica:
 
 1. Fechamento do balancete (débitos, créditos e saldos).

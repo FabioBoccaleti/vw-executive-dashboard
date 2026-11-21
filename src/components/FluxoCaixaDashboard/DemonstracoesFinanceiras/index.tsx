@@ -119,6 +119,7 @@ export function DemonstracoesFinanceiras({
   const [buscaCaixa, setBuscaCaixa] = useState('');
   const [erroCaixaEditor, setErroCaixaEditor] = useState('');
   const [editor, setEditor] = useState<LinhaDemonstracao | null>(null);
+  const [linhaExcluir, setLinhaExcluir] = useState<LinhaDemonstracao | null>(null);
   const [editorCaptacao, setEditorCaptacao] = useState<EditorCaptacao | null>(null);
   const [erroCaptacao, setErroCaptacao] = useState('');
   const [bancosEditor, setBancosEditor] = useState<LinhaDemonstracao[] | null>(null);
@@ -225,6 +226,16 @@ export function DemonstracoesFinanceiras({
     if (erro) { setErroAcao(erro); return false; }
     atualizar({ ...cadastro, linhas });
     return true;
+  }
+
+  function confirmarExclusaoLinha() {
+    if (!cadastro || !linhaExcluir) {
+      setErroAcao('Não foi possível localizar a linha para exclusão.');
+      return;
+    }
+    if (atualizarLinhas(cadastro.linhas.filter(item => item.id !== linhaExcluir.id && linhaPai(item) !== linhaExcluir.id))) {
+      setLinhaExcluir(null);
+    }
   }
 
   async function salvar(novo: CadastroDemonstracoes, informarErro = setErroAcao) {
@@ -910,7 +921,7 @@ export function DemonstracoesFinanceiras({
                               <Button variant="outline" size="sm" aria-label={`Subir ${linha.nome}`} disabled={index === 0} onClick={() => moverLinha(linha.id, -1)}>↑</Button>
                               <Button variant="outline" size="sm" aria-label={`Descer ${linha.nome}`} disabled={index === lista.length - 1} onClick={() => moverLinha(linha.id, 1)}>↓</Button>
                               <Button variant="outline" size="sm" onClick={() => abrirEditor(linha)}>Editar {linha.nome}</Button>
-                              <Button variant="outline" size="sm" onClick={() => atualizarLinhas(cadastro.linhas.filter(item => item.id !== linha.id && linhaPai(item) !== linha.id))}>Excluir {linha.nome}</Button>
+                              <Button variant="outline" size="sm" onClick={() => { setErroAcao(''); setLinhaExcluir(linha); }}>Excluir {linha.nome}</Button>
                             </>}
                           </div>
                         </div>
@@ -1465,6 +1476,28 @@ export function DemonstracoesFinanceiras({
               <Button type="button" disabled={salvandoNotasDfc} className="bg-red-600 hover:bg-red-700"
                 onClick={() => { void excluirNotaDfc(); }}>
                 {salvandoNotasDfc ? 'Excluindo...' : 'Excluir nota'}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={linhaExcluir !== null} onOpenChange={open => {
+          if (!open && !salvando) setLinhaExcluir(null);
+        }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir linha?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Deseja excluir a linha “{linhaExcluir?.nome}”?
+                {linhaExcluir && cadastro?.linhas.some(item => linhaPai(item) === linhaExcluir.id)
+                  && ' As sublinhas ou bancos vinculados também serão removidos.'}
+                {' A alteração será aplicada ao cadastro em edição. Clique em “Salvar cadastro” para gravá-la. Os balancetes importados não serão excluídos.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {erroAcao && <p role="alert" className="text-sm text-red-700">{erroAcao}</p>}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={salvando}>Cancelar</AlertDialogCancel>
+              <Button type="button" disabled={salvando} className="bg-red-600 hover:bg-red-700" onClick={confirmarExclusaoLinha}>
+                Excluir linha
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
