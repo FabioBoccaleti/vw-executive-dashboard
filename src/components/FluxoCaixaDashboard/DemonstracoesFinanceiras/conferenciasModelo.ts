@@ -684,6 +684,22 @@ function analisarArrendamentos(
   return { contasPassivo, contasDireitoUso, candidatos, aumentoPassivoCentavos, variacaoDireitoUsoCentavos, fluxoDfcCentavos };
 }
 
+function ehLinhaCapitalGiro(
+  linha: LinhaDemonstracao,
+  linhas: LinhaDemonstracao[],
+  config: ConferenciasConfig,
+): boolean {
+  const nomes = [linha.nome];
+  const pai = linhas.find(item => item.id === linhaPai(linha));
+  if (pai) nomes.push(pai.nome);
+  const normalizados = nomes.map(nome => normalizarTexto(nome).trim().replace(/\s+/g, ' '));
+  if (config.linhasCapitalGiro.some(nome => normalizados.includes(normalizarTexto(nome).trim().replace(/\s+/g, ' ')))) return true;
+  if (linha.demonstracao !== 'ativo' && linha.demonstracao !== 'passivo') return false;
+  if (normalizados.some(nome => /^(estoques?|contas? a receber|fornecedores?|contas? correntes?|adiantamentos (?:com|de|a) clientes?)\b/.test(nome))) return true;
+  return normalizados.some(nome => /^(emprestimos(?: e financiamentos)?|financiamentos|floor plan)\b/.test(nome))
+    && linha.itens.every(item => prefixoDe(item.referencia, '2.1'));
+}
+
 function analisarVariacoes(
   cadastro: CadastroDemonstracoes,
   atual: ContasBalancete | null,
@@ -700,6 +716,7 @@ function analisarVariacoes(
   const alteracoes: AlteracaoAtipica[] = [];
   for (const demo of demos) {
     const linhas = cadastro.linhas.filter(linha => linha.demonstracao === demo.codigo);
+    const distribuicaoDfc = demo.codigo === 'dfc' ? distribuirContasDfc(linhas, [atual]) : null;
     const valoresAtual = calcularLinhas(cadastro.linhas, demo.codigo, [atual]);
     const valoresAnteriores = mesesAnteriores.filter(periodo => periodo.contas);
     const valoresPorMes = valoresAnteriores.map(periodo => ({
@@ -707,6 +724,7 @@ function analisarVariacoes(
       valores: calcularLinhas(cadastro.linhas, demo.codigo, [periodo.contas]),
     }));
     for (const linha of linhas) {
+      if (linha.tipo !== 'contas' || linha.calculo || linha.foraDfc) continue;
       const valorMes = valoresAtual.get(linha.id);
       const anteriores = valoresPorMes.map(item => item.valores.get(linha.id))
         .filter((valor): valor is number => valor !== null && valor !== undefined);
@@ -716,32 +734,18 @@ function analisarVariacoes(
       const variacaoCentavos = Math.abs(centavos(variacao));
       const mediaCentavos = Math.abs(centavos(mediaAnterior));
       const variacaoPercentual = mediaCentavos === 0 ? null : variacaoCentavos / mediaCentavos * 100;
-      const linhaCapitalGiro = config.linhasCapitalGiro.some(nome => normalizarTexto(nome) === normalizarTexto(linha.nome));
-      const limiteReais = linhaCapitalGiro ? config.limiteCapitalGiroCentavos : config.limiteVariacaoCentavos;
-      const ultrapassaSempre = variacaoCentavos > config.limiteVariacaoSempreCentavos;
+      const linhaCapitalGiro = ehLinhaCapitalGiro(linha, linhas, config);
+      const limiteCentavos = linhaCapitalGiro ? config.limiteCapitalGiroCentavos : config.limiteVariacaoCentavos;
+      const ultrapassaSempre = !linhaCapitalGiro && variacaoCentavos > config.limiteVariacaoSempreCentavos;
+      const ultrapassaNormal = variacaoCentavos > limiteCentavos
+        && (variacaoPercentual === null ? !linhaCapitalGiro : variacaoPercentual > config.limiteVariacaoPercentual);
       const inverteSinal = mediaCentavos > 0 && Math.sign(valorMes) !== Math.sign(mediaAnterior)
-        && Math.abs(centavos(valorMes)) > config.limiteVariacaoCentavos;
-      const ultrapassaNormal = mediaCentavos === 0
-        ? variacaoCentavos > limiteReais
-        : variacaoCentavos > limiteReais && (variacaoPercentual ?? 0) > config.limiteVariacaoPercentual;
+        && (linhaCapitalGiro ? ultrapassaNormal : Math.abs(centavos(valorMes)) > config.limiteVariacaoCentavos);
       if (!ultrapassaSempre && !inverteSinal && !ultrapassaNormal) continue;
 
-      const idsLinha = new Set([linha.id]);
-      let mudou = true;
-      while (mudou) {
-        mudou = false;
-        for (const candidata of linhas) {
-          const pai = linhaPai(candidata);
-          if (pai && idsLinha.has(pai) && !idsLinha.has(candidata.id)) {
-            idsLinha.add(candidata.id);
-            mudou = true;
-          }
-        }
-      }
-      const linhasDaLinha = cadastro.linhas.filter(candidata => idsLinha.has(candidata.id));
-      const contasDaLinha = contasAnaliticas(atual).filter(conta => linhasDaLinha.some(candidata =>
-        linhaCorrespondente(candidata, conta.conta).length > 0
-        || candidata.calculo === 'resultadoBalancete' && ['3', '4', '5', '6'].some(grupo => isGrupo(conta.conta, grupo))));
+      const contasDaLinha = distribuicaoDfc
+        ? distribuicaoDfc.porLinha.get(linha.id) ?? []
+        : listarContasDaLinha(linha, [atual]).map(item => item.conta);
       const contribuicoes = contasDaLinha.map(conta => {
         const metricasAnteriores = valoresPorMes.map(({ periodo }) => {
           const item = periodo.contas?.[conta.conta];
@@ -776,7 +780,7 @@ function analisarVariacoes(
           ? 'Variação superior ao limite absoluto.'
           : inverteSinal
             ? 'Inversão de sinal em relação à média.'
-            : `Variação acima dos limites de ${config.limiteVariacaoPercentual}% e ${formatarMoeda(reais(limiteReais))}.`,
+            : `Variação acima dos limites de ${config.limiteVariacaoPercentual}% e ${formatarMoeda(reais(limiteCentavos))}.`,
       });
     }
   }

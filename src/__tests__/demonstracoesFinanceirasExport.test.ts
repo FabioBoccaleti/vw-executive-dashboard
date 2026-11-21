@@ -11,6 +11,41 @@ import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/Dem
 import type { ConferenciasExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
 
 describe('Exportação Excel das demonstrações financeiras', () => {
+  it('exporta somente variações de detalhes elegíveis e preserva a célula percentual de 12%', async () => {
+    const cadastro = {
+      ...cadastroVazio(),
+      linhas: [
+        { id: 'circulante', nome: 'Circulante', demonstracao: 'ativo' as const, tipo: 'total' as const, itens: [{ referencia: 'estoque', operacao: 1 as const }] },
+        { id: 'estoque', nome: 'Estoque', demonstracao: 'ativo' as const, tipo: 'contas' as const, sublinhaDe: 'circulante', itens: [{ referencia: '1.1.2.01', operacao: 1 as const }] },
+        { id: 'lucro-bruto', nome: 'Lucro Bruto', demonstracao: 'dre' as const, tipo: 'total' as const, itens: [{ referencia: 'receita', operacao: 1 as const }] },
+        { id: 'receita', nome: 'Receita', demonstracao: 'dre' as const, tipo: 'contas' as const, itens: [{ referencia: '3.1.01', operacao: 1 as const }] },
+      ],
+    };
+    const periodo = (valor: number) => extractAccounts(`A;1.1.2.01;Estoque;0;0;0;${valor}\nR;3.1.01;Receita;0;0;${valor};0`, { strict: true });
+    const anterior = periodo(20000000);
+    const atual = periodo(22400000);
+    const config = CONFERENCIAS_CONFIG_PADRAO;
+    const resultados = construirConferencias({
+      ano: 2026, mes: 4, atual, anterior, proximo: null, acumulado: [atual],
+      mesesDoAno: [], mesesAnteriores: [1, 2, 3].map(mes => ({ ano: 2026, mes, contas: anterior })),
+      cadastro, config,
+    });
+    expect(resultados.find(item => item.id === 'alertas')!.variacoesAtipicas!.map(item => item.linha)).toEqual(['Receita']);
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados: { [chavePeriodo({ ano: 2026, mes: 4 })]: atual },
+      anos: [2026], mesLimite: 4, incluirNotasAnuais: false, notas: [],
+      conferencias: [{ ano: 2026, mes: 4, resultados, config, snapshots: [], comparacoes: [] }],
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    const ws = reopened.getWorksheet('Conferências')!;
+    const indice = ws.getColumn(2).values.indexOf('Receita — Variação superior ao limite absoluto.');
+    expect(indice).toBeGreaterThan(0);
+    expect([3, 4, 5, 6].map(coluna => ws.getCell(indice, coluna).value)).toEqual([22400000, 20000000, 2400000, 0.12]);
+    expect(ws.getCell(indice, 6).numFmt).toContain('%');
+    expect(ws.getColumn(3).values.filter(valor => valor === 'Valor do mês')).toHaveLength(1);
+  });
+
   it('exporta os efeitos das contas sem linha e o resíduo do item 6 separadamente por método', async () => {
     const padrao = aplicarModeloDfcPadrao(cadastroVazio());
     const cadastro = { ...padrao, linhas: padrao.linhas.map(linha => ({

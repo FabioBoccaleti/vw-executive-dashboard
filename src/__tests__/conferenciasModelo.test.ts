@@ -33,7 +33,118 @@ function conta(
   };
 }
 
+function variacoesAtipicas(
+  cadastro: CadastroDemonstracoes,
+  anterior: ContasBalancete,
+  atual: ContasBalancete,
+  config = CONFERENCIAS_CONFIG_PADRAO,
+) {
+  return construirConferencias({
+    ano: 2026, mes: 4, atual, anterior, proximo: null, acumulado: [atual],
+    mesesDoAno: [], mesesAnteriores: [1, 2, 3].map(mes => ({ ano: 2026, mes, contas: anterior })),
+    cadastro, config,
+  }).find(item => item.id === 'alertas')!.variacoesAtipicas!;
+}
+
 describe('conferenciasModelo', () => {
+  it.each([
+    ['Pagamentos a fornecedores e floor plan', 'dfc', '4.1.1.01', 20000000, 22400000],
+    ['Estoque', 'ativo', '1.1.2.01', 60000000, 63000000],
+    ['Contas a receber', 'ativo', '1.1.3.01', 20000000, 22400000],
+    ['Empréstimos e Financiamentos', 'passivo', '2.1.1.02', 20000000, 22400000],
+    ['Adiantamentos com clientes', 'passivo', '2.1.1.03', 20000000, 22400000],
+    ['Fornecedores', 'passivo', '2.1.1.01', 20000000, 22400000],
+    ['Contas correntes', 'ativo', '1.1.4.01', 20000000, 22400000],
+  ] as const)('não aplica a regra de R$ 2 milhões a %s', (nome, demonstracao, codigo, base, valorAtual) => {
+    const cadastro: CadastroDemonstracoes = {
+      ...cadastroVazio(),
+      linhas: [{ id: 'detalhe', nome, demonstracao, tipo: 'contas', itens: [{ referencia: codigo, operacao: 1 }] }],
+    };
+    const periodo = (valor: number) => ({
+      [codigo]: conta(codigo, 0, demonstracao === 'dfc' ? valor : 0, 0, demonstracao === 'passivo' ? -valor : valor),
+    });
+    const config = demonstracao === 'dfc' ? CONFERENCIAS_CONFIG_PADRAO : { ...CONFERENCIAS_CONFIG_PADRAO, linhasCapitalGiro: [] };
+    expect(variacoesAtipicas(cadastro, periodo(base), periodo(valorAtual), config)).toEqual([]);
+  });
+
+  it.each([
+    [8000000, 13000000, false],
+    [12000000, 18000000, false],
+    [10000000, 16000000, true],
+    [0, 10000000, false],
+    [1000000, -1000000, false],
+    [1000000, -4100000, true],
+  ] as const)('exige os limites monetário e percentual no capital de giro, de %s para %s', (base, valorAtual, alerta) => {
+    const cadastro: CadastroDemonstracoes = {
+      ...cadastroVazio(),
+      linhas: [{ id: 'estoque', nome: 'Estoques', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.1.2.01', operacao: 1 }] }],
+    };
+    const periodo = (valor: number) => ({ '1.1.2.01': conta('1.1.2.01', 0, 0, 0, valor) });
+    const variacoes = variacoesAtipicas(cadastro, periodo(base), periodo(valorAtual));
+    expect(variacoes.map(item => item.linha)).toEqual(alerta ? ['Estoques'] : []);
+    if (alerta) expect(Math.abs(variacoes[0].variacao)).toBeGreaterThan(5000000);
+  });
+
+  it.each(['2.1.1.02', '2.2.1.01'])('herda a categoria de empréstimos do grupo apenas para detalhes circulantes (%s)', codigo => {
+    const cadastro: CadastroDemonstracoes = {
+      ...cadastroVazio(),
+      linhas: [
+        { id: 'emprestimos', nome: 'Empréstimos e Financiamentos', demonstracao: 'passivo', tipo: 'total', itens: [{ referencia: 'banco', operacao: 1 }] },
+        { id: 'banco', nome: 'Banco A', demonstracao: 'passivo', tipo: 'contas', sublinhaDe: 'emprestimos', itens: [{ referencia: codigo, operacao: 1 }] },
+      ],
+    };
+    const periodo = (valor: number) => ({ [codigo]: conta(codigo, 0, 0, 0, -valor) });
+    const variacoes = variacoesAtipicas(cadastro, periodo(20000000), periodo(22400000), { ...CONFERENCIAS_CONFIG_PADRAO, linhasCapitalGiro: [] });
+    expect(variacoes.map(item => item.linha)).toEqual(codigo.startsWith('2.1') ? [] : ['Banco A']);
+  });
+
+  it('mantém os nomes adicionais cadastrados e a regra absoluta para outros detalhes', () => {
+    const cadastro: CadastroDemonstracoes = {
+      ...cadastroVazio(),
+      linhas: [
+        { id: 'especial', nome: 'Linha personalizada', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1.01', operacao: 1 }] },
+        { id: 'outro', nome: 'Outra receita', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.2.01', operacao: 1 }] },
+      ],
+    };
+    const periodo = (valor: number) => ({
+      '3.1.01': conta('3.1.01', 0, 0, valor, 0),
+      '3.2.01': conta('3.2.01', 0, 0, valor, 0),
+    });
+    const variacoes = variacoesAtipicas(cadastro, periodo(20000000), periodo(22400000), {
+      ...CONFERENCIAS_CONFIG_PADRAO, linhasCapitalGiro: ['Linha personalizada'],
+    });
+    expect(variacoes).toMatchObject([{ linha: 'Outra receita', variacaoPercentual: 12, motivo: 'Variação superior ao limite absoluto.' }]);
+  });
+
+  it('analisa apenas os detalhes, sem totais do balanço, seções da DFC, Lucro Bruto ou Resultado do Período', () => {
+    const cadastro: CadastroDemonstracoes = {
+      ...cadastroVazio(),
+      linhas: [
+        { id: 'circulante', nome: 'Circulante', demonstracao: 'ativo', tipo: 'total', itens: [{ referencia: 'caixa', operacao: 1 }] },
+        { id: 'caixa', nome: 'Caixa', demonstracao: 'ativo', tipo: 'contas', sublinhaDe: 'circulante', itens: [{ referencia: '1.1.1.01', operacao: 1 }] },
+        { id: 'nao-circulante', nome: 'Não Circulante', demonstracao: 'ativo', tipo: 'total', itens: [{ referencia: 'maquinas', operacao: 1 }] },
+        { id: 'maquinas', nome: 'Máquinas', demonstracao: 'ativo', tipo: 'contas', sublinhaDe: 'nao-circulante', itens: [{ referencia: '1.5.2.01', operacao: 1 }] },
+        { id: 'lucro-bruto', nome: 'Lucro Bruto', demonstracao: 'dre', tipo: 'total', itens: [{ referencia: 'receita', operacao: 1 }] },
+        { id: 'receita', nome: 'Receita', demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: '3.1.01', operacao: 1 }] },
+        { id: 'resultado', nome: 'Resultado do Período', demonstracao: 'passivo', tipo: 'contas', calculo: 'resultadoBalancete', itens: [] },
+        ...(['operacional', 'investimento', 'financiamento'] as const).flatMap((secao, indice) => [
+          { id: `dfc-${secao}`, nome: `Atividades de ${secao}`, demonstracao: 'dfc' as const, tipo: 'total' as const, itens: [{ referencia: `detalhe-${secao}`, operacao: 1 as const }] },
+          { id: `detalhe-${secao}`, nome: `Detalhe ${secao}`, demonstracao: 'dfc' as const, tipo: 'contas' as const, sublinhaDe: `dfc-${secao}`, itens: [{ referencia: `5.${indice + 1}.01`, operacao: 1 as const }] },
+        ]),
+      ],
+    };
+    const periodo = (valor: number) => ({
+      '1.1.1.01': conta('1.1.1.01', 0, 0, 0, valor),
+      '1.5.2.01': conta('1.5.2.01', 0, 0, 0, valor),
+      '3.1.01': conta('3.1.01', 0, 0, valor, -valor),
+      ...Object.fromEntries([1, 2, 3].map(grupo => [`5.${grupo}.01`, conta(`5.${grupo}.01`, 0, valor, 0, valor)])),
+    });
+    const variacoes = variacoesAtipicas(cadastro, periodo(20000000), periodo(22400000));
+    expect(variacoes.map(item => item.linha).sort()).toEqual([
+      'Caixa', 'Detalhe financiamento', 'Detalhe investimento', 'Detalhe operacional', 'Máquinas', 'Receita',
+    ]);
+  });
+
   it('exige apenas analíticas com saldo ou débitos/créditos, respeitando escopo e prefixos de cada demonstração', () => {
     const cadastro: CadastroDemonstracoes = {
       ...cadastroVazio(),

@@ -60,6 +60,22 @@ describe('ConferenciasTab', () => {
     expect(fechamento.getByText('Erro')).toBeInTheDocument();
   });
 
+  it.each([[22400000, '12%'], [22500000, '12,5%']] as const)('exibe a variação de %s como percentual %s, não como fração', async (valorAtual, percentual) => {
+    const cadastro = {
+      ...cadastroVazio(),
+      linhas: [{
+        id: 'receita', nome: 'Receita', demonstracao: 'dre' as const, tipo: 'contas' as const,
+        itens: [{ referencia: '3.1.01', operacao: 1 as const }],
+      }],
+    };
+    mocks.raw.mockImplementation(async (ano: number, mes: number) => ano === 2026 && mes >= 1 && mes <= 4
+      ? { rawText: `R;3.1.01;Receita;0;0;${mes === 4 ? valorAtual : 20000000};0` } : null);
+    render(<ConferenciasTab selectedYear={2026} selectedMonth={4} cadastro={cadastro} />);
+    const titulo = await screen.findByText('12. Alertas de sinal, PL, variação e arrendamento');
+    const alertas = within(titulo.closest('details')!);
+    expect(alertas.getByText(content => content.endsWith(`percentual ${percentual}`))).toBeInTheDocument();
+  });
+
   it('mostra efeitos por conta e o valor não explicado por método da DFC no item 9', async () => {
     const padrao = aplicarModeloDfcPadrao(cadastroVazio());
     const cadastro = { ...padrao, linhas: padrao.linhas.map(linha => ({

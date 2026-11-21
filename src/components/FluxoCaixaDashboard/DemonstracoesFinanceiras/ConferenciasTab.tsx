@@ -31,6 +31,7 @@ type Props = {
 };
 
 const moedas = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const percentuais = new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 1 });
 const estados: Record<ResultadoConferencia['estado'], { rotulo: string; classe: string }> = {
   ok: { rotulo: 'OK', classe: 'bg-green-100 text-green-800' },
   atencao: { rotulo: 'Atenção', classe: 'bg-amber-100 text-amber-900' },
@@ -353,7 +354,7 @@ export function ConferenciasTab({ selectedYear, selectedMonth, cadastro, current
         </div> : null}
         {resultado.variacoesAtipicas?.map(item => <details key={`${item.demonstracao}-${item.linha}`} className="rounded border p-3">
           <summary className="cursor-pointer font-medium">{item.demonstracao} · {item.linha}: {item.motivo}</summary>
-          <p className="mt-2 text-sm">Mês {moedas.format(item.valorMes)} · média anterior {moedas.format(item.mediaAnterior)} · variação {moedas.format(item.variacao)} · percentual {item.variacaoPercentual === null ? 'indisponível' : `${item.variacaoPercentual.toFixed(1)}%`}</p>
+          <p className="mt-2 text-sm">Mês {moedas.format(item.valorMes)} · média anterior {moedas.format(item.mediaAnterior)} · variação {moedas.format(item.variacao)} · percentual {item.variacaoPercentual === null ? 'indisponível' : percentuais.format(item.variacaoPercentual / 100)}</p>
           <TabelaContas contas={item.contas} />
         </details>)}
         {detalhesArrendamento && <section className="space-y-2 rounded border p-3">
@@ -424,7 +425,7 @@ export function ConferenciasTab({ selectedYear, selectedMonth, cadastro, current
         <label className="space-y-1 text-sm"><span className="block font-medium">Exceções de natureza</span><span className="block text-xs text-muted-foreground">Prefixo mais longo prevalece; formato prefixo=devedora ou prefixo=credora.</span><Textarea rows={5} value={textoExcecoes} onChange={event => setTextoExcecoes(event.target.value)} /></label>
         <CampoLista titulo="Prefixos excluídos da checagem de sinal" descricao="Uma conta ou prefixo por linha." texto={textoExclusoes} onChange={setTextoExclusoes} />
         <CampoLista titulo="Palavras que indicam contas redutoras" descricao="Uma expressão por linha." texto={textoPalavrasRedutoras} onChange={setTextoPalavrasRedutoras} />
-        <CampoLista titulo="Linhas de capital de giro" descricao="Nomes exatos das linhas sujeitos ao limite maior." texto={textoCapitalGiro} onChange={setTextoCapitalGiro} />
+        <CampoLista titulo="Linhas de capital de giro" descricao="Nomes adicionais de linhas ou grupos. Estoques, contas a receber, fornecedores, contas correntes, adiantamentos com clientes e empréstimos/financiamentos circulantes são reconhecidos automaticamente no Balanço." texto={textoCapitalGiro} onChange={setTextoCapitalGiro} />
         <CampoLista titulo="Prefixos do passivo de arrendamento" descricao="Uma conta ou prefixo por linha." texto={textoPassivoArrendamento} onChange={setTextoPassivoArrendamento} />
         <CampoLista titulo="Prefixos do ativo de direito de uso" descricao="Uma conta ou prefixo por linha." texto={textoAtivoDireitoUso} onChange={setTextoAtivoDireitoUso} />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -443,6 +444,7 @@ export function ConferenciasTab({ selectedYear, selectedMonth, cadastro, current
             <Input type="number" min="0" step={campo === 'limiteVariacaoPercentual' ? '0.1' : '0.01'} value={textosValores[campo] ?? ''} onChange={event => atualizarValor(campo, event.target.value)} />
           </label>)}
         </div>
+        <p className="text-xs text-muted-foreground">Capital de giro exige ultrapassar os limites monetário e percentual, inclusive em inversões de sinal. A regra de variação absoluta não se aplica a essas linhas. Totais e subtotais não geram alertas de variação.</p>
         <div className="flex items-end">
           <Button disabled={!config || salvandoConfig} onClick={() => { void salvarConfiguracao(); }}>{salvandoConfig ? 'Salvando...' : 'Salvar parâmetros'}</Button>
         </div>
