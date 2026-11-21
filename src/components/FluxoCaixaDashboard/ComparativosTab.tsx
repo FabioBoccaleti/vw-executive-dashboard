@@ -13,9 +13,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { loadFluxoCaixaRaw, loadFluxoCaixaIndex } from "./fluxoCaixaStorage";
 import { GRUPOS_CONFIG, classificarTipo } from "./DespesasTab";
 import { loadDespesasTipos } from "./despesasStorage";
+import {
+  calcularDfcIndireto,
+  calcularLinhas,
+  calcularSaldosCaixaEquivalentes,
+  encontrarLinhaBasePercentualDre,
+  encontrarLinhaDrePorNomes,
+  type CadastroDemonstracoes,
+  type ContasBalancete,
+} from "./DemonstracoesFinanceiras/modelo";
+import { loadCadastroDemonstracoes } from "./DemonstracoesFinanceiras/storage";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
+const YEARS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
 const MONTH_LIST = [
   { n: 0,  short: 'Anual', long: 'Anual'     },
   { n: 1,  short: 'Jan',   long: 'Janeiro'   },
@@ -52,14 +62,19 @@ interface ComparativoMetrics {
   passivoNaoCirculante: number;
   patrimonioLiquido:    number;
   // DRE
-  receitaLiquida:       number;
-  resultadoAntesIR:     number;
-  resultadoLiquido:     number;
+  receitaLiquida:       number | null;
+  resultadoAntesIR:     number | null;
+  resultadoLiquido:     number | null;
   // Fluxo de Caixa
-  fluxoOperacional:     number;
-  fluxoInvestimento:    number;
-  fluxoFinanciamento:   number;
-  variacaoCaixa:        number;
+  fluxoOperacionalDireto:    number | null;
+  fluxoInvestimentoDireto:   number | null;
+  fluxoFinanciamentoDireto:  number | null;
+  variacaoCaixaDireto:       number | null;
+  fluxoOperacionalIndireto:  number | null;
+  fluxoInvestimentoIndireto: number | null;
+  fluxoFinanciamentoIndireto:number | null;
+  variacaoCaixaIndireto:     number | null;
+  variacaoCaixaReal:          number | null;
   // Estoques
   estoqueVW:            number;
   estoqueAudi:          number;
@@ -80,10 +95,10 @@ interface ComparativoMetrics {
   imobPL:               number;
   imobInvest:           number;
   taxaRisco:            number;
-  margemBruta:          number;
-  roic:                 number;
-  roe:                  number;
-  ros:                  number;
+  margemBruta:          number | null;
+  roic:                 number | null;
+  roe:                  number | null;
+  ros:                  number | null;
   // Despesas
   totalDespesas:        number;
   categoriasDespesas:   DespesaCategoria[];
@@ -111,6 +126,23 @@ function periodLongLabel(p: Period): string {
   return p.month === 0 ? `Anual ${p.year}` : `${m?.long ?? ''} / ${p.year}`;
 }
 
+function defaultComparisonPeriods(year: number, month: number): Period[] {
+  if (month === 0) {
+    return Array.from({ length: MAX_PERIODS }, (_, index) => ({
+      year: year - MAX_PERIODS + index + 1,
+      month: 0,
+    }));
+  }
+  const lastMonth = year * 12 + month - 1;
+  return Array.from({ length: MAX_PERIODS }, (_, index) => {
+    const serialMonth = lastMonth - MAX_PERIODS + index + 1;
+    return {
+      year: Math.floor(serialMonth / 12),
+      month: serialMonth % 12 + 1,
+    };
+  });
+}
+
 // ─── NUMBER PARSER (formato brasileiro: 1.234.567,89) ────────────────────────
 function parseNum(v: string): number {
   return parseFloat((v || '0').trim().replace(/\./g, '').replace(',', '.')) || 0;
@@ -133,9 +165,13 @@ function fmtPct(v: number): string {
 }
 
 // ─── METRICS EXTRACTOR ───────────────────────────────────────────────────────
-function extractMetrics(rawText: string, tipos: Record<string, string> = {}): ComparativoMetrics {
+function extractMetrics(
+  rawText: string,
+  tipos: Record<string, string>,
+  cadastro: CadastroDemonstracoes,
+): ComparativoMetrics {
   const lines = rawText.split('\n').filter(l => l.trim());
-  const acc: Record<string, { saldoAnt: number; saldoAtual: number; valDeb: number; valCred: number; desc: string }> = {};
+  const acc: ContasBalancete = {};
 
   for (const line of lines) {
     const parts = line.split(';');
@@ -145,19 +181,18 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
     const id = conta?.trim();
     if (!id) continue;
     acc[id] = {
+      nivel: nivel?.trim() ?? '',
+      conta: id,
+      desc: desc?.trim() ?? '',
       saldoAnt:   parseNum(saldoAnt),
       valDeb:     parseNum(valDeb),
       valCred:    parseNum(valCred),
       saldoAtual: parseNum(saldoAtual),
-      desc:       desc?.trim() ?? '',
     };
   }
 
-  const get    = (id: string) => acc[id] ?? { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0, desc: '' };
-  const absAnt = (id: string) => Math.abs(get(id).saldoAnt);
+  const get    = (id: string) => acc[id] ?? { nivel: '', conta: id, saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0, desc: '' };
   const absAtu = (id: string) => Math.abs(get(id).saldoAtual);
-  // Movimento líquido do mês — mesmo método do ResultadoTab
-  const absMon = (id: string) => { const a = get(id); return Math.abs(a.valDeb - a.valCred); };
 
   // ── Balanço Patrimonial ───────────────────────────────────────────────────
   const ativoCirculante      = absAtu('1.1');
@@ -166,112 +201,6 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
   const passivoCirculante    = absAtu('2.1');
   const passivoNaoCirculante = absAtu('2.2');
   const patrimonioLiquido    = absAtu('2.3');
-
-  // ── DRE — mesmo método do ResultadoTab (movimento líquido do mês) ─────────
-  const recBruta      = absMon('3.1');
-  const impostosV     = absMon('3.2');
-  const devolucoes    = absMon('3.3');
-  const receitaLiquida = recBruta - impostosV - devolucoes;
-  const CMV           = absMon('4');
-  const lucBruto      = receitaLiquida - CMV;
-  const rendOper      = absMon('3.4');
-  const rendFinanc    = absMon('3.5');
-  const rendNaoOper   = absMon('3.6');
-  // Despesas grupo 5 — soma das contas-folha usando valDeb−valCred (signed)
-  const allKeys5_dre = Object.keys(acc).filter(k => k.startsWith('5.'));
-  const leaves5_dre  = allKeys5_dre.filter(k => !allKeys5_dre.some(o => o !== k && o.startsWith(k + '.')));
-  const despOper5Net  = leaves5_dre.reduce((s, k) => s + (get(k).valDeb - get(k).valCred), 0);
-  const deprec_per    = get('5.5.2.07.20').valDeb;
-  // Provisão IR/CSLL com sinal: devedor → positivo (deduz), credor → negativo (adiciona)
-  const provisaoIR    = (get('6').valDeb || 0) - (get('6').valCred || 0);
-  const resultadoAntesIR = lucBruto + rendOper + rendFinanc + rendNaoOper - despOper5Net;
-  const resultadoLiquido = resultadoAntesIR - provisaoIR;
-
-  // ── Fluxo de Caixa (Método Indireto) ─────────────────────────────────────
-  const estoques     = { ant: absAnt('1.1.2'),        atu: absAtu('1.1.2')       };
-  const estAudi      = { ant: absAnt('1.1.7.02'),      atu: absAtu('1.1.7.02')    };
-  const creditos     = { ant: absAnt('1.1.3'),         atu: absAtu('1.1.3')       };
-  const contasCorr   = { ant: absAnt('1.1.4'),         atu: absAtu('1.1.4')       };
-  const valDiversos  = { ant: absAnt('1.1.5'),         atu: absAtu('1.1.5')       };
-  const despAntec    = { ant: absAnt('1.1.6'),         atu: absAtu('1.1.6')       };
-  const fornecVW     = { ant: absAnt('2.1.3'),         atu: absAtu('2.1.3')       };
-  const fornecAudi   = { ant: absAnt('2.1.4'),         atu: absAtu('2.1.4')       };
-  const fornecTotal  = { ant: fornecVW.ant + fornecAudi.ant, atu: fornecVW.atu + fornecAudi.atu };
-  const obrigTrib    = { ant: absAnt('2.1.2.02'),      atu: absAtu('2.1.2.02')    };
-  const obrigTrab    = { ant: absAnt('2.1.2.01'),      atu: absAtu('2.1.2.01')    };
-  const contasPagar  = { ant: absAnt('2.1.2.03'),      atu: absAtu('2.1.2.03')    };
-  const imobiliz     = { ant: absAnt('1.5.5'),         atu: absAtu('1.5.5')       };
-  const intangivel   = { ant: absAnt('1.5.7'),         atu: absAtu('1.5.7')       };
-  const investimentos = { ant: absAnt('1.5.3'),         atu: absAtu('1.5.3')       };
-  const realizLPCred  = { ant: absAnt('1.5.1.01.52'), atu: absAtu('1.5.1.01.52') };
-  const emprestCP    = { ant: absAnt('2.1.1'),         atu: absAtu('2.1.1')       };
-  const emprestCP_01 = { ant: absAnt('2.1.1.01'),      atu: absAtu('2.1.1.01')    }; // Fornecedores → operacional
-  const emprestCP_02 = { ant: absAnt('2.1.1.02'),      atu: absAtu('2.1.1.02')    }; // Financiamentos CP → financiamento
-  const emprestLP    = { ant: absAnt('2.2.1.07'),      atu: absAtu('2.2.1.07')    };
-  const pessoasLig   = { ant: absAnt('2.2.1.01'),      atu: absAtu('2.2.1.01')    };
-  const debitosLig   = { ant: absAnt('2.2.1.02'),      atu: absAtu('2.2.1.02')    };
-  const arrendLP     = { ant: absAnt('2.2.1.15'),      atu: absAtu('2.2.1.15')    };
-  const outrosPassLP = { ant: absAnt('2.2.3'),          atu: absAtu('2.2.3')       };
-  const grupo2_2_1   = { ant: absAnt('2.2.1'),          atu: absAtu('2.2.1')       };
-  const outros2_2_1Ant = grupo2_2_1.ant - emprestLP.ant - pessoasLig.ant - debitosLig.ant - arrendLP.ant;
-  const outros2_2_1Atu = grupo2_2_1.atu - emprestLP.atu - pessoasLig.atu - debitosLig.atu - arrendLP.atu;
-  const estTotalAnt  = estoques.ant + estAudi.ant;
-  const estTotalAtu  = estoques.atu + estAudi.atu;
-
-  // Outros ativos Audi além do estoque (1.1.7 excl. 1.1.7.02): capital de giro operacional Audi
-  const outrasAtivAudiAnt = absAnt('1.1.7') - absAnt('1.1.7.02');
-  const outrasAtivAudiAtu = absAtu('1.1.7') - absAtu('1.1.7.02');
-  const outrasAtivAudiResiduo = outrasAtivAudiAtu - outrasAtivAudiAnt;
-  // Receitas Diferidas (2.2.2) — ICMS ST Diferido: variação → operacional
-  const dRecDiferidas = absAtu('2.2.2') - absAnt('2.2.2');
-  // Realizável LP além de 1.5.1.01.52 (créditos c/ ligadas já rastreados) → investimento
-  const realizLP = { ant: absAnt('1.5.1'), atu: absAtu('1.5.1') };
-  const dRealizLPOutros = (realizLP.atu - realizLPCred.atu) - (realizLP.ant - realizLPCred.ant);
-  // dIntangivel: reclassificado de Investimento → Operacionais (igual à tabela)
-  const dIntangivel = intangivel.atu - intangivel.ant;
-  // Variação de PL além do resultado (aportes/retiradas/dividendos)
-  const PL = { ant: absAnt('2.3'), atu: absAtu('2.3') };
-  const dPL_extra = (PL.atu - PL.ant) - resultadoLiquido;
-
-  // Fluxo Operacional base (sem ajuste residual, sem deprec — capturada pelo ajuste)
-  const fluxoOperBase =
-    resultadoLiquido +
-    (-(estTotalAtu - estTotalAnt)) + (-(creditos.atu - creditos.ant)) +
-    (-(contasCorr.atu - contasCorr.ant)) + (-(valDiversos.atu - valDiversos.ant)) +
-    (-(despAntec.atu - despAntec.ant)) + (-outrasAtivAudiResiduo) +
-    (fornecTotal.atu - fornecTotal.ant) +
-    (obrigTrib.atu - obrigTrib.ant) + (obrigTrab.atu - obrigTrab.ant) +
-    (contasPagar.atu - contasPagar.ant) +
-    (emprestCP_01.atu - emprestCP_01.ant) +  // Fornecedores 2.1.1.01 → operacional
-    (outros2_2_1Atu - outros2_2_1Ant) +      // Resíduo 2.2.1 → operacional
-    dRecDiferidas +                           // Receitas Diferidas (2.2.2) → operacional
-    -(realizLPCred.atu - realizLPCred.ant);  // Créditos LP c/ ligadas → operacional
-
-  // Fluxo Investimento base
-  const fluxoInvestBase =
-    -(imobiliz.atu - imobiliz.ant) - dIntangivel -
-    (investimentos.atu - investimentos.ant) - dRealizLPOutros;
-
-  // Fluxo Financiamento base (inclui dPL_extra)
-  const fluxoFinancBase =
-    (emprestCP_02.atu - emprestCP_02.ant) +
-    (emprestLP.atu - emprestLP.ant) +
-    (pessoasLig.atu - pessoasLig.ant) + (debitosLig.atu - debitosLig.ant) +
-    (arrendLP.atu - arrendLP.ant) + (outrosPassLP.atu - outrosPassLP.ant) +
-    dPL_extra;
-
-  // Ajuste residual: captura depreciação e sub-contas não mapeadas
-  const varCaixaReal = absAtu('1.1.1') - absAnt('1.1.1');
-  const ajusteResidualBP = varCaixaReal - (fluxoOperBase + fluxoInvestBase + fluxoFinancBase);
-
-  // Valores finais com reclassificações de seção (espelham a tabela FC Direto/Indireto):
-  //   Intangível → Operacionais (−dIntangivel no Invest, +dIntangivel no Oper)
-  //   dPL_extra  → Operacionais (+dPL_extra no Oper, −dPL_extra no Financ)
-  const fluxoOperacional  = fluxoOperBase + ajusteResidualBP + dPL_extra - dIntangivel;
-  const fluxoInvestimento = fluxoInvestBase + dIntangivel;
-  const fluxoFinanciamento = fluxoFinancBase - dPL_extra;
-
-  const variacaoCaixa = fluxoOperacional + fluxoInvestimento + fluxoFinanciamento; // = varCaixaReal
 
   // ── Estoques ──────────────────────────────────────────────────────────────
   const estoqueVW   = absAtu('1.1.2');
@@ -288,7 +217,12 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
   const cpNetVW   = Math.max(0, absAtu('2.1.1.02.01.001') - absAtu('1.1.2.01.01.001'));
   const cpNetAudi = Math.max(0, absAtu('2.1.4.01.01.007') - absAtu('1.1.7.02.01.001'));
   const endividamentoCP = cpBase + cpNetVW + cpNetAudi;
-  const endividamentoLP = emprestLP.atu;
+  const emprestCP = absAtu('2.1.1');
+  const emprestLP = absAtu('2.2.1.07');
+  const pessoasLig = absAtu('2.2.1.01');
+  const debitosLig = absAtu('2.2.1.02');
+  const arrendLP = absAtu('2.2.1.15');
+  const endividamentoLP = emprestLP;
 
   // ── Mútuo dos Sócios ──────────────────────────────────────────────────────
   // Mesma conta da aba Mútuo Sócios: sub-grupo 2.2.1.01.01
@@ -343,10 +277,63 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
 
   const totalDespesas = categoriasDespesas.reduce((s, c) => s + c.valor, 0);
 
+  const periodos = [acc];
+  const valoresDreCadastrados = calcularLinhas(cadastro.linhas, 'dre', periodos);
+  const linhaReceitaLiquida = encontrarLinhaBasePercentualDre(cadastro.linhas);
+  const linhaResultadoLiquido = encontrarLinhaDrePorNomes(cadastro.linhas, [
+    'Resultado Líquido do Exercício', 'Resultado Líquido', 'Lucro Líquido do Exercício', 'Lucro Líquido',
+  ]);
+  const linhaResultadoAntesIR = encontrarLinhaDrePorNomes(cadastro.linhas, [
+    'Resultado Antes do IR/CSLL',
+    'Resultado Antes do IR e CSLL',
+    'Resultado Antes da Provisão de IR e CSLL',
+    'Lucro Antes do IR',
+    'Lucro Antes do IR (LAIR)',
+    'LAIR',
+  ]);
+  const linhaLucroBruto = encontrarLinhaDrePorNomes(cadastro.linhas, [
+    'Lucro (Prejuízo) Bruto', 'Lucro Bruto',
+  ]);
+  const valorLinhaDre = (linhaId?: string) => linhaId
+    ? valoresDreCadastrados.get(linhaId) ?? null
+    : null;
+  const receitaLiquidaCadastrada = valorLinhaDre(linhaReceitaLiquida?.id);
+  const resultadoLiquidoCadastrado = valorLinhaDre(linhaResultadoLiquido?.id);
+  const resultadoAntesIRCadastrado = valorLinhaDre(linhaResultadoAntesIR?.id);
+  const lucroBrutoCadastrado = valorLinhaDre(linhaLucroBruto?.id);
+
+  const valoresDfcDireto = calcularLinhas(cadastro.linhas, 'dfc', periodos);
+  const valoresDfcIndireto = calcularDfcIndireto(
+    cadastro.linhas,
+    cadastro.dfcIndiretoRegras ?? [],
+    periodos,
+  ).valores;
+  const valorDfc = (valores: Map<string, number | null>, codigo: string) => valores.get(codigo) ?? null;
+  const somaDfc = (operacional: number | null, investimento: number | null, financiamento: number | null) => {
+    if (operacional === null || investimento === null || financiamento === null) return null;
+    return Math.round((operacional + investimento + financiamento) * 100) / 100;
+  };
+  const fluxoOperacionalDireto = valorDfc(valoresDfcDireto, 'dfc-operacional');
+  const fluxoInvestimentoDireto = valorDfc(valoresDfcDireto, 'dfc-investimento');
+  const fluxoFinanciamentoDireto = valorDfc(valoresDfcDireto, 'dfc-financiamento');
+  const variacaoCaixaDireto = somaDfc(
+    fluxoOperacionalDireto,
+    fluxoInvestimentoDireto,
+    fluxoFinanciamentoDireto,
+  );
+  const fluxoOperacionalIndireto = valorDfc(valoresDfcIndireto, 'dfc-operacional');
+  const fluxoInvestimentoIndireto = valorDfc(valoresDfcIndireto, 'dfc-investimento');
+  const fluxoFinanciamentoIndireto = valorDfc(valoresDfcIndireto, 'dfc-financiamento');
+  const variacaoCaixaIndireto = valorDfc(valoresDfcIndireto, 'dfc-total');
+  const variacaoCaixaReal = calcularSaldosCaixaEquivalentes(
+    cadastro.dfcContasCaixaEquivalentes ?? [],
+    periodos,
+  ).variacaoReal;
+
   // ── Indicadores Financeiros ───────────────────────────────────────────────
   const disponib = absAtu('1.1.1');
   const passTotal = passivoCirculante + passivoNaoCirculante;
-  const dividasFin = emprestCP.atu + emprestLP.atu + pessoasLig.atu + debitosLig.atu + arrendLP.atu;
+  const dividasFin = emprestCP + emprestLP + pessoasLig + debitosLig + arrendLP;
   const capInvestido = patrimonioLiquido + dividasFin;
   const ancPlusPNC = patrimonioLiquido + passivoNaoCirculante;
 
@@ -357,16 +344,28 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
   const imobPL      = patrimonioLiquido > 0 ? (ativoNaoCirculante / patrimonioLiquido) * 100 : 0;
   const imobInvest  = ancPlusPNC > 0 ? (ativoNaoCirculante / ancPlusPNC) * 100 : 0;
   const taxaRisco   = ativoCirculante > 0 ? passTotal / ativoCirculante : 0;
-  const margemBruta = receitaLiquida > 0 ? ((receitaLiquida - CMV) / receitaLiquida) * 100 : 0;
-  const roic        = capInvestido > 0 ? (resultadoLiquido / capInvestido) * 100 : 0;
-  const roe         = patrimonioLiquido > 0 ? (resultadoLiquido / patrimonioLiquido) * 100 : 0;
-  const ros         = receitaLiquida > 0 ? (resultadoLiquido / receitaLiquida) * 100 : 0;
+  const margemBruta = receitaLiquidaCadastrada !== null && receitaLiquidaCadastrada > 0 && lucroBrutoCadastrado !== null
+    ? (lucroBrutoCadastrado / receitaLiquidaCadastrada) * 100
+    : null;
+  const roic = capInvestido > 0 && resultadoLiquidoCadastrado !== null
+    ? (resultadoLiquidoCadastrado / capInvestido) * 100
+    : null;
+  const roe = patrimonioLiquido > 0 && resultadoLiquidoCadastrado !== null
+    ? (resultadoLiquidoCadastrado / patrimonioLiquido) * 100
+    : null;
+  const ros = receitaLiquidaCadastrada !== null && receitaLiquidaCadastrada > 0 && resultadoLiquidoCadastrado !== null
+    ? (resultadoLiquidoCadastrado / receitaLiquidaCadastrada) * 100
+    : null;
 
   return {
     ativoCirculante, ativoNaoCirculante, ativoTotal,
     passivoCirculante, passivoNaoCirculante, patrimonioLiquido,
-    receitaLiquida, resultadoAntesIR, resultadoLiquido,
-    fluxoOperacional, fluxoInvestimento, fluxoFinanciamento, variacaoCaixa,
+    receitaLiquida: receitaLiquidaCadastrada,
+    resultadoAntesIR: resultadoAntesIRCadastrado,
+    resultadoLiquido: resultadoLiquidoCadastrado,
+    fluxoOperacionalDireto, fluxoInvestimentoDireto, fluxoFinanciamentoDireto, variacaoCaixaDireto,
+    fluxoOperacionalIndireto, fluxoInvestimentoIndireto, fluxoFinanciamentoIndireto, variacaoCaixaIndireto,
+    variacaoCaixaReal,
     estoqueVW, estoqueAudi, valoresReceber,
     endividamentoCP, endividamentoLP,
     mutuoSocios, parcelamentoRefis,
@@ -381,7 +380,7 @@ interface KpiCardProps {
   title: string;
   icon: string;
   periods: LoadedPeriod[];
-  getValue: (m: ComparativoMetrics) => number;
+  getValue: (m: ComparativoMetrics) => number | null;
   direction?: Direction;
   refIdx: number; // índice do período base (mais antigo)
 }
@@ -475,7 +474,7 @@ interface CompRowProps {
   label:      string;
   desc?:      string;
   periods:    LoadedPeriod[];
-  getValue:   (m: ComparativoMetrics) => number;
+  getValue:   (m: ComparativoMetrics) => number | null;
   direction?: Direction;
   isHeader?:  boolean;
   indent?:    boolean;
@@ -514,7 +513,7 @@ function CompRow({ label, desc, periods, getValue, direction = 'neutral', isHead
         if (!period) return <td key={idx} />;
         if (period.error) return (
           <td key={idx} className="py-3 px-4 text-center">
-            <span className="text-xs text-red-500">Erro</span>
+            <span className="text-xs text-red-500" title={period.error}>Erro</span>
           </td>
         );
         if (!period.loaded || val === null) return (
@@ -706,17 +705,14 @@ function PeriodSelector({
 export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?: number; selectedMonth?: number }) {
   const defaultYear = selectedYear ?? new Date().getFullYear();
   const defaultMonth = selectedMonth !== undefined ? selectedMonth : 0;
+  const initialPeriods = defaultComparisonPeriods(defaultYear, defaultMonth);
   const [availableKeys, setAvailableKeys] = useState<Record<string, boolean>>({});
   const [despTipos,     setDespTipos]     = useState<Record<string, string>>({});
+  const [cadastro,      setCadastro]      = useState<CadastroDemonstracoes | null>(null);
   const [indexLoading,  setIndexLoading]  = useState(true);
   const [indexError,    setIndexError]    = useState<string | null>(null);
 
-  const [selectedPeriods, setSelectedPeriods] = useState<Period[]>([
-    { year: defaultYear, month: defaultMonth },
-    { year: defaultYear, month: defaultMonth },
-    { year: defaultYear, month: defaultMonth },
-    { year: defaultYear, month: defaultMonth },
-  ]);
+  const [selectedPeriods, setSelectedPeriods] = useState<Period[]>(initialPeriods);
   const [activePeriodCount, setActivePeriodCount] = useState(4);
   const [loadedPeriods,    setLoadedPeriods]    = useState<LoadedPeriod[]>([]);
   const [compLoading,      setCompLoading]      = useState(false);
@@ -738,8 +734,13 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
   // ── Load index + tipos on mount ───────────────────────────────────────────
   useEffect(() => {
     setIndexLoading(true);
-    Promise.all([loadFluxoCaixaIndex(), loadDespesasTipos()])
-      .then(([idx, tipos]) => { setAvailableKeys(idx); setDespTipos(tipos); setIndexError(null); })
+    Promise.all([loadFluxoCaixaIndex(), loadDespesasTipos(), loadCadastroDemonstracoes()])
+      .then(([idx, tipos, cadastroDreDfc]) => {
+        setAvailableKeys(idx);
+        setDespTipos(tipos);
+        setCadastro(cadastroDreDfc);
+        setIndexError(null);
+      })
       .catch(e  => setIndexError(String(e)))
       .finally(() => setIndexLoading(false));
   }, []);
@@ -772,6 +773,11 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
   const runComparison = useCallback(async () => {
     setCompLoading(true);
     setCompError(null);
+    if (!cadastro) {
+      setCompError('O cadastro da DRE e da DFC não foi carregado.');
+      setCompLoading(false);
+      return;
+    }
     const active = selectedPeriods.slice(0, activePeriodCount);
     const results: LoadedPeriod[] = [];
 
@@ -787,7 +793,7 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
           results.push({ period, metrics: null, loaded: false, error: 'Sem dados' });
           continue;
         }
-        results.push({ period, metrics: extractMetrics(entry.rawText, despTipos), loaded: true, error: null });
+        results.push({ period, metrics: extractMetrics(entry.rawText, despTipos, cadastro), loaded: true, error: null });
       } catch (e: any) {
         results.push({ period, metrics: null, loaded: false, error: String(e) });
       }
@@ -796,7 +802,7 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
     setLoadedPeriods(results);
     setHasResults(true);
     setCompLoading(false);
-  }, [selectedPeriods, activePeriodCount, availableKeys]);
+  }, [selectedPeriods, activePeriodCount, availableKeys, cadastro]);
 
   const totalAvailable = Object.keys(availableKeys).length;
   const colSpan = 1 + MAX_PERIODS;
@@ -913,11 +919,12 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
             )}>
               <KpiCard title="Patrimônio Líquido"        icon="🏛️" periods={loadedPeriods} getValue={m => m.patrimonioLiquido}    direction="asc"     refIdx={refIdx} />
               <KpiCard title="Resultado Líquido"          icon="📈" periods={loadedPeriods} getValue={m => m.resultadoLiquido}     direction="asc"     refIdx={refIdx} />
-              <KpiCard title="Caixa Operacional"          icon="💰" periods={loadedPeriods} getValue={m => m.fluxoOperacional}     direction="asc"     refIdx={refIdx} />
+              <KpiCard title="Caixa Operacional — Direto" icon="💰" periods={loadedPeriods} getValue={m => m.fluxoOperacionalDireto} direction="asc" refIdx={refIdx} />
+              <KpiCard title="Caixa Operacional — Indireto" icon="💵" periods={loadedPeriods} getValue={m => m.fluxoOperacionalIndireto} direction="asc" refIdx={refIdx} />
               <KpiCard title="Total Endividamento Banc."  icon="🏦" periods={loadedPeriods} getValue={m => m.endividamentoCP + m.endividamentoLP} direction="desc" refIdx={refIdx} />
               <KpiCard title="Ativo Total"                icon="📊" periods={loadedPeriods} getValue={m => m.ativoTotal}           direction="asc"     refIdx={refIdx} />
               <KpiCard title="Receita Líquida"            icon="💵" periods={loadedPeriods} getValue={m => m.receitaLiquida}       direction="asc"     refIdx={refIdx} />
-              <KpiCard title="Variação de Caixa"          icon="📉" periods={loadedPeriods} getValue={m => m.variacaoCaixa}       direction="asc"     refIdx={refIdx} />
+              <KpiCard title="Variação Real do Caixa"     icon="📉" periods={loadedPeriods} getValue={m => m.variacaoCaixaReal}   direction="asc"     refIdx={refIdx} />
               <KpiCard title="Total Despesas Operac."     icon="📋" periods={loadedPeriods} getValue={m => m.totalDespesas}        direction="desc"    refIdx={refIdx} />
             </div>
           </div>
@@ -971,9 +978,9 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
 
                       {/* DRE */}
                       <SectionHeader icon="📈" title="Demonstração do Resultado (DRE)" subtitle="Movimentação do período — receitas e despesas incorridas" colSpan={colSpan} />
-                      <CompRow label="Receita Líquida"                   desc="Receita bruta − impostos − devoluções"          periods={loadedPeriods} getValue={m => m.receitaLiquida}      direction="asc" refIdx={refIdx} />
-                      <CompRow label="Resultado Antes do IR/CSLL"        desc="Lucro operacional antes da tributação"           periods={loadedPeriods} getValue={m => m.resultadoAntesIR}   direction="asc" isHeader refIdx={refIdx} />
-                      <CompRow label="Resultado Líquido do Exercício"    desc="Lucro/Prejuízo após IR e CSLL"                   periods={loadedPeriods} getValue={m => m.resultadoLiquido}   direction="asc" isHeader refIdx={refIdx} />
+                      <CompRow label="Receita Líquida"                   desc="Valor da linha correspondente na DRE cadastrada" periods={loadedPeriods} getValue={m => m.receitaLiquida}      direction="asc" refIdx={refIdx} />
+                      <CompRow label="Resultado Antes do IR/CSLL"        desc="Valor da linha correspondente na DRE cadastrada" periods={loadedPeriods} getValue={m => m.resultadoAntesIR}   direction="asc" isHeader refIdx={refIdx} />
+                      <CompRow label="Resultado Líquido do Exercício"    desc="Valor da linha correspondente na DRE cadastrada" periods={loadedPeriods} getValue={m => m.resultadoLiquido}   direction="asc" isHeader refIdx={refIdx} />
 
                       {/* INDICADORES */}
                       <SectionHeader icon="📐" title="Indicadores Financeiros" subtitle="Ratios de liquidez, endividamento e rentabilidade" colSpan={colSpan} />
@@ -990,11 +997,18 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
                       <CompRow label="ROS (Margem Líquida)"   desc="Res.Líq. / Rec.Líq. — > 5% saudável" periods={loadedPeriods} getValue={m => m.ros}      direction="asc"  refIdx={refIdx} fmtFn={v => `${v.toFixed(1)}%`}  fmtFullFn={v => `${v.toFixed(2)}%`} isHeader />
 
                       {/* FLUXO DE CAIXA */}
-                      <SectionHeader icon="💰" title="Fluxo de Caixa Direto" subtitle="Geração e consumo de caixa no período" colSpan={colSpan} />
-                      <CompRow label="Caixa Líquido — At. Operacionais"   desc="Resultado ajustado por variações de capital de giro" periods={loadedPeriods} getValue={m => m.fluxoOperacional}   direction="asc"     refIdx={refIdx} />
-                      <CompRow label="Caixa Líquido — At. Investimento"   desc="Imobilizado, intangável, investimentos"               periods={loadedPeriods} getValue={m => m.fluxoInvestimento} direction="neutral" refIdx={refIdx} />
-                      <CompRow label="Caixa Líquido — At. Financiamento"  desc="Empréstimos, mútuos, arrendamentos"                   periods={loadedPeriods} getValue={m => m.fluxoFinanciamento} direction="neutral" refIdx={refIdx} />
-                      <CompRow label="Variação Total de Caixa no Período" desc="Operacional + Investimento + Financiamento"           periods={loadedPeriods} getValue={m => m.variacaoCaixa}      direction="asc"     isHeader refIdx={refIdx} />
+                      <SectionHeader icon="💰" title="Fluxo de Caixa Direto" subtitle="Movimentos classificados nas linhas diretas cadastradas" colSpan={colSpan} />
+                      <CompRow label="Caixa Líquido — At. Operacionais"   desc="Soma das linhas operacionais do FC Direto" periods={loadedPeriods} getValue={m => m.fluxoOperacionalDireto}   direction="asc"     refIdx={refIdx} />
+                      <CompRow label="Caixa Líquido — At. Investimento"   desc="Soma das linhas de investimento do FC Direto" periods={loadedPeriods} getValue={m => m.fluxoInvestimentoDireto} direction="neutral" refIdx={refIdx} />
+                      <CompRow label="Caixa Líquido — At. Financiamento"  desc="Soma das linhas de financiamento do FC Direto" periods={loadedPeriods} getValue={m => m.fluxoFinanciamentoDireto} direction="neutral" refIdx={refIdx} />
+                      <CompRow label="Variação Total — FC Direto"         desc="Operacional + Investimento + Financiamento" periods={loadedPeriods} getValue={m => m.variacaoCaixaDireto} direction="asc" isHeader refIdx={refIdx} />
+
+                      <SectionHeader icon="🔄" title="Fluxo de Caixa Indireto" subtitle="Resultado e variações conforme regras do FC Indireto" colSpan={colSpan} />
+                      <CompRow label="Caixa Líquido — At. Operacionais"   desc="Resultado ajustado pelas variações operacionais cadastradas" periods={loadedPeriods} getValue={m => m.fluxoOperacionalIndireto} direction="asc" refIdx={refIdx} />
+                      <CompRow label="Caixa Líquido — At. Investimento"   desc="Soma das linhas de investimento do FC Indireto" periods={loadedPeriods} getValue={m => m.fluxoInvestimentoIndireto} direction="neutral" refIdx={refIdx} />
+                      <CompRow label="Caixa Líquido — At. Financiamento"  desc="Soma das linhas de financiamento do FC Indireto" periods={loadedPeriods} getValue={m => m.fluxoFinanciamentoIndireto} direction="neutral" refIdx={refIdx} />
+                      <CompRow label="Variação Total — FC Indireto"       desc="Operacional + Investimento + Financiamento" periods={loadedPeriods} getValue={m => m.variacaoCaixaIndireto} direction="asc" isHeader refIdx={refIdx} />
+                      <CompRow label="Variação Real das Contas de Caixa"  desc="Variação dos equivalentes de caixa selecionados na DFC" periods={loadedPeriods} getValue={m => m.variacaoCaixaReal} direction="neutral" refIdx={refIdx} />
 
                       {/* ESTOQUES */}
                       <SectionHeader icon="📦" title="Posição de Estoques" subtitle="Saldo atual do inventário por marca" colSpan={colSpan} />
