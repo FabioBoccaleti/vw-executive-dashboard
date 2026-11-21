@@ -128,7 +128,7 @@ it('detalha valores da DRE por conta para cada ano e no acumulado, preservando a
   expect(screen.queryByRole('row', { name: /3\.1 — Receita/ })).not.toBeInTheDocument();
 });
 
-it('exibe percentuais opcionais da DRE sobre a receita líquida de cada período, sem detalhar contas expandidas', async () => {
+it('exibe percentuais da DRE por padrão e permite ocultá-los', async () => {
   mocks.raw.mockImplementation(async (ano: number, mes: number) => {
     if (ano === 2025 && mes === 2) return raw(200, 20, 300);
     if (ano === 2026 && mes === 1) return raw(1000, 200, 150);
@@ -142,9 +142,15 @@ it('exibe percentuais opcionais da DRE sobre a receita líquida de cada período
   ] };
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   const linhaReceita = await screen.findByRole('row', { name: /Receita Líquida de Vendas/ });
+  expect(await within(linhaReceita).findByText('100,0%')).toBeInTheDocument();
+  const ocultar = screen.getByRole('button', { name: 'Ocultar % da Receita Líquida de Vendas' });
+  expect(ocultar).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(ocultar);
   expect(within(linhaReceita).queryByText('100,0%')).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Mostrar % da Receita Líquida de Vendas' }));
+  const mostrar = screen.getByRole('button', { name: 'Mostrar % da Receita Líquida de Vendas' });
+  expect(mostrar).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(mostrar);
   expect(await within(linhaReceita).findByText('100,0%')).toBeInTheDocument();
   expect(within(screen.getByRole('row', { name: /Custos/ })).getByText('-20,0%')).toBeInTheDocument();
   expect(within(screen.getByRole('row', { name: /Resultado/ })).getByText('80,0%')).toBeInTheDocument();

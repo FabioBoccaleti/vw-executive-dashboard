@@ -77,7 +77,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [anosComparados, setAnosComparados] = useState<number[] | null>(null);
   const [anoAdicionar, setAnoAdicionar] = useState(String(selectedYear - 1));
   const [periodoDre, setPeriodoDre] = useState<'mes' | 'acumulado'>('mes');
-  const [mostrarPercentualDre, setMostrarPercentualDre] = useState(false);
+  const [mostrarPercentualDre, setMostrarPercentualDre] = useState(true);
   const [periodoDfc, setPeriodoDfc] = useState<'mes' | 'acumulado'>('mes');
   const [metodoDfc, setMetodoDfc] = useState<'direto' | 'indireto'>('direto');
   const [documentoNotasDfc, setDocumentoNotasDfc] = useState<DocumentoNotasDfc | null>(null);
