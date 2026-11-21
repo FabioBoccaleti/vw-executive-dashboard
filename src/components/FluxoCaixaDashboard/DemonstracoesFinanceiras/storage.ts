@@ -3,7 +3,7 @@ import { kvCompareAndSet, kvGet } from '@/lib/kvClient';
 import { extractAccounts } from '../balanceteParser';
 import { loadFluxoCaixaRaw } from '../fluxoCaixaStorage';
 import {
-  aplicarModeloDfcPadrao, cadastroSchema, cadastroVazio, chavePeriodo, rotuloPeriodo, validarCadastro,
+  aplicarModeloBalancoSorana, aplicarModeloDfcPadrao, cadastroSchema, cadastroVazio, chavePeriodo, rotuloPeriodo, validarCadastro,
   type CadastroDemonstracoes, type DadosDemonstracoes, type PeriodoDemonstracao,
 } from './modelo';
 
@@ -61,10 +61,10 @@ export async function saveNotasDfc(
 
 export async function loadCadastroDemonstracoes(): Promise<CadastroDemonstracoes> {
   const data = await kvGet<unknown>(KEY, { throwOnError: true });
-  if (data === null) return aplicarModeloDfcPadrao(cadastroVazio());
+  if (data === null) return aplicarModeloBalancoSorana(aplicarModeloDfcPadrao(cadastroVazio()));
   const parsed = cadastroSchema.safeParse(data);
   if (!parsed.success) throw new Error('O cadastro salvo de demonstrações está inválido.');
-  const cadastro = aplicarModeloDfcPadrao(parsed.data);
+  const cadastro = aplicarModeloBalancoSorana(aplicarModeloDfcPadrao(parsed.data));
   const erro = validarCadastro(cadastro);
   if (erro) throw new Error(erro);
   return cadastro;
@@ -81,7 +81,7 @@ export async function saveCadastroDemonstracoes(cadastro: CadastroDemonstracoes)
 export async function loadDadosDemonstracoes(
   principal: PeriodoDemonstracao,
   comparacoes: PeriodoDemonstracao | PeriodoDemonstracao[],
-  escopo: 'dre' | 'dfc' | 'patrimonial' | 'cadastros' = 'dre',
+  escopo: 'dre' | 'dfc' | 'patrimonial' | 'balanco' | 'cadastros' = 'dre',
   acumulado = true,
 ): Promise<DadosDemonstracoes> {
   const periodos = new Map<string, PeriodoDemonstracao>();
@@ -92,7 +92,14 @@ export async function loadDadosDemonstracoes(
       : periodosComparacao.flatMap(periodo => acumulado
         ? Array.from({ length: periodo.mes }, (_, index) => ({ ano: periodo.ano, mes: index + 1 }))
         : [periodo])
-    : escopo === 'patrimonial' ? periodosComparacao : [];
+    : escopo === 'balanco'
+      ? [...new Map(
+        [principal, ...periodosComparacao].map(periodo => [chavePeriodo(periodo), periodo] as const),
+      ).values()].flatMap(periodo => [
+        periodo,
+        ...Array.from({ length: periodo.mes }, (_, index) => ({ ano: periodo.ano, mes: index + 1 })),
+      ])
+      : escopo === 'patrimonial' ? periodosComparacao : [];
   for (const periodo of [
     principal, ...adicionais,
   ]) {

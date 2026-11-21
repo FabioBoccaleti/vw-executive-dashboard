@@ -579,7 +579,8 @@ it.each([
   await screen.findByRole('rowheader', { name: 'Segundo grupo' });
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
   await screen.findByRole('columnheader', { name: 'Fev/25' });
-  const linhas = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+  const linhas = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    .filter(linha => !/^(?:Patrimônio Líquido|Capital Social|Reservas de Capital|Reservas de Lucros|Lucros \(Prejuízos\) Acumulados|Resultado do Período)$/.test(within(linha).getByRole('rowheader').textContent ?? ''));
   expect(linhas.map(linha => within(linha).getByRole('rowheader').textContent)).toEqual([
     'Circulante', 'Primeiro grupo', 'Segundo grupo', 'Total geral',
   ]);
@@ -597,7 +598,7 @@ it.each([
   fireEvent.click(edicao.getByRole('button', { name: 'Aplicar linha' }));
   fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
   await screen.findByText('Cadastro salvo com sucesso.');
-  expect(persistido?.linhas.filter(linha => linha.demonstracao === demonstracao)).toHaveLength(2);
+  expect(persistido?.linhas.filter(linha => linha.demonstracao === demonstracao && !linha.modeloProtegido)).toHaveLength(2);
   expect(persistido?.linhas.filter(linha => linha.demonstracao === 'dfc')).toHaveLength(25);
   fireEvent.click(screen.getByRole('tab', { name: titulo }));
   await waitFor(() => expect(within(screen.getByRole('row', { name: /Total geral/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(80)', '(40)']));
@@ -994,6 +995,18 @@ it('carrega apenas os períodos necessários, sem bloquear uma demonstração po
   expect(Object.keys(patrimonio)).toEqual(['2026_2', '2024_1']);
 });
 
+it('carrega o acumulado do ano para as conferências do balanço sem ampliar outras telas patrimoniais', async () => {
+  mocks.raw.mockResolvedValue(raw(500, 100, 300));
+  const balanco = await loadDadosDemonstracoes({ ano: 2026, mes: 2 }, { ano: 2024, mes: 1 }, 'balanco');
+  expect(Object.keys(balanco).sort()).toEqual(['2024_1', '2026_1', '2026_2']);
+  expect(mocks.raw).toHaveBeenCalledTimes(3);
+
+  mocks.raw.mockClear();
+  const anual = await loadDadosDemonstracoes({ ano: 2026, mes: 0 }, { ano: 2026, mes: 0 }, 'balanco');
+  expect(Object.keys(anual)).toEqual(['2026_0']);
+  expect(mocks.raw).toHaveBeenCalledTimes(1);
+});
+
 it('desabilita contas já vinculadas a outro grupo e mantém a edição do grupo atual', async () => {
   mocks.raw.mockResolvedValue({ rawText: '2;3.1;Receitas;0;0;100;0\n2;3.1;Receitas repetidas;0;0;200;0\nA;3.1.1;Receita completa;0;0;10;0\nA;3.1.1;Receita completa;0;0;15;0\nA;3.1.2;Outra receita completa;0;0;5;0\nS;3.2;Agrupadora sem filhas no arquivo;0;0;100;0' });
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
@@ -1041,4 +1054,67 @@ it('avisa sobre agrupadoras já cadastradas e exige a substituição por contas 
   fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('A conta 3.2 está incompleta');
   expect(mocks.cas).not.toHaveBeenCalled();
+});
+
+it('exibe as contas do Capital Social e concilia o resultado do balancete com a DRE acumulada', async () => {
+  mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+    if (ano !== 2026 || ![1, 2].includes(mes)) return null;
+    const receita = mes === 1 ? 100 : 200;
+    const custo = mes === 1 ? 20 : 40;
+    const despesaNaoClassificada = mes === 1 ? 0 : 10;
+    return { rawText: [
+      'A;1.1.1.01;Caixa;0;0;0;1000',
+      'A;1.5.5.02.01.001;Depreciação acumulada;0;0;0;10',
+      'P;2.1.1;Passivo circulante;0;0;0;-100',
+      'P;2.3.1.01.01.001;Capital social;0;0;0;-740',
+      `R;3.1.1;Receita;0;0;100;-${receita}`,
+      `D;4.1.1;Custo;0;${mes === 1 ? 20 : 20};0;${custo}`,
+      `D;5.1.1;Despesa não classificada;0;${despesaNaoClassificada};0;${despesaNaoClassificada}`,
+    ].join('\n') };
+  });
+  persistido = {
+    ...cadastroVazio(),
+    version: 'v1',
+    empresa: { nome: 'Empresa exemplo', cnpj: '00.000.000/0001-00', nire: '' },
+    linhas: [
+      { id: 'ativo-total', nome: 'Ativo', demonstracao: 'ativo', tipo: 'total', itens: [
+        { referencia: 'ativo-caixa', operacao: 1 }, { referencia: 'ativo-depreciacao', operacao: 1 },
+      ] },
+      { id: 'ativo-caixa', nome: 'Caixa', demonstracao: 'ativo', tipo: 'contas', sublinhaDe: 'ativo-total', itens: [
+        { referencia: '1.1.1.01', operacao: 1 },
+      ] },
+      { id: 'ativo-depreciacao', nome: 'Depreciação acumulada', demonstracao: 'ativo', tipo: 'contas', sublinhaDe: 'ativo-total', itens: [
+        { referencia: '1.5.5.02.01.001', operacao: 1 },
+      ] },
+      { id: 'passivo-total', nome: 'Passivo', demonstracao: 'passivo', tipo: 'total', itens: [
+        { referencia: 'passivo-nao-circulante', operacao: 1 },
+      ] },
+      { id: 'passivo-nao-circulante', nome: 'Passivo Não Circulante', demonstracao: 'passivo', tipo: 'contas', sublinhaDe: 'passivo-total', itens: [
+        { referencia: '2.1.1', operacao: 1 }, { referencia: '2.3.1.01.01.001', operacao: 1 },
+      ] },
+      { id: 'dre-receita', nome: 'Receita', demonstracao: 'dre', tipo: 'contas', itens: [
+        { referencia: '3.1.1', operacao: 1 },
+      ] },
+      { id: 'dre-custo', nome: 'Custos', demonstracao: 'dre', tipo: 'contas', itens: [
+        { referencia: '4.1.1', operacao: 1 },
+      ] },
+      { id: 'dre-lucro', nome: 'LUCRO LÍQUIDO DO EXERCÍCIO', demonstracao: 'dre', tipo: 'total', itens: [
+        { referencia: 'dre-receita', operacao: 1 }, { referencia: 'dre-custo', operacao: 1 },
+      ] },
+    ],
+  };
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Passivo' }));
+
+  const linhaCapital = await screen.findByRole('row', { name: /Capital Social/ });
+  expect(within(linhaCapital).getByRole('cell')).toHaveTextContent('740');
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Capital Social' }));
+  const contaCapital = await screen.findByRole('row', { name: /2\.3\.1\.01\.01\.001 — Capital social/ });
+  expect(within(contaCapital).getByRole('cell')).toHaveTextContent('740');
+
+  const conferencias = within(screen.getByRole('region', { name: 'Conferências do balanço' }));
+  expect(conferencias.getByText('Ativo – (Passivo + PL)').parentElement).toHaveTextContent('0,00');
+  expect(conferencias.getByText('Resultado do balancete – Lucro líquido da DRE').parentElement).toHaveTextContent('(10,00)');
+  fireEvent.click(conferencias.getByText('Contas de resultado sem linha na DRE (1)'));
+  expect(await conferencias.findByText(/5\.1\.1 — Despesa não classificada/)).toBeInTheDocument();
 });

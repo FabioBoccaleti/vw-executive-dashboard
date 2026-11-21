@@ -37,13 +37,19 @@ const linhaSchema = z.object({
   nome: z.string().trim().min(1),
   demonstracao: z.enum(['dre', 'ativo', 'passivo', 'dfc', 'endividamento']),
   tipo: z.enum(['contas', 'total']),
-  itens: z.array(itemSchema).min(1),
+  itens: z.array(itemSchema),
   bancoDe: z.string().min(1).optional(),
   sublinhaDe: z.string().min(1).optional(),
   foraDfc: z.boolean().optional(),
   dfcSubtotalNome: z.string().trim().min(1).optional(),
   captacao: captacaoSchema.optional(),
-});
+  contasPorPrefixo: z.boolean().optional(),
+  saldoInvertido: z.boolean().optional(),
+  calculo: z.enum(['resultadoBalancete']).optional(),
+  modeloProtegido: z.boolean().optional(),
+}).refine(linha => linha.calculo
+  ? linha.tipo === 'contas' && linha.demonstracao === 'passivo' && linha.itens.length === 0
+  : linha.itens.length > 0);
 const dfcIndiretoRegraSchema = z.object({
   referencia: z.string().trim().regex(/^\d+(?:\.\d+)*$/),
   linha: z.string().refine(linha => DFC_INDIRETO_CATEGORIAS_MAPEAVEIS.some(categoria => categoria.codigo === linha)),
@@ -57,6 +63,7 @@ export const cadastroSchema = z.object({
   dfcContasCaixaEquivalentes: z.array(z.string().trim().min(1)).min(1).optional(),
   dfcIndiretoModeloInicializado: z.boolean().optional(),
   dfcIndiretoRegras: z.array(dfcIndiretoRegraSchema).optional(),
+  modeloBalancoSoranaAplicado: z.boolean().optional(),
 });
 export type CadastroDemonstracoes = z.infer<typeof cadastroSchema>;
 export type RegraDfcIndireto = z.infer<typeof dfcIndiretoRegraSchema>;
@@ -66,6 +73,11 @@ export type ContasBalancete = Record<string, ContaBalancete>;
 export interface PeriodoDemonstracao { ano: number; mes: number }
 export type DadosDemonstracoes = Record<string, ContasBalancete | null>;
 export const linhaPai = (linha: LinhaDemonstracao) => linha.bancoDe ?? linha.sublinhaDe;
+export const LINHA_PL_ID = 'passivo-pl';
+export const LINHA_RESULTADO_PERIODO_ID = 'passivo-resultado-periodo';
+
+const PREFIXOS_PL_SORANA = ['2.3.1', '2.3.2.01', '2.3.2.02', '2.3.2.03', '2.3.3'];
+const PREFIXOS_REDUTORAS_ATIVO = ['1.5.5.02.01', '1.5.5.02.02'];
 
 const normalizarNomeLinhaDre = (nome: string) =>
   nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
@@ -117,7 +129,7 @@ export function identificarContasIncompletas(periodos: Array<ContasBalancete | n
 }
 
 export function validarContasCompletas(linhas: LinhaDemonstracao[], incompletas: Set<string>): string | null {
-  const conta = linhas.filter(linha => linha.tipo === 'contas' && linha.demonstracao !== 'dfc')
+  const conta = linhas.filter(linha => linha.tipo === 'contas' && linha.demonstracao !== 'dfc' && !linha.contasPorPrefixo)
     .flatMap(linha => linha.itens).find(item => incompletas.has(item.referencia));
   return conta ? `A conta ${conta.referencia} está incompleta ou é agrupadora. Selecione apenas contas completas (analíticas).` : null;
 }
@@ -256,6 +268,124 @@ export function aplicarModeloDfcPadrao(cadastro: CadastroDemonstracoes): Cadastr
     dfcIndiretoModeloInicializado: true,
     dfcIndiretoRegras: atualizado.dfcIndiretoRegras ?? [...DFC_INDIRETO_REGRAS_PADRAO],
   };
+}
+
+export function aplicarModeloBalancoSorana(cadastro: CadastroDemonstracoes): CadastroDemonstracoes {
+  if (cadastro.modeloBalancoSoranaAplicado) return cadastro;
+
+  const idsPlLegados = new Set<string>();
+  const linhasPlLegadas = cadastro.linhas.filter(linha => linha.demonstracao === 'passivo'
+    && (linha.id === LINHA_PL_ID
+      || normalizarNomeLinhaDre(linha.nome) === normalizarNomeLinhaDre('Patrimônio Líquido')));
+  for (const linha of linhasPlLegadas) {
+    idsPlLegados.add(linha.id);
+    for (const filha of cadastro.linhas.filter(item => linhaPai(item) === linha.id)) idsPlLegados.add(filha.id);
+  }
+
+  let linhas = cadastro.linhas
+    .filter(linha => !idsPlLegados.has(linha.id))
+    .map(linha => {
+      if (linha.demonstracao === 'ativo' && linha.tipo === 'contas') {
+        const itens = linha.itens.map(item => PREFIXOS_REDUTORAS_ATIVO.some(prefixo =>
+          item.referencia === prefixo || item.referencia.startsWith(`${prefixo}.`))
+          ? { ...item, operacao: -1 as const }
+          : item);
+        return itens.some((item, index) => item !== linha.itens[index]) ? { ...linha, itens } : linha;
+      }
+      if (linha.demonstracao !== 'passivo') return linha;
+      if (linha.tipo === 'contas') {
+        const itens = linha.itens.filter(item => !PREFIXOS_PL_SORANA.some(prefixo =>
+          mesmaHierarquia(item.referencia, prefixo)));
+        return itens.length === linha.itens.length ? linha : { ...linha, itens };
+      }
+      const itens = linha.itens.filter(item => !idsPlLegados.has(item.referencia));
+      return itens.length === linha.itens.length ? linha : { ...linha, itens };
+    });
+
+  let alterou = true;
+  while (alterou) {
+    const ids = new Set(linhas.map(linha => linha.id));
+    const filtradas = linhas
+      .filter(linha => linha.calculo || linha.itens.length > 0)
+      .map(linha => {
+        if (linha.tipo !== 'total') return linha;
+        const itens = linha.itens.filter(item => ids.has(item.referencia));
+        return itens.length === linha.itens.length ? linha : { ...linha, itens };
+      });
+    const validas = filtradas.filter(linha => linha.calculo || linha.itens.length > 0);
+    alterou = validas.length !== linhas.length || validas.some((linha, index) => linha !== linhas[index]);
+    linhas = validas;
+  }
+
+  const filhosPl: LinhaDemonstracao[] = [
+    {
+      id: 'passivo-pl-capital',
+      nome: 'Capital Social',
+      demonstracao: 'passivo',
+      tipo: 'contas',
+      sublinhaDe: LINHA_PL_ID,
+      contasPorPrefixo: true,
+      saldoInvertido: true,
+      modeloProtegido: true,
+      itens: [{ referencia: '2.3.1', operacao: 1 }],
+    },
+    {
+      id: 'passivo-pl-reservas-capital',
+      nome: 'Reservas de Capital',
+      demonstracao: 'passivo',
+      tipo: 'contas',
+      sublinhaDe: LINHA_PL_ID,
+      contasPorPrefixo: true,
+      saldoInvertido: true,
+      modeloProtegido: true,
+      itens: [{ referencia: '2.3.2.01', operacao: 1 }],
+    },
+    {
+      id: 'passivo-pl-reservas-lucros',
+      nome: 'Reservas de Lucros',
+      demonstracao: 'passivo',
+      tipo: 'contas',
+      sublinhaDe: LINHA_PL_ID,
+      contasPorPrefixo: true,
+      saldoInvertido: true,
+      modeloProtegido: true,
+      itens: [
+        { referencia: '2.3.2.02', operacao: 1 },
+        { referencia: '2.3.2.03', operacao: 1 },
+      ],
+    },
+    {
+      id: 'passivo-pl-lucros-acumulados',
+      nome: 'Lucros (Prejuízos) Acumulados',
+      demonstracao: 'passivo',
+      tipo: 'contas',
+      sublinhaDe: LINHA_PL_ID,
+      contasPorPrefixo: true,
+      saldoInvertido: true,
+      modeloProtegido: true,
+      itens: [{ referencia: '2.3.3', operacao: 1 }],
+    },
+    {
+      id: LINHA_RESULTADO_PERIODO_ID,
+      nome: 'Resultado do Período',
+      demonstracao: 'passivo',
+      tipo: 'contas',
+      sublinhaDe: LINHA_PL_ID,
+      calculo: 'resultadoBalancete',
+      modeloProtegido: true,
+      itens: [],
+    },
+  ];
+  const linhaPl: LinhaDemonstracao = {
+    id: LINHA_PL_ID,
+    nome: 'Patrimônio Líquido',
+    demonstracao: 'passivo',
+    tipo: 'total',
+    modeloProtegido: true,
+    itens: filhosPl.map(linha => ({ referencia: linha.id, operacao: 1 })),
+  };
+  linhas = [...linhas, linhaPl, ...filhosPl];
+  return { ...cadastro, linhas, modeloBalancoSoranaAplicado: true };
 }
 
 export function validarRegrasDfcIndireto(regras: RegraDfcIndireto[]): string | null {
@@ -527,8 +657,10 @@ export function calcularConta(
   demonstracao: TipoDemonstracao,
   periodos: Array<ContasBalancete | null>,
   incompletas = identificarContasIncompletas(periodos),
+  opcoes: { contasPorPrefixo?: boolean; saldoInvertido?: boolean } = {},
 ): number | null {
-  if (!periodos.length || periodos.some(periodo => periodo === null) || incompletas.has(item.referencia)) return null;
+  if (!periodos.length || periodos.some(periodo => periodo === null)
+    || (!opcoes.contasPorPrefixo && incompletas.has(item.referencia))) return null;
   if (demonstracao === 'dfc') {
     const movimento = periodos.reduce((total, periodo) => {
       const conta = periodo?.[item.referencia];
@@ -538,13 +670,50 @@ export function calcularConta(
   }
   let valor = 0;
   for (const periodo of periodos) {
-    const conta = periodo?.[item.referencia];
-    if (!conta) continue;
-    valor += demonstracao === 'dre' ? conta.valCred - conta.valDeb : conta.saldoAtual;
+    if (opcoes.contasPorPrefixo) {
+      for (const conta of Object.values(periodo ?? {})) {
+        if (incompletas.has(conta.conta) || !(conta.conta === item.referencia || conta.conta.startsWith(`${item.referencia}.`))) continue;
+        valor += opcoes.saldoInvertido ? -conta.saldoAtual : Math.abs(conta.saldoAtual);
+      }
+    } else {
+      const conta = periodo?.[item.referencia];
+      if (!conta) continue;
+      valor += demonstracao === 'dre' ? conta.valCred - conta.valDeb : conta.saldoAtual;
+    }
   }
-  return demonstracao === 'dre'
-    ? Math.round(valor * 100) / 100
+  if (demonstracao === 'dre') return Math.round(valor * 100) / 100;
+  return opcoes.saldoInvertido
+    ? Math.round(valor * 100) * item.operacao / 100
     : Math.round(Math.abs(valor) * 100) * item.operacao / 100;
+}
+
+export function listarContasDaLinha(
+  linha: LinhaDemonstracao,
+  periodos: Array<ContasBalancete | null>,
+): Array<{ item: ItemDemonstracao; conta: ContaBalancete }> {
+  const incompletas = identificarContasIncompletas(periodos);
+  const contas = new Map<string, { item: ItemDemonstracao; conta: ContaBalancete }>();
+  for (const periodo of periodos) {
+    for (const item of linha.itens) {
+      const correspondentes = linha.contasPorPrefixo
+        ? Object.values(periodo ?? {}).filter(conta => conta.conta === item.referencia
+          || conta.conta.startsWith(`${item.referencia}.`))
+        : [periodo?.[item.referencia]].filter((conta): conta is ContaBalancete => Boolean(conta));
+      for (const conta of correspondentes) {
+        if (!incompletas.has(conta.conta)) contas.set(conta.conta, { item, conta });
+      }
+    }
+  }
+  return [...contas.values()].sort((a, b) => a.conta.conta.localeCompare(b.conta.conta, 'pt-BR', { numeric: true }));
+}
+
+function calcularResultadoBalancete(periodos: Array<ContasBalancete | null>): number | null {
+  if (!periodos.length || periodos.some(periodo => periodo === null)) return null;
+  const incompletas = identificarContasIncompletas(periodos);
+  const centavos = periodos.reduce((total, periodo) => total + Object.values(periodo ?? {})
+    .filter(conta => ['3', '4', '5', '6'].includes(conta.conta.split('.')[0]) && !incompletas.has(conta.conta))
+    .reduce((subtotal, conta) => subtotal + Math.round(conta.saldoAtual * 100), 0), 0);
+  return -centavos / 100;
 }
 
 interface ContasDfcDistribuidas {
@@ -885,6 +1054,11 @@ export function calcularLinhas(
   const resultado = new Map<string, number | null>();
   function calcular(linha: LinhaDemonstracao): number | null {
     if (resultado.has(linha.id)) return resultado.get(linha.id) ?? null;
+    if (linha.calculo === 'resultadoBalancete') {
+      const valor = calcularResultadoBalancete(periodos);
+      resultado.set(linha.id, valor);
+      return valor;
+    }
     let total = 0;
     let disponivel = periodos.length > 0 && periodos.every(periodo => periodo !== null);
     for (const item of linha.itens) {
@@ -894,7 +1068,10 @@ export function calcularLinhas(
         if (valor === null || valor === undefined) disponivel = false;
         else total += Math.round(valor * 100) * (demonstracao === 'dre' ? 1 : item.operacao);
       } else {
-        const valor = calcularConta(item, demonstracao, periodos, incompletas);
+        const valor = calcularConta(item, demonstracao, periodos, incompletas, {
+          contasPorPrefixo: linha.contasPorPrefixo,
+          saldoInvertido: linha.saldoInvertido,
+        });
         if (valor === null) disponivel = false;
         else total += Math.round(valor * 100);
       }

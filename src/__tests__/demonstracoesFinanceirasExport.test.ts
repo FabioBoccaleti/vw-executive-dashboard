@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
 import {
-  aplicarModeloDfcPadrao, cadastroVazio, chavePeriodo,
+  aplicarModeloBalancoSorana, aplicarModeloDfcPadrao, cadastroVazio, chavePeriodo,
   type DadosDemonstracoes, type LinhaDemonstracao,
 } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { criarWorkbookDemonstracoesFinanceiras } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/exportacaoExcel';
@@ -155,5 +155,72 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     expect(dfcDireto.getCell(inicioCaixa, 4).value).toBe(100);
 
     expect(reopened.getWorksheet('DFC Indireto')!.getColumn(1).values).toContain('Resultado líquido do período (lucro + / prejuízo –)');
+  });
+
+  it('exporta a composição do PL e as diferenças das duas conferências do balanço', () => {
+    const base = aplicarModeloDfcPadrao(cadastroVazio());
+    const cadastro = aplicarModeloBalancoSorana({
+      ...base,
+      empresa: { nome: 'Empresa Exemplo LTDA', cnpj: '00.000.000/0001-00', nire: '' },
+      linhas: [
+        ...base.linhas,
+        { id: 'ativo-total', nome: 'Ativo', demonstracao: 'ativo', tipo: 'total', itens: [
+          { referencia: 'ativo-caixa', operacao: 1 }, { referencia: 'ativo-depreciacao', operacao: 1 },
+        ] },
+        { id: 'ativo-caixa', nome: 'Caixa', demonstracao: 'ativo', tipo: 'contas', sublinhaDe: 'ativo-total', itens: [
+          { referencia: '1.1.1.01', operacao: 1 },
+        ] },
+        { id: 'ativo-depreciacao', nome: 'Depreciação acumulada', demonstracao: 'ativo', tipo: 'contas', sublinhaDe: 'ativo-total', itens: [
+          { referencia: '1.5.5.02.01.001', operacao: 1 },
+        ] },
+        { id: 'passivo-total', nome: 'Passivo', demonstracao: 'passivo', tipo: 'total', itens: [
+          { referencia: 'passivo-nao-circulante', operacao: 1 },
+        ] },
+        { id: 'passivo-nao-circulante', nome: 'Passivo Não Circulante', demonstracao: 'passivo', tipo: 'contas', sublinhaDe: 'passivo-total', itens: [
+          { referencia: '2.1.1', operacao: 1 }, { referencia: '2.3.1.01.01.001', operacao: 1 },
+        ] },
+        { id: 'dre-receita', nome: 'Receita', demonstracao: 'dre', tipo: 'contas', itens: [
+          { referencia: '3.1.1', operacao: 1 },
+        ] },
+        { id: 'dre-custo', nome: 'Custos', demonstracao: 'dre', tipo: 'contas', itens: [
+          { referencia: '4.1.1', operacao: 1 },
+        ] },
+        { id: 'dre-lucro', nome: 'LUCRO LÍQUIDO DO EXERCÍCIO', demonstracao: 'dre', tipo: 'total', itens: [
+          { referencia: 'dre-receita', operacao: 1 }, { referencia: 'dre-custo', operacao: 1 },
+        ] },
+      ],
+    });
+    const criarBalancete = (mes: number) => extractAccounts([
+      'A;1.1.1.01;Caixa;0;0;0;1000',
+      'A;1.5.5.02.01.001;Depreciação acumulada;0;0;0;10',
+      'P;2.1.1;Passivo;0;0;0;-100',
+      `P;2.3.1;Capital social totalizador;0;0;0;${mes === 1 ? -810 : -740}`,
+      `P;2.3.1.01.01.001;Capital social;0;0;0;${mes === 1 ? -810 : -740}`,
+      `R;3.1.1;Receita;0;0;100;${mes === 1 ? -100 : -200}`,
+      `D;4.1.1;Custo;0;20;0;${mes === 1 ? 20 : 40}`,
+      `D;5.1.1;Despesa não classificada;0;${mes === 1 ? 0 : 10};0;${mes === 1 ? 0 : 10}`,
+    ].join('\n'), { strict: true });
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro,
+      dados: {
+        [chavePeriodo({ ano: 2026, mes: 1 })]: criarBalancete(1),
+        [chavePeriodo({ ano: 2026, mes: 2 })]: criarBalancete(2),
+      },
+      anos: [2026],
+      mesLimite: 2,
+      incluirNotasAnuais: false,
+      notas: [],
+    });
+    const passivo = workbook.getWorksheet('Passivo + PL')!;
+    const colunaNomes = passivo.getColumn(1).values;
+    const linhaCapital = colunaNomes.indexOf('Capital Social');
+    const linhaBalanco = colunaNomes.indexOf('Ativo – (Passivo + PL)');
+    const linhaResultado = colunaNomes.indexOf('Resultado do balancete – Lucro líquido da DRE');
+    const linhaSemDre = colunaNomes.indexOf('5.1.1 — Despesa não classificada');
+
+    expect([passivo.getCell(linhaCapital, 2).value, passivo.getCell(linhaCapital, 3).value]).toEqual([810, 740]);
+    expect([passivo.getCell(linhaBalanco, 2).value, passivo.getCell(linhaBalanco, 3).value]).toEqual([0, 0]);
+    expect([passivo.getCell(linhaResultado, 2).value, passivo.getCell(linhaResultado, 3).value]).toEqual([0, -10]);
+    expect(passivo.getCell(linhaSemDre, 3).value).toBe(-10);
   });
 });

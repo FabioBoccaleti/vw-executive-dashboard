@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
-import { aplicarModeloDfcPadrao, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasDfcPendentes, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import { aplicarModeloBalancoSorana, aplicarModeloDfcPadrao, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, cadastroVazio, identificarContasDfcNaoMapeadas, identificarContasDfcPendentes, identificarContasIncompletas, identificarContasNaoClassificadas, listarContasDaLinha, listarContasDfcDaLinha, validarContasCompletas, validarLinhas, type LinhaDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 
 const grupo = (id: string, conta: string, operacao: 1 | -1 = 1): LinhaDemonstracao => ({
   id, nome: id, demonstracao: 'dre', tipo: 'contas', itens: [{ referencia: conta, operacao }],
@@ -61,6 +61,53 @@ describe('Demonstrações financeiras — cálculo e integridade', () => {
     const anterior = extractAccounts('A;1.1;Caixa;90,00;80,00;20,00;150,00', { strict: true });
     expect(calcularLinhas([linha], 'ativo', [atual]).get('Caixa')).toBe(160);
     expect(calcularLinhas([linha], 'ativo', [anterior]).get('Caixa')).toBe(150);
+  });
+
+  it('migra redutoras para sinal negativo e separa o PL com prefixos e resultado do balancete', () => {
+    const linhas: LinhaDemonstracao[] = [
+      { ...grupo('Depreciação acumulada', '1.5.5.02.01.001'), demonstracao: 'ativo' },
+      { ...grupo('Amortização acumulada', '1.5.5.02.02.001'), demonstracao: 'ativo' },
+      {
+        id: 'passivo-nao-circulante', nome: 'Passivo Não Circulante', demonstracao: 'passivo', tipo: 'contas',
+        itens: ['2.2.1', '2.3.1.01.01.001', '2.3.2.01.01.001'].map(referencia => ({ referencia, operacao: 1 })),
+      },
+    ];
+    const cadastro = aplicarModeloBalancoSorana({ ...cadastroVazio(), linhas });
+    const contas = extractAccounts([
+      'A;1.5.5.02.01.001;Depreciação acumulada;0;0;0;20',
+      'A;1.5.5.02.02.001;Amortização acumulada;0;0;0;5',
+      'P;2.2.1;Passivo;0;0;0;-30',
+      'P;2.3.1;Capital social totalizador;0;0;0;-100',
+      'P;2.3.1.01.01.001;Capital social;0;0;0;-100',
+      'P;2.3.2.01.01.001;Reserva de capital;0;0;0;-20',
+      'P;2.3.2.02.01.001;Reserva de lucros 1;0;0;0;-30',
+      'P;2.3.2.03.01.001;Reserva de lucros 2;0;0;0;-10',
+      'P;2.3.3.01.01.001;Lucros acumulados;0;0;0;-50',
+      'P;2.3.3.02.01.001;Prejuízos acumulados;0;0;0;10',
+      'R;3.1.1;Receita;0;0;150;-150',
+      'D;4.1.1;Custo;0;40;0;40',
+      'D;5.1.1;Despesa;0;10;0;10',
+      'D;6.1.1;Imposto;0;5;0;5',
+    ].join('\n'), { strict: true });
+
+    expect(validarLinhas(cadastro.linhas)).toBeNull();
+    expect(cadastro.linhas.find(linha => linha.id === 'passivo-nao-circulante')?.itens.map(item => item.referencia)).toEqual(['2.2.1']);
+    expect(cadastro.linhas.find(linha => linha.nome === 'Depreciação acumulada')?.itens[0].operacao).toBe(-1);
+    expect(cadastro.linhas.find(linha => linha.nome === 'Amortização acumulada')?.itens[0].operacao).toBe(-1);
+    const ativo = calcularLinhas(cadastro.linhas, 'ativo', [contas]);
+    expect(ativo.get('Depreciação acumulada')).toBe(-20);
+    expect(ativo.get('Amortização acumulada')).toBe(-5);
+
+    const passivo = calcularLinhas(cadastro.linhas, 'passivo', [contas]);
+    expect(passivo.get('passivo-pl-capital')).toBe(100);
+    expect(passivo.get('passivo-pl-reservas-capital')).toBe(20);
+    expect(passivo.get('passivo-pl-reservas-lucros')).toBe(40);
+    expect(passivo.get('passivo-pl-lucros-acumulados')).toBe(40);
+    expect(passivo.get('passivo-resultado-periodo')).toBe(95);
+    expect(passivo.get('passivo-pl')).toBe(295);
+    expect(listarContasDaLinha(cadastro.linhas.find(linha => linha.id === 'passivo-pl-capital')!, [contas]).map(({ conta }) => conta.conta))
+      .toEqual(['2.3.1.01.01.001']);
+    expect(aplicarModeloBalancoSorana(cadastro)).toBe(cadastro);
   });
 
   it('calcula DFC Direto mensal e acumulado pelo movimento Crédito − Débito', () => {

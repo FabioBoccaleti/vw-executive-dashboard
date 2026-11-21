@@ -1,8 +1,8 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import {
-  DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO, MESES, calcularConta, calcularDfcIndireto, calcularLinhas,
-  calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, identificarContasIncompletas, linhaPai,
+  DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID, MESES, calcularConta, calcularDfcIndireto, calcularLinhas,
+  calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasIncompletas, identificarContasNaoClassificadas, linhaPai, listarContasDaLinha,
   type CadastroDemonstracoes, type DadosDemonstracoes, type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
 import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
@@ -223,6 +223,66 @@ function linhasTabela(cadastro: CadastroDemonstracoes, demonstracao: TipoDemonst
   });
 }
 
+function totalizarRaizes(linhas: LinhaDemonstracao[], valores: Map<string, number | null>, excluidas = new Set<string>()) {
+  const raizes = linhas.filter(linha => !linhaPai(linha) && !excluidas.has(linha.id));
+  const totalizadas = new Set(raizes.filter(linha => linha.tipo === 'total')
+    .flatMap(linha => linha.itens.map(item => item.referencia)));
+  const raizesFinais = raizes.filter(linha => !totalizadas.has(linha.id));
+  if (!raizesFinais.length) return null;
+  const valoresRaizes = raizesFinais.map(linha => valores.get(linha.id));
+  const valoresNumericos = valoresRaizes.filter((valor): valor is number => valor !== null && valor !== undefined);
+  if (valoresNumericos.length !== raizesFinais.length) return null;
+  return valoresNumericos.reduce((total, valor) => total + Math.round(valor * 100), 0) / 100;
+}
+
+function adicionarConferenciasBalanco(
+  ws: ExcelJS.Worksheet,
+  cadastro: CadastroDemonstracoes,
+  dados: DadosDemonstracoes,
+  colunas: ColunaExportacao[],
+  resultadosPassivo: Array<Map<string, number | null>>,
+) {
+  const linhasAtivo = cadastro.linhas.filter(linha => linha.demonstracao === 'ativo');
+  const linhasPassivo = cadastro.linhas.filter(linha => linha.demonstracao === 'passivo');
+  const linhaLucroDre = encontrarLinhaDrePorNomes(cadastro.linhas, ['LUCRO LÍQUIDO DO EXERCÍCIO']);
+  const periodosDre = colunas.map(coluna => Array.from({ length: coluna.mes }, (_, index) =>
+    dados[chavePeriodo({ ano: coluna.ano, mes: index + 1 })] ?? null));
+  const ativos = colunas.map(coluna =>
+    calcularLinhas(cadastro.linhas, 'ativo', periodosDaColuna(dados, coluna)));
+  const valoresBalanco = colunas.map((_, index) => {
+    const totalAtivo = totalizarRaizes(linhasAtivo, ativos[index]);
+    const totalPassivo = totalizarRaizes(linhasPassivo, resultadosPassivo[index], new Set([LINHA_PL_ID]));
+    const patrimonioLiquido = resultadosPassivo[index].get(LINHA_PL_ID);
+    return totalAtivo === null || totalPassivo === null || patrimonioLiquido === null || patrimonioLiquido === undefined
+      ? null
+      : Math.round((totalAtivo - totalPassivo - patrimonioLiquido) * 100) / 100;
+  });
+  const valoresResultado = colunas.map((_, index) => {
+    const resultadoBalancete = resultadosPassivo[index].get(LINHA_RESULTADO_PERIODO_ID);
+    const lucroDre = linhaLucroDre
+      ? calcularLinhas(cadastro.linhas, 'dre', periodosDre[index]).get(linhaLucroDre.id) ?? null
+      : null;
+    return resultadoBalancete === null || resultadoBalancete === undefined || lucroDre === null
+      ? null
+      : Math.round((resultadoBalancete - lucroDre) * 100) / 100;
+  });
+
+  adicionarSecao(ws, 'Conferências do balanço', colunas.length + 1);
+  adicionarLinhaDados(ws, 'Ativo – (Passivo + PL)', valoresBalanco, 'total');
+  adicionarLinhaDados(ws, 'Resultado do balancete – Lucro líquido da DRE', valoresResultado, 'total');
+  if (!linhaLucroDre) {
+    adicionarLinhaDados(ws, 'DRE: cadastre a linha “LUCRO LÍQUIDO DO EXERCÍCIO” para conferir o resultado.', colunas.map(() => null));
+  }
+
+  const contasSemDre = identificarContasNaoClassificadas(cadastro.linhas, periodosDre);
+  if (contasSemDre.length > 0) {
+    adicionarSecao(ws, 'Contas de resultado sem linha na DRE', colunas.length + 1);
+    for (const conta of contasSemDre) {
+      adicionarLinhaDados(ws, `${conta.conta} — ${conta.desc}`, conta.valores);
+    }
+  }
+}
+
 function adicionarDemonstracao(
   ws: ExcelJS.Worksheet,
   cadastro: CadastroDemonstracoes,
@@ -255,6 +315,9 @@ function adicionarDemonstracao(
       ws, linha.nome, valores, linha.estilo, linha.recuo,
       colunasPlanilha.map(({ tipo }) => tipo),
     );
+  }
+  if (demonstracao === 'passivo') {
+    adicionarConferenciasBalanco(ws, cadastro, dados, colunas, resultados);
   }
   return resultados;
 }
@@ -292,11 +355,18 @@ function adicionarAberturaDemonstracao(
       item.id === linhaExportacao.id && item.demonstracao === demonstracao && item.tipo === 'contas');
     if (!linha) continue;
 
-    for (const item of linha.itens) {
+    const itens = linha.contasPorPrefixo
+      ? listarContasDaLinha(linha, periodosPorColuna.flat()).map(({ item, conta }) => ({
+        item: { referencia: conta.conta, operacao: item.operacao },
+        descricao: conta.desc,
+      }))
+      : linha.itens.map(item => ({ item, descricao: descricoes.get(item.referencia) ?? '' }));
+    for (const { item, descricao } of itens) {
       const valores = periodosPorColuna.map((periodos, indice) =>
-        calcularConta(item, demonstracao, periodos, incompletasPorColuna[indice]));
+        calcularConta(item, demonstracao, periodos, incompletasPorColuna[indice], {
+          saldoInvertido: linha.saldoInvertido,
+        }));
       if (valores.every(valor => valor !== null && valor === 0)) continue;
-      const descricao = descricoes.get(item.referencia);
       adicionarLinhaDados(
         ws,
         descricao ? `${item.referencia} — ${descricao}` : item.referencia,

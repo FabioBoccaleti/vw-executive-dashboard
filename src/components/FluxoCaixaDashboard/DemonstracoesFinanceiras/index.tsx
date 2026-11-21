@@ -10,7 +10,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  TIPOS, MESES, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarCadastro, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, encontrarLinhaBasePercentualDre, identificarContasNaoClassificadas, listarContasDfcDaLinha, identificarContasDfcPendentes,
+  TIPOS, MESES, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarCadastro, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasNaoClassificadas, listarContasDaLinha, listarContasDfcDaLinha, identificarContasDfcPendentes,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type ContaDfcPendente, type LinhaDemonstracao, type PeriodoDemonstracao, type RegraDfcIndireto, type TipoDemonstracao,
 } from './modelo';
@@ -27,6 +27,17 @@ const percentual = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, ma
 const formatarMoedaComCentavos = (valor: number | null) => valor === null
   ? '—'
   : valor < 0 ? `(${moedaComCentavos.format(Math.abs(valor))})` : moedaComCentavos.format(valor);
+function totalizarRaizes(linhas: LinhaDemonstracao[], valores: Map<string, number | null>, excluidas = new Set<string>()) {
+  const raizes = linhas.filter(linha => !linhaPai(linha) && !excluidas.has(linha.id));
+  const totalizadas = new Set(raizes.filter(linha => linha.tipo === 'total')
+    .flatMap(linha => linha.itens.map(item => item.referencia)));
+  const raizesFinais = raizes.filter(linha => !totalizadas.has(linha.id));
+  if (!raizesFinais.length) return null;
+  const valoresRaizes = raizesFinais.map(linha => valores.get(linha.id));
+  const valoresNumericos = valoresRaizes.filter((valor): valor is number => valor !== null && valor !== undefined);
+  if (valoresNumericos.length !== raizesFinais.length) return null;
+  return valoresNumericos.reduce((total, valor) => total + Math.round(valor * 100), 0) / 100;
+}
 const titulosDemonstracoes: Record<TipoDemonstracao, string> = {
   dre: 'Demonstração do Resultado do Exercício',
   ativo: 'Balanço Patrimonial — Ativo',
@@ -107,7 +118,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [tipoCadastro, setTipoCadastro] = useState<TipoDemonstracao>('dre');
   const [cadastrosExpandidos, setCadastrosExpandidos] = useState<Set<string>>(new Set());
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(new Set());
-  const escopoDados = aba === 'cadastros' ? 'cadastros' : aba === 'dre' || aba === 'dfc' ? aba : 'patrimonial';
+  const escopoDados = aba === 'cadastros' ? 'cadastros'
+    : aba === 'dre' || aba === 'dfc' ? aba
+      : aba === 'passivo' ? 'balanco' : 'patrimonial';
   const periodosComparados = useMemo(
     () => (anosComparados ?? [selectedYear]).map(ano => ({ ano, mes: selectedMonth })),
     [anosComparados, selectedYear, selectedMonth],
@@ -592,13 +605,63 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const valores = aba !== 'cadastros' && cadastro && dados
     ? colunas.map(coluna => calcularLinhas(cadastro.linhas, aba, coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null)))
     : [];
+  const linhaLucroDre = cadastro
+    ? encontrarLinhaDrePorNomes(cadastro.linhas, ['LUCRO LÍQUIDO DO EXERCÍCIO'])
+    : undefined;
+  const periodosDreAcumulados = aba === 'passivo' && dados
+    ? colunas.map(coluna => {
+      const periodo = coluna.periodos[0];
+      if (periodo.mes === 0) return [dados[chavePeriodo(periodo)] ?? null];
+      return Array.from({ length: periodo.mes }, (_, index) =>
+        dados[chavePeriodo({ ano: periodo.ano, mes: index + 1 })] ?? null);
+    })
+    : [];
+  const periodosDreFaltantes = [...new Set(periodosDreAcumulados.flatMap((periodos, index) =>
+    periodos.flatMap((contas, mes) => contas === null
+      ? [colunas[index].periodos[0].mes === 0
+        ? `Ano/${colunas[index].periodos[0].ano}`
+        : `${MESES[mes + 1]}/${colunas[index].periodos[0].ano}`]
+      : [])))];
+  const contasResultadoSemDre = aba === 'passivo' && cadastro
+    ? identificarContasNaoClassificadas(cadastro.linhas, periodosDreAcumulados)
+    : [];
+  const conferenciasBalanco = aba === 'passivo' && cadastro && dados
+    ? colunas.map((coluna, index) => {
+      const periodosColuna = coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null);
+      const valoresAtivo = calcularLinhas(cadastro.linhas, 'ativo', periodosColuna);
+      const totalAtivo = totalizarRaizes(cadastro.linhas.filter(linha => linha.demonstracao === 'ativo'), valoresAtivo);
+      const valoresPassivo = valores[index];
+      const totalPassivo = valoresPassivo
+        ? totalizarRaizes(
+          cadastro.linhas.filter(linha => linha.demonstracao === 'passivo'),
+          valoresPassivo,
+          new Set([LINHA_PL_ID]),
+        )
+        : null;
+      const patrimonioLiquido = valoresPassivo?.get(LINHA_PL_ID) ?? null;
+      const resultadoBalancete = valoresPassivo?.get(LINHA_RESULTADO_PERIODO_ID) ?? null;
+      const periodosDre = periodosDreAcumulados[index] ?? [];
+      const lucroDre = linhaLucroDre
+        ? calcularLinhas(cadastro.linhas, 'dre', periodosDre).get(linhaLucroDre.id) ?? null
+        : null;
+      return {
+        balanco: totalAtivo === null || totalPassivo === null || patrimonioLiquido === null
+          ? null
+          : Math.round((totalAtivo - totalPassivo - patrimonioLiquido) * 100) / 100,
+        resultado: resultadoBalancete === null || lucroDre === null
+          ? null
+          : Math.round((resultadoBalancete - lucroDre) * 100) / 100,
+      };
+    })
+    : [];
   const detalhesColunas = dados ? colunas.map(coluna => {
     const periodos = coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null);
     return { periodos, incompletas: identificarContasIncompletas(periodos) };
   }) : [];
   const faltantes = [...new Map(colunas.flatMap(coluna => coluna.periodos).filter(periodo => dados && !dados[chavePeriodo(periodo)]).map(periodo => [chavePeriodo(periodo), periodo])).values()];
   const contasAusentes = aba !== 'cadastros' && aba !== 'dfc' && dados
-    ? [...new Set(linhas.filter(linha => linha.tipo === 'contas').flatMap(linha => linha.itens.map(item => item.referencia)))]
+    ? [...new Set(linhas.filter(linha => linha.tipo === 'contas' && !linha.contasPorPrefixo)
+      .flatMap(linha => linha.itens.map(item => item.referencia)))]
       .filter(codigo => colunas.some(coluna => coluna.periodos.some(periodo => dados[chavePeriodo(periodo)] && !dados[chavePeriodo(periodo)]?.[codigo])))
     : [];
   const contasNaoClassificadas = aba === 'dre' && cadastro && dados
@@ -632,7 +695,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
           : Math.round(atividades.reduce<number>((total, valor) => total + Math.round((valor ?? 0) * 100), 0)) / 100;
       })
     : [];
-  const contasIncompletasVinculadas = linhas.filter(linha => aba !== 'dfc' && linha.tipo === 'contas')
+  const contasIncompletasVinculadas = linhas.filter(linha => aba !== 'dfc' && linha.tipo === 'contas' && !linha.contasPorPrefixo)
     .flatMap(linha => linha.itens).filter(item => contasIncompletas.has(item.referencia));
   const linhasDisponiveisEditor = editor && cadastro
     ? cadastro.linhas.filter(item => item.id !== editor.id && item.demonstracao === editor.demonstracao && !linhaPai(item))
@@ -822,20 +885,30 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                       const expandido = cadastrosExpandidos.has(linha.id);
                       return <div key={linha.id} className="rounded border p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div><p className="font-medium">{linha.nome}{linha.foraDfc ? ' · Fora da DFC' : ''}</p><p className="text-xs text-muted-foreground">{filhas.length ? `${linha.itens.length} ${linha.demonstracao === 'endividamento' ? 'bancos ou dívidas' : 'sublinhas'}` : `${linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · ${linha.itens.length} itens`}</p></div>
+                          <div><p className="font-medium">{linha.nome}{linha.foraDfc ? ' · Fora da DFC' : ''}</p><p className="text-xs text-muted-foreground">{linha.calculo === 'resultadoBalancete'
+                            ? 'Calculado pelo saldo das contas dos grupos 3, 4, 5 e 6'
+                            : filhas.length ? `${linha.itens.length} ${linha.demonstracao === 'endividamento' ? 'bancos ou dívidas' : 'sublinhas'}` : `${linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · ${linha.itens.length} itens`}</p></div>
                           <div className="flex flex-wrap gap-1">
                             {podeExpandir && <Button variant="outline" size="sm" aria-expanded={expandido} onClick={() => alternarExpandido(linha.id, setCadastrosExpandidos)}>{expandido ? 'Ocultar' : 'Exibir'} contas de {linha.nome}</Button>}
-                            <Button variant="outline" size="sm" aria-label={`Subir ${linha.nome}`} disabled={index === 0} onClick={() => moverLinha(linha.id, -1)}>↑</Button>
-                            <Button variant="outline" size="sm" aria-label={`Descer ${linha.nome}`} disabled={index === lista.length - 1} onClick={() => moverLinha(linha.id, 1)}>↓</Button>
-                            <Button variant="outline" size="sm" onClick={() => abrirEditor(linha)}>Editar {linha.nome}</Button>
-                            <Button variant="outline" size="sm" onClick={() => atualizarLinhas(cadastro.linhas.filter(item => item.id !== linha.id && linhaPai(item) !== linha.id))}>Excluir {linha.nome}</Button>
+                            {!linha.modeloProtegido && <>
+                              <Button variant="outline" size="sm" aria-label={`Subir ${linha.nome}`} disabled={index === 0} onClick={() => moverLinha(linha.id, -1)}>↑</Button>
+                              <Button variant="outline" size="sm" aria-label={`Descer ${linha.nome}`} disabled={index === lista.length - 1} onClick={() => moverLinha(linha.id, 1)}>↓</Button>
+                              <Button variant="outline" size="sm" onClick={() => abrirEditor(linha)}>Editar {linha.nome}</Button>
+                              <Button variant="outline" size="sm" onClick={() => atualizarLinhas(cadastro.linhas.filter(item => item.id !== linha.id && linhaPai(item) !== linha.id))}>Excluir {linha.nome}</Button>
+                            </>}
                           </div>
                         </div>
                         {podeExpandir && expandido && <div className="mt-3 space-y-3 border-t pt-3 text-sm">
                           {(filhas.length ? filhas : [linha]).map(grupo => <div key={grupo.id}>
                             {filhas.length > 0 && <p className="font-medium">{grupo.nome}</p>}
                             <ul className="space-y-1 pl-4 text-muted-foreground">
-                              {grupo.itens.map(item => <li key={item.referencia}>{descricaoConta(item)}</li>)}
+                              {grupo.calculo === 'resultadoBalancete'
+                                ? <li>− saldo atual das contas analíticas dos grupos 3, 4, 5 e 6</li>
+                                : grupo.contasPorPrefixo && dados
+                                  ? (listarContasDaLinha(grupo, periodosDetalhamento).length > 0
+                                    ? listarContasDaLinha(grupo, periodosDetalhamento).map(({ conta }) => <li key={conta.conta}>{conta.conta} — {conta.desc}</li>)
+                                    : grupo.itens.map(item => <li key={item.referencia}>{descricaoConta(item)}</li>))
+                                  : grupo.itens.map(item => <li key={item.referencia}>{descricaoConta(item)}</li>)}
                             </ul>
                           </div>)}
                         </div>}
@@ -990,9 +1063,22 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                       <tbody>
                         {linhasTabela.map(({ linha, subtotal }) => {
                           const ocultarValor = aba === 'dfc' && Boolean(linha.dfcSubtotalNome) && !subtotal;
+                          const contasPrefixadas = linha.contasPorPrefixo && dados
+                            ? listarContasDaLinha(linha, detalhesColunas.flatMap(detalhe => detalhe.periodos))
+                            : [];
+                          const itensDetalhe = contasPrefixadas.length > 0
+                            ? contasPrefixadas.map(({ item, conta }) => ({
+                              referencia: conta.conta,
+                              operacao: item.operacao,
+                              descricao: conta.desc,
+                            }))
+                            : linha.itens.map(item => ({
+                              ...item,
+                              descricao: descricoes.get(item.referencia) ?? 'Descrição indisponível no balancete carregado',
+                            }));
                           return <Fragment key={subtotal ? `${linha.id}-subtotal` : linha.id}><tr className={subtotal ? 'border-y bg-muted/60 font-bold' : linha.tipo === 'total' ? 'border-y bg-muted/40 font-semibold' : 'border-b'}>
                             <th scope="row" aria-label={subtotal ? linha.dfcSubtotalNome ?? linha.nome : linha.nome} className={`p-3 text-left font-inherit ${linhaPai(linha) ? 'pl-8' : ''}`}>
-                              {linha.tipo === 'contas' && <button type="button" className="mr-2 inline-flex rounded p-1 hover:bg-muted focus-visible:outline focus-visible:outline-2"
+                              {linha.tipo === 'contas' && !linha.calculo && <button type="button" className="mr-2 inline-flex rounded p-1 hover:bg-muted focus-visible:outline focus-visible:outline-2"
                                 aria-label={`${gruposExpandidos.has(linha.id) ? 'Ocultar' : 'Exibir'} contas de ${linha.nome}`}
                                 aria-expanded={gruposExpandidos.has(linha.id)} onClick={() => alternarExpandido(linha.id, setGruposExpandidos)}>
                                 {gruposExpandidos.has(linha.id) ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
@@ -1033,11 +1119,17 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                               </td>;
                             })}
                           </tr>
-                          {linha.tipo === 'contas' && !subtotal && gruposExpandidos.has(linha.id) && (aba === 'dfc' ? contasDfcPorLinha.get(linha.id) ?? [] : linha.itens).map(item => <tr key={item.referencia} className="border-b bg-muted/20">
-                            <th scope="row" className={`p-3 text-left font-normal text-muted-foreground ${linhaPai(linha) ? 'pl-16' : 'pl-12'}`}>{descricaoConta(item)}</th>
+                          {linha.tipo === 'contas' && !linha.calculo && !subtotal && gruposExpandidos.has(linha.id) && (aba === 'dfc'
+                            ? contasDfcPorLinha.get(linha.id) ?? []
+                            : itensDetalhe).map(item => <tr key={item.referencia} className="border-b bg-muted/20">
+                            <th scope="row" className={`p-3 text-left font-normal text-muted-foreground ${linhaPai(linha) ? 'pl-16' : 'pl-12'}`}>
+                              {aba === 'dfc' ? descricaoConta(item) : `${item.referencia} — ${'descricao' in item ? item.descricao : ''}`}
+                            </th>
                             {colunas.map((_, index) => {
                               const detalhe = detalhesColunas[index];
-                              const valor = detalhe ? calcularConta(item, aba, detalhe.periodos, detalhe.incompletas) : null;
+                              const valor = detalhe ? calcularConta(item, aba, detalhe.periodos, detalhe.incompletas, {
+                                saldoInvertido: linha.saldoInvertido,
+                              }) : null;
                               return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>;
                             })}
                           </tr>)}
@@ -1048,6 +1140,36 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
                     </table>
                   </div>
                 )}
+                {aba === 'passivo' && cadastro && dados && <section aria-label="Conferências do balanço" className="space-y-3 rounded border p-3">
+                  <div>
+                    <h3 className="font-semibold">Conferências do balanço</h3>
+                    <p className="text-sm text-muted-foreground">O resultado do período integra o Patrimônio Líquido. A conferência da DRE compara o resultado do balancete com o lucro líquido acumulado desde janeiro.</p>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {[
+                      { nome: 'Ativo – (Passivo + PL)', campo: 'balanco' as const },
+                      { nome: 'Resultado do balancete – Lucro líquido da DRE', campo: 'resultado' as const },
+                    ].map(conferencia => <div key={conferencia.campo} className="flex flex-wrap items-center justify-between gap-2 border-b py-2">
+                      <span className="font-medium">{conferencia.nome}</span>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
+                        {colunas.map((coluna, index) => <span key={index}>{coluna.titulo}: {formatarMoedaComCentavos(conferenciasBalanco[index]?.[conferencia.campo] ?? null)}</span>)}
+                      </div>
+                    </div>)}
+                  </div>
+                  {!linhaLucroDre && <p role="alert" className="text-sm text-amber-800">Não foi encontrada uma linha principal da DRE chamada “LUCRO LÍQUIDO DO EXERCÍCIO”. Cadastre essa linha para habilitar a conferência do resultado.</p>}
+                  {periodosDreFaltantes.length > 0 && <p role="status" className="text-sm text-amber-800">A conferência da DRE aguarda balancetes de: {periodosDreFaltantes.join(', ')}.</p>}
+                  {contasResultadoSemDre.length > 0 && <details className="rounded border border-amber-300 p-3">
+                    <summary className="cursor-pointer text-sm font-medium">Contas de resultado sem linha na DRE ({contasResultadoSemDre.length})</summary>
+                    <ul className="mt-3 space-y-2 text-sm">
+                      {contasResultadoSemDre.map(conta => <li key={conta.conta} className="border-b pb-2">
+                        <span className="font-medium">{conta.conta} — {conta.desc}</span>
+                        <div className="flex flex-wrap gap-x-4 text-muted-foreground tabular-nums">
+                          {conta.valores.map((valor, index) => <span key={index}>{colunas[index].titulo}: {formatarMoedaComCentavos(valor)}</span>)}
+                        </div>
+                      </li>)}
+                    </ul>
+                  </details>}
+                </section>}
                 {aba === 'dfc' && cadastro && dados && <section aria-label="Caixa e equivalentes" className="space-y-3 rounded border p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>

@@ -98,6 +98,23 @@ demonstração. Totalizações usam linhas da própria demonstração, sem dupla
 contagem. **Salvar cadastro** persiste as configurações e detecta alterações
 concorrentes.
 
+O cadastro do balanço migra o **Patrimônio Líquido** para um grupo próprio,
+separado do Passivo Não Circulante. O modelo Sorana agrupa Capital Social
+(`2.3.1`), Reservas de Capital (`2.3.2.01`), Reservas de Lucros
+(`2.3.2.02` e `2.3.2.03`) e Lucros (Prejuízos) Acumulados (`2.3.3`), invertendo
+o saldo contábil desses prefixos. A linha de Capital Social pode ser expandida
+para identificar as contas analíticas que formam seu total. Depreciação e
+amortização acumuladas (`1.5.5.02.01` e `1.5.5.02.02`) são subtraídas do Ativo
+quando já classificadas no cadastro.
+O **Resultado do Período** é calculado como o inverso da soma dos saldos
+analíticos dos grupos `3`, `4`, `5` e `6` e integra o PL; no balancete anual
+encerrado, esses grupos zerados não duplicam o valor já transferido a
+Lucros/Prejuízos Acumulados. No rodapé do Passivo + PL, **Ativo – (Passivo +
+PL)** confere o fechamento, e **Resultado do balancete – Lucro líquido da
+DRE** compara o resultado com a linha `LUCRO LÍQUIDO DO EXERCÍCIO` da DRE
+(acumulado de janeiro ao mês exibido ou pelo balancete anual). Se houver
+diferença, a tela lista as contas de resultado sem classificação na DRE.
+
 Na **DRE**, no **Ativo** e no **Passivo**, o tipo **Linha principal com sublinhas** é opcional: cada sublinha
 tem nome e contas próprios, e aparece abaixo da linha principal, que soma seus
 valores. Ao converter um grupo de contas existente, suas contas são preservadas
