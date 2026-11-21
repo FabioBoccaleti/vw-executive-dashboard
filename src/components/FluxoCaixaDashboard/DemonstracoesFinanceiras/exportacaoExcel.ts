@@ -366,9 +366,7 @@ function adicionarAberturaDemonstracao(
       : linha.itens.map(item => ({ item, descricao: descricoes.get(item.referencia) ?? '' }));
     for (const { item, descricao } of itens) {
       const valores = periodosPorColuna.map((periodos, indice) =>
-        calcularConta(item, demonstracao, periodos, incompletasPorColuna[indice], {
-          saldoInvertido: linha.saldoInvertido,
-        }));
+        calcularConta(item, demonstracao, periodos, incompletasPorColuna[indice]));
       if (valores.every(valor => valor !== null && valor === 0)) continue;
       adicionarLinhaDados(
         ws,
@@ -635,10 +633,13 @@ function adicionarPlanilhaConferencias(
       : ['Conta', 'Descrição / motivo', 'Saldo anterior', 'Débitos', 'Créditos', 'Saldo atual', 'Movimento']);
     for (const conta of contas) {
       const descricao = `${conta.descricao}${conta.detalhe ? ` — ${conta.detalhe}` : ''}`;
-      linha(modo === 'movimentos'
+      const row = linha(modo === 'movimentos'
         ? [conta.conta, descricao, conta.debitos, conta.creditos, conta.movimento]
         : [conta.conta, descricao, conta.saldoAnterior, conta.debitos, conta.creditos, conta.saldoAtual, conta.movimento],
       modo === 'movimentos' ? [3, 4, 5] : [3, 4, 5, 6, 7]);
+      if (conta.destaque) row.eachCell(celula => {
+        celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+      });
     }
   };
   const estados: Record<EstadoConferencia, { nome: string; cor: string }> = {
@@ -760,7 +761,7 @@ function adicionarPlanilhaConferencias(
   adicionarSecao(ws, 'Parâmetros das conferências', ultimaColuna);
   const config = periodos[0].config;
   for (const [titulo, valor, moeda] of [
-    ['Sinal invertido (R$)', config.limiteSinalCentavos / 100, true],
+    ['Destaque de sinal invertido (R$)', config.limiteSinalCentavos / 100, true],
     ['Tolerância de conferência (R$)', config.toleranciaConferenciaCentavos / 100, true],
     ['Tolerância de continuidade (R$)', config.toleranciaContinuidadeCentavos / 100, true],
     ['Variação percentual (%)', config.limiteVariacaoPercentual, false],

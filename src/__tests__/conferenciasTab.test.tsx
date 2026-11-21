@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { cadastroVazio } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { ConferenciasTab } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/ConferenciasTab';
 import { carregarConferenciasExportacao, carregarConferenciasPeriodosExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
@@ -48,6 +48,20 @@ describe('ConferenciasTab', () => {
     expect(await screen.findByText('1. Balancete fecha')).toBeInTheDocument();
     expect(screen.getByText('9. Contas sem classificação ou duplicadas')).toBeInTheDocument();
     expect(screen.getByText('12. Alertas de sinal, PL, variação e arrendamento')).toBeInTheDocument();
+  });
+
+  it('mostra sinais invertidos abaixo do limite e destaca os maiores sem ocultar os saldos originais', async () => {
+    mocks.get.mockImplementation(async (key: string) => key === 'fluxo_caixa_demonstracoes_conferencias'
+      ? { ...CONFERENCIAS_CONFIG_PADRAO, limiteSinalCentavos: 200 } : null);
+    mocks.raw.mockResolvedValue({ rawText: 'A;1.1.3.01.03.003;Débitos por devolução;-1,05;0;0;-1,05\nP;2.1.4.01;Contingência devedora;2,50;0;0;2,50' });
+    render(<ConferenciasTab selectedYear={2026} selectedMonth={1} cadastro={cadastroVazio()} />);
+    const titulo = await screen.findByText('12. Alertas de sinal, PL, variação e arrendamento');
+    const alertas = within(titulo.closest('details')!);
+    expect(await alertas.findByText('1.1.3.01.03.003')).toBeInTheDocument();
+    expect(alertas.getByText('2.1.4.01')).toBeInTheDocument();
+    expect(alertas.getByText('Esperada credora · Acima do limite de destaque')).toBeInTheDocument();
+    expect(alertas.getByText('Esperada devedora')).toBeInTheDocument();
+    expect(alertas.getAllByText('-R$ 1,05').length).toBeGreaterThan(0);
   });
 
   it('exporta as mesmas conferências do mês, com parâmetros salvos e referências de versões', async () => {

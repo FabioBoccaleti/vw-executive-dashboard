@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { DemonstracoesFinanceiras } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras';
-import { cadastroVazio, type CadastroDemonstracoes, type TipoDemonstracao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
+import {
+  aplicarModeloBalancoSorana, calcularLinhas, cadastroVazio, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID,
+  type CadastroDemonstracoes, type TipoDemonstracao,
+} from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasStorage';
 import {
   loadCadastroDemonstracoes, loadDadosDemonstracoes, type DocumentoNotasDfc,
@@ -65,6 +68,154 @@ async function adicionarGrupo(nome: string, conta: string) {
   fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 }
+
+it('mantém saldos negativos das contas a receber e reduz o Passivo por contas devedoras nos grupos e detalhes', async () => {
+  persistido = {
+    ...cadastroVazio(), version: 'v1', modeloBalancoSoranaAplicado: true,
+    empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+    linhas: [
+      { id: 'receber', nome: 'Contas a receber', demonstracao: 'ativo', tipo: 'contas', contasPorPrefixo: true, saldoInvertido: true, itens: [{ referencia: '1.1.3', operacao: -1 }] },
+      { id: 'passivo', nome: 'Passivo Circulante', demonstracao: 'passivo', tipo: 'contas', contasPorPrefixo: true, itens: [{ referencia: '2.1', operacao: -1 }] },
+    ],
+  };
+  mocks.raw.mockResolvedValue({ rawText: [
+    'A;1.1.3.01.03.001;Clientes;0;0;0;120',
+    'A;1.1.3.01.03.003;Débitos por devolução;0;0;0;-30',
+    'A;1.1.3.01.03.006;Créditos a identificar;0;0;0;-10',
+    'P;2.1.1.01;Fornecedores;0;0;0;-100',
+    'P;2.1.4.01;Outras contingências devedoras;0;0;0;20',
+  ].join('\n') });
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Ativo' }));
+  expect(within(await screen.findByRole('row', { name: /Contas a receber/ })).getByRole('cell')).toHaveTextContent('80');
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Contas a receber' }));
+  expect(within(await screen.findByRole('row', { name: /1\.1\.3\.01\.03\.003 —/ })).getByRole('cell')).toHaveTextContent('(30)');
+  expect(within(screen.getByRole('row', { name: /1\.1\.3\.01\.03\.006 —/ })).getByRole('cell')).toHaveTextContent('(10)');
+  fireEvent.click(screen.getByRole('tab', { name: 'Passivo' }));
+  expect(within(await screen.findByRole('row', { name: /Passivo Circulante/ })).getByRole('cell')).toHaveTextContent('80');
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Passivo Circulante' }));
+  expect(within(await screen.findByRole('row', { name: /2\.1\.1\.01 —/ })).getByRole('cell')).toHaveTextContent('100');
+  expect(within(screen.getByRole('row', { name: /2\.1\.4\.01 —/ })).getByRole('cell')).toHaveTextContent('(20)');
+});
+
+it('preserva amortizações 1.5.7.02 negativas na tela sem modificar operações do cadastro legado', async () => {
+  persistido = {
+    ...cadastroVazio(), version: 'v1', modeloBalancoSoranaAplicado: true,
+    empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+    linhas: [
+      { id: 'intangivel', nome: 'Intangível', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.5.7.01.001', operacao: 1 }] },
+      { id: 'amortizacoes', nome: 'Amortizações acumuladas', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.5.7.02.001', operacao: 1 }] },
+      { id: 'nao-circulante', nome: 'Não Circulante', demonstracao: 'ativo', tipo: 'total', itens: [
+        { referencia: 'intangivel', operacao: 1 }, { referencia: 'amortizacoes', operacao: 1 },
+      ] },
+    ],
+  };
+  mocks.raw.mockResolvedValue({ rawText: 'A;1.5.7.01.001;Intangível;0;0;0;100\nA;1.5.7.02.001;Amortização intangível;0;0;0;-20' });
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Ativo' }));
+  const amortizacoes = await screen.findByRole('row', { name: /Amortizações acumuladas/ });
+  expect(within(amortizacoes).getByRole('cell')).toHaveTextContent('(20)');
+  expect(within(screen.getByRole('row', { name: /Não Circulante/ })).getByRole('cell')).toHaveTextContent('80');
+  fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Amortizações acumuladas' }));
+  expect(within(await screen.findByRole('row', { name: /1\.5\.7\.02\.001 —/ })).getByRole('cell')).toHaveTextContent('(20)');
+  expect(mocks.cas).not.toHaveBeenCalled();
+  await abrirCadastros();
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  const recarregado = await loadCadastroDemonstracoes();
+  expect(recarregado.linhas.find(linha => linha.id === 'amortizacoes')?.itens[0].operacao).toBe(1);
+  expect(recarregado.linhas.find(linha => linha.id === 'intangivel')?.itens[0].operacao).toBe(1);
+  expect(recarregado.linhas.some(linha => linha.id === LINHA_PL_ID)).toBe(false);
+});
+
+it('edita e recarrega o Patrimônio Líquido com sublinhas, prefixos e resultado automático preservados', async () => {
+  persistido = aplicarModeloBalancoSorana({
+    ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+  });
+  mocks.raw.mockResolvedValue({ rawText: [
+    'P;2.3.1;Capital total;-100;0;0;-100',
+    'P;2.3.1.01;Capital integralizado;-100;0;0;-100',
+    'P;2.3.2.01.01;Reserva de capital;-10;0;0;-10',
+    'P;2.3.2.02.01;Reserva de lucros;-20;0;0;-20',
+    'P;2.3.3.01;Prejuízos acumulados;5;0;0;5',
+    'P;2.3.4.01;Ajuste devedor;15;0;0;15',
+    'R;3.1;Receita;0;0;40;-40',
+  ].join('\n') });
+  const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'passivo' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Patrimônio Líquido' }));
+  const dialogo = within(await screen.findByRole('dialog'));
+  fireEvent.change(dialogo.getByLabelText('Nome da linha principal *'), { target: { value: 'Patrimônio Líquido ajustado' } });
+  fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Capital integralizado' } });
+  const prefixo = await dialogo.findByRole('checkbox', { name: /^2\.3\.1 — Capital total/ });
+  expect(prefixo).toBeEnabled();
+  fireEvent.click(prefixo);
+  fireEvent.click(dialogo.getByRole('checkbox', { name: /^2\.3\.1\.01 —/ }));
+
+  fireEvent.click(dialogo.getByRole('button', { name: 'Resultado do Período' }));
+  expect(dialogo.getByText(/Resultado calculado automaticamente/)).toBeInTheDocument();
+  expect(dialogo.queryByLabelText('Pesquisar contas')).not.toBeInTheDocument();
+  fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Resultado apurado' } });
+  fireEvent.change(dialogo.getByLabelText('Tipo de linha'), { target: { value: 'contas' } });
+  expect(dialogo.getByRole('alert')).toHaveTextContent('preservar o cálculo automático');
+  expect(dialogo.getByLabelText('Tipo de linha')).toHaveValue('bancos');
+  fireEvent.click(dialogo.getByRole('button', { name: 'Reservas de Capital' }));
+  fireEvent.click(dialogo.getByRole('button', { name: 'Remover sublinha' }));
+  fireEvent.click(dialogo.getByRole('button', { name: 'Adicionar sublinha' }));
+  fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Ajustes de patrimônio' } });
+  fireEvent.click(dialogo.getByRole('checkbox', { name: /^2\.3\.4\.01 —/ }));
+  fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  tela.unmount();
+
+  const recarregado = await loadCadastroDemonstracoes();
+  const resultado = recarregado.linhas.find(linha => linha.id === LINHA_RESULTADO_PERIODO_ID);
+  expect(resultado).toMatchObject({ nome: 'Resultado apurado', calculo: 'resultadoBalancete', itens: [] });
+  expect(recarregado.linhas.find(linha => linha.id === LINHA_PL_ID)?.nome).toBe('Patrimônio Líquido ajustado');
+  expect(recarregado.linhas.some(linha => linha.id === 'passivo-pl-reservas-capital')).toBe(false);
+  const dados = await loadDadosDemonstracoes({ ano: 2026, mes: 2 }, [], 'patrimonial');
+  const valores = calcularLinhas(recarregado.linhas, 'passivo', [dados['2026_2']]);
+  expect(valores.get(LINHA_RESULTADO_PERIODO_ID)).toBe(40);
+  expect(valores.get(LINHA_PL_ID)).toBe(140);
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'passivo' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Editar Patrimônio Líquido ajustado' }));
+  expect(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Ajustes de patrimônio' })).toBeInTheDocument();
+});
+
+it('move e exclui o Patrimônio Líquido com confirmação, sem recriar o grupo ao recarregar', async () => {
+  persistido = aplicarModeloBalancoSorana({
+    ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' },
+    linhas: [{ id: 'obrigacoes', nome: 'Obrigações', demonstracao: 'passivo', tipo: 'contas', itens: [{ referencia: '2.1.1', operacao: 1 }] }],
+  });
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  await abrirCadastros();
+  fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'passivo' } });
+  expect(screen.getByRole('button', { name: 'Subir Patrimônio Líquido' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Subir Patrimônio Líquido' }));
+  expect(screen.getByRole('button', { name: 'Subir Patrimônio Líquido' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Descer Patrimônio Líquido' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  expect(persistido?.linhas.filter(linha => linha.demonstracao === 'passivo' && !linha.sublinhaDe)[0].id).toBe(LINHA_PL_ID);
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir Patrimônio Líquido' }));
+  const confirmacao = within(await screen.findByRole('alertdialog'));
+  expect(confirmacao.getByText(/Deseja excluir a linha/)).toHaveTextContent('sublinhas ou bancos vinculados');
+  fireEvent.click(confirmacao.getByRole('button', { name: 'Cancelar' }));
+  expect(screen.getByRole('button', { name: 'Editar Patrimônio Líquido' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir Patrimônio Líquido' }));
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Excluir linha' }));
+  expect(screen.queryByRole('button', { name: 'Editar Patrimônio Líquido' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
+  await screen.findByText('Cadastro salvo com sucesso.');
+  const recarregado = await loadCadastroDemonstracoes();
+  expect(recarregado.linhas.some(linha => linha.id === LINHA_PL_ID || linha.sublinhaDe === LINHA_PL_ID)).toBe(false);
+  expect(recarregado.linhas.find(linha => linha.id === 'obrigacoes')).toBeDefined();
+});
 
 it.each(['dre', 'endividamento'] as const)('confirma a exclusão de linhas de %s, preservando o cadastro ao cancelar', async demonstracao => {
   persistido = {
@@ -571,7 +722,7 @@ it.each([
   { demonstracao: 'ativo' as const, titulo: 'Ativo', vinculo: 'sublinhaDe' as const },
   { demonstracao: 'passivo' as const, titulo: 'Passivo', vinculo: 'sublinhaDe' as const },
   { demonstracao: 'endividamento' as const, titulo: 'Endividamento', vinculo: 'bancoDe' as const },
-])('detalha sublinhas de $titulo com os sinais configurados e saldos comparativos', async ({ demonstracao, titulo, vinculo }) => {
+])('detalha sublinhas de $titulo com sinais contábeis e saldos comparativos', async ({ demonstracao, titulo, vinculo }) => {
   mocks.raw.mockImplementation(async (ano: number) => ({
     rawText: `A;1.1;Conta detalhada;0;0;0;${ano === 2026 ? '-120' : '60'}`,
   }));
@@ -585,7 +736,9 @@ it.each([
   fireEvent.click(screen.getByRole('button', { name: 'Exibir contas de Grupo detalhado' }));
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar ano' }));
   await screen.findByRole('columnheader', { name: 'Fev/25' });
-  await waitFor(() => expect(within(screen.getByRole('row', { name: /1\.1 — Conta detalhada/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(120)', '(60)']));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /1\.1 — Conta detalhada/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(
+    demonstracao === 'ativo' ? ['(120)', '60'] : ['120', '(60)'],
+  ));
   expect(screen.getByRole('button', { name: 'Ocultar contas de Grupo detalhado' })).toHaveAttribute('aria-expanded', 'true');
 });
 
@@ -671,7 +824,7 @@ it.each([
   fireEvent.click(screen.getByRole('button', { name: 'Editar Circulante' }));
   const dialogo = within(await screen.findByRole('dialog'));
   fireEvent.change(dialogo.getByLabelText('Tipo de linha'), { target: { value: 'bancos' } });
-  expect(dialogo.getByLabelText(`Operação de ${codigo}.1`)).toHaveValue('-1');
+  expect(dialogo.queryByLabelText(`Operação de ${codigo}.1`)).not.toBeInTheDocument();
   fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Primeiro grupo' } });
   fireEvent.click(dialogo.getByRole('button', { name: 'Adicionar sublinha' }));
   fireEvent.change(dialogo.getByLabelText('Nome da sublinha *'), { target: { value: 'Segundo grupo' } });
@@ -692,24 +845,28 @@ it.each([
   expect(linhas.map(linha => within(linha).getByRole('rowheader').textContent)).toEqual([
     'Circulante', 'Primeiro grupo', 'Segundo grupo', 'Total geral',
   ]);
-  expect(linhas.map(linha => within(linha).getAllByRole('cell').map(cell => cell.textContent))).toEqual([
-    ['(80)', '(40)'], ['(100)', '(50)'], ['20', '10'], ['(80)', '(40)'],
-  ]);
+  expect(linhas.map(linha => within(linha).getAllByRole('cell').map(cell => cell.textContent))).toEqual(
+    demonstracao === 'ativo'
+      ? [['80', '40'], ['100', '50'], ['(20)', '(10)'], ['80', '40']]
+      : [['(80)', '(40)'], ['(100)', '(50)'], ['20', '10'], ['(80)', '(40)']],
+  );
 
   await abrirCadastros();
   fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: demonstracao } });
   fireEvent.click(screen.getByRole('button', { name: 'Editar Circulante' }));
   const edicao = within(await screen.findByRole('dialog'));
   fireEvent.change(edicao.getByLabelText('Tipo de linha'), { target: { value: 'contas' } });
-  expect(edicao.getByLabelText(`Operação de ${codigo}.1`)).toHaveValue('-1');
-  expect(edicao.getByLabelText(`Operação de ${codigo}.2`)).toHaveValue('1');
+  expect(edicao.queryByLabelText(`Operação de ${codigo}.1`)).not.toBeInTheDocument();
+  expect(edicao.queryByLabelText(`Operação de ${codigo}.2`)).not.toBeInTheDocument();
   fireEvent.click(edicao.getByRole('button', { name: 'Aplicar linha' }));
   fireEvent.click(screen.getByRole('button', { name: 'Salvar cadastro' }));
   await screen.findByText('Cadastro salvo com sucesso.');
   expect(persistido?.linhas.filter(linha => linha.demonstracao === demonstracao && !linha.modeloProtegido)).toHaveLength(2);
   expect(persistido?.linhas.filter(linha => linha.demonstracao === 'dfc')).toHaveLength(25);
   fireEvent.click(screen.getByRole('tab', { name: titulo }));
-  await waitFor(() => expect(within(screen.getByRole('row', { name: /Total geral/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(80)', '(40)']));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Total geral/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(
+    demonstracao === 'ativo' ? ['80', '40'] : ['(80)', '(40)'],
+  ));
 });
 
 it('cadastra empresa, grupos, totalização e assinante; salva e recarrega DRE com mês e acumulado', async () => {
@@ -789,7 +946,7 @@ it('arredonda valores apenas na exibição e apresenta negativos entre parêntes
 
 it('compara saldos pontuais no mesmo mês sem acumular os valores patrimoniais', async () => {
   const monthlyRaw = (receita: number, custo: number, caixa: number, passivo: number) => ({
-    rawText: `${raw(receita, custo, caixa).rawText}\nP;2.1;Fornecedores;0,00;0,00;0,00;${passivo},00`,
+    rawText: `${raw(receita, custo, caixa).rawText}\nP;2.1;Fornecedores;0,00;0,00;0,00;-${passivo},00`,
   });
   mocks.raw.mockImplementation(async (ano: number, mes: number) => {
     if (ano === 2026 && mes === 2) return monthlyRaw(500, 100, 300, 90);
@@ -815,10 +972,10 @@ it('compara saldos pontuais no mesmo mês sem acumular os valores patrimoniais',
   fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'ativo' } });
   fireEvent.click(screen.getByRole('button', { name: 'Editar Disponibilidades' }));
   const dialogo = within(await screen.findByRole('dialog'));
-  fireEvent.change(dialogo.getByLabelText('Operação de 1.1'), { target: { value: '-1' } });
+  expect(dialogo.queryByLabelText('Operação de 1.1')).not.toBeInTheDocument();
   fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
   fireEvent.click(screen.getByRole('tab', { name: 'Ativo' }));
-  await waitFor(() => expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['(300)', '(75)']));
+  await waitFor(() => expect(within(screen.getByRole('row', { name: /Disponibilidades/ })).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['300', '75']));
 });
 
 it('cadastra Endividamento separadamente do Passivo e compara os saldos após recarregar', async () => {
@@ -838,7 +995,7 @@ it('cadastra Endividamento separadamente do Passivo e compara os saldos após re
   fireEvent.change(dialogo.getByLabelText('Tipo de linha'), { target: { value: 'contas' } });
   fireEvent.change(dialogo.getByLabelText('Nome da linha *'), { target: { value: 'Dívida bancária' } });
   fireEvent.click(await dialogo.findByRole('checkbox', { name: /^2\.1 —/ }));
-  fireEvent.change(dialogo.getByLabelText('Operação de 2.1'), { target: { value: '-1' } });
+  expect(dialogo.queryByLabelText('Operação de 2.1')).not.toBeInTheDocument();
   fireEvent.click(dialogo.getByRole('button', { name: 'Aplicar linha' }));
 
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));
@@ -865,7 +1022,7 @@ it('cadastra Endividamento separadamente do Passivo e compara os saldos após re
 
 it('salva bancos com contas próprias e exibe seus saldos abaixo do total da linha principal', async () => {
   mocks.raw.mockImplementation(async (ano: number) => ({
-    rawText: `P;2.1;Credor A;0;0;0;${ano === 2026 ? '90,40' : '60,40'}\nP;2.2;Credor B;0;0;0;20,40\nP;2.3;Credor C;0;0;0;10,40`,
+    rawText: `P;2.1;Credor A;0;0;0;${ano === 2026 ? '-90,40' : '-60,40'}\nP;2.2;Credor B;0;0;0;-20,40\nP;2.3;Credor C;0;0;0;-10,40`,
   }));
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' } };
   const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
@@ -908,7 +1065,7 @@ it('salva bancos com contas próprias e exibe seus saldos abaixo do total da lin
 
 it('preserva parcelas e juros provisionados por mês sem detalhar as colunas comparativas', async () => {
   const banco = 'Banco Itaú';
-  mocks.raw.mockResolvedValue({ rawText: 'P;2.1;Empréstimos;0;0;0;1250,25' });
+  mocks.raw.mockResolvedValue({ rawText: 'P;2.1;Empréstimos;0;0;0;-1250,25' });
   persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
     { id: 'principal', nome: 'Dívida bancária', demonstracao: 'endividamento', tipo: 'total', itens: [{ referencia: 'itau', operacao: 1 }] },
     { id: 'itau', nome: banco, demonstracao: 'endividamento', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }], bancoDe: 'principal' },
@@ -1175,7 +1332,7 @@ it('exibe as contas do Capital Social e concilia o resultado do balancete com a 
     const despesaNaoClassificada = mes === 1 ? 0 : 10;
     return { rawText: [
       'A;1.1.1.01;Caixa;0;0;0;1000',
-      'A;1.5.5.02.01.001;Depreciação acumulada;0;0;0;10',
+      'A;1.5.5.02.01.001;Depreciação acumulada;0;0;0;-10',
       'P;2.1.1;Passivo circulante;0;0;0;-100',
       'P;2.3.1.01.01.001;Capital social;0;0;0;-740',
       `R;3.1.1;Receita;0;0;100;-${receita}`,

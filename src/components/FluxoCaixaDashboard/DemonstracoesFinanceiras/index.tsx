@@ -387,7 +387,10 @@ export function DemonstracoesFinanceiras({
     if (!editor || !bancosEditor) return;
     const banco: LinhaDemonstracao = editor.demonstracao === 'endividamento'
       ? { id: crypto.randomUUID(), nome: '', demonstracao: 'endividamento', tipo: 'contas', itens: [], bancoDe: editor.id }
-      : { id: crypto.randomUUID(), nome: '', demonstracao: editor.demonstracao, tipo: 'contas', itens: [], sublinhaDe: editor.id };
+      : {
+        id: crypto.randomUUID(), nome: '', demonstracao: editor.demonstracao, tipo: 'contas', itens: [], sublinhaDe: editor.id,
+        ...(editor.id === LINHA_PL_ID ? { contasPorPrefixo: true } : {}),
+      };
     setBancosEditor([...bancosEditor, banco]);
     escolherBanco(banco.id);
   }
@@ -405,7 +408,7 @@ export function DemonstracoesFinanceiras({
 
   function confirmarLinha() {
     if (!editor || !cadastro) return;
-    if (bancosEditor && (!editor.nome.trim() || !bancosEditor.length || bancosEditor.some(banco => !banco.nome.trim() || !banco.itens.length))) {
+    if (bancosEditor && (!editor.nome.trim() || !bancosEditor.length || bancosEditor.some(banco => !banco.nome.trim() || (!banco.calculo && !banco.itens.length)))) {
       setErroEditor(editor.demonstracao === 'endividamento'
         ? 'Preencha o nome da linha principal e informe o nome e ao menos uma conta para cada banco ou dívida.'
         : 'Preencha o nome da linha principal e informe o nome e ao menos uma conta para cada sublinha.');
@@ -572,7 +575,7 @@ export function DemonstracoesFinanceiras({
 
   function selecionar(referencia: string, marcado: boolean) {
     if (!alvoEditor) return;
-    if (marcado && alvoEditor.tipo === 'contas' && alvoEditor.demonstracao !== 'dfc' && contasIncompletas.has(referencia)) {
+    if (marcado && alvoEditor.tipo === 'contas' && alvoEditor.demonstracao !== 'dfc' && !alvoEditor.contasPorPrefixo && contasIncompletas.has(referencia)) {
       setErroEditor(`A conta ${referencia} está incompleta ou é agrupadora. Selecione uma conta completa.`);
       return;
     }
@@ -584,17 +587,6 @@ export function DemonstracoesFinanceiras({
       }
     }
     atualizarAlvo({ ...alvoEditor, itens: marcado ? [...alvoEditor.itens, { referencia, operacao: 1 }] : alvoEditor.itens.filter(item => item.referencia !== referencia) });
-  }
-
-  function operacao(item: ItemDemonstracao) {
-    return (
-      <select aria-label={`Operação de ${item.referencia}`} className={selectClass} value={item.operacao}
-        onChange={event => {
-          if (alvoEditor) atualizarAlvo({ ...alvoEditor, itens: alvoEditor.itens.map(value => value.referencia === item.referencia ? { ...value, operacao: event.target.value === '1' ? 1 : -1 } : value) });
-        }}>
-        <option value="1">+ Somar</option><option value="-1">− Subtrair</option>
-      </select>
-    );
   }
 
   const principal = { ano: selectedYear, mes: selectedMonth };
@@ -917,7 +909,7 @@ export function DemonstracoesFinanceiras({
                             : filhas.length ? `${linha.itens.length} ${linha.demonstracao === 'endividamento' ? 'bancos ou dívidas' : 'sublinhas'}` : `${linha.tipo === 'total' ? 'Totalização' : 'Grupo de contas'} · ${linha.itens.length} itens`}</p></div>
                           <div className="flex flex-wrap gap-1">
                             {podeExpandir && <Button variant="outline" size="sm" aria-expanded={expandido} onClick={() => alternarExpandido(linha.id, setCadastrosExpandidos)}>{expandido ? 'Ocultar' : 'Exibir'} contas de {linha.nome}</Button>}
-                            {!linha.modeloProtegido && <>
+                            {(!linha.modeloProtegido || linha.id === LINHA_PL_ID) && <>
                               <Button variant="outline" size="sm" aria-label={`Subir ${linha.nome}`} disabled={index === 0} onClick={() => moverLinha(linha.id, -1)}>↑</Button>
                               <Button variant="outline" size="sm" aria-label={`Descer ${linha.nome}`} disabled={index === lista.length - 1} onClick={() => moverLinha(linha.id, 1)}>↓</Button>
                               <Button variant="outline" size="sm" onClick={() => abrirEditor(linha)}>Editar {linha.nome}</Button>
@@ -1154,9 +1146,7 @@ export function DemonstracoesFinanceiras({
                             </th>
                             {colunas.map((_, index) => {
                               const detalhe = detalhesColunas[index];
-                              const valor = detalhe ? calcularConta(item, aba, detalhe.periodos, detalhe.incompletas, {
-                                saldoInvertido: linha.saldoInvertido,
-                              }) : null;
+                              const valor = detalhe ? calcularConta(item, aba, detalhe.periodos, detalhe.incompletas) : null;
                               return <td key={index} className={`whitespace-nowrap p-3 text-right tabular-nums ${valor !== null && valor < 0 ? 'text-red-700' : ''}`}>{valor === null ? '—' : formatarMoeda(valor)}</td>;
                             })}
                           </tr>)}
@@ -1536,10 +1526,10 @@ export function DemonstracoesFinanceiras({
               : editor?.tipo === 'total'
               ? editor.demonstracao === 'dre'
                 ? 'Selecione linhas já cadastradas. Na DRE, os sinais são automáticos e as totalizações somam os valores com seus respectivos sinais.'
-                : 'Selecione linhas já cadastradas e defina se cada item soma ou subtrai.'
+                : 'Selecione linhas já cadastradas. As totalizações somam os valores com seus sinais contábeis.'
               : editor?.demonstracao === 'dre'
                 ? 'Selecione contas completas. Na DRE, os sinais seguem o movimento do balancete automaticamente.'
-                : 'Selecione contas completas e defina se cada item soma ou subtrai.'}</DialogDescription></DialogHeader>
+                : 'Selecione contas completas. O Ativo mantém o saldo do balancete; o Passivo, PL e Endividamento invertem o saldo, sem eliminar seu sinal.'}</DialogDescription></DialogHeader>
             {editor && <>
               <label className="space-y-1 text-sm"><span>{bancosEditor ? 'Nome da linha principal *' : 'Nome da linha *'}</span><Input value={editor.nome} onChange={event => setEditor({ ...editor, nome: event.target.value })} /></label>
               {editor.demonstracao === 'dfc' && !editor.foraDfc && bancosEditor && <label className="space-y-1 text-sm">
@@ -1549,6 +1539,10 @@ export function DemonstracoesFinanceiras({
               {(editor.demonstracao !== 'endividamento' || !cadastro?.linhas.some(item => item.bancoDe === editor.id)) && <label className="space-y-1 text-sm"><span className="block">Tipo de linha</span>
                 <select className={selectClass} value={bancosEditor ? 'bancos' : editor.tipo} onChange={event => {
                   const tipo = event.target.value;
+                  if (tipo !== 'bancos' && bancosEditor?.some(banco => banco.calculo)) {
+                    setErroEditor('Mantenha a linha principal com sublinhas para preservar o cálculo automático do Resultado do Período.');
+                    return;
+                  }
                   if (editor.demonstracao !== 'endividamento' && tipo === 'bancos' && editor.tipo === 'total' && !bancosEditor && editor.itens.length) {
                     setErroEditor('Esta totalização já contém linhas. Remova suas referências antes de transformá-la em uma linha com sublinhas.');
                     return;
@@ -1586,18 +1580,22 @@ export function DemonstracoesFinanceiras({
                   }}>{editor.demonstracao === 'endividamento' ? 'Remover banco ou dívida' : 'Remover sublinha'}</Button>
                 </div>}
               </div>}
-              {alvoEditor && <>{alvoEditor.tipo === 'contas' ? <>
+              {alvoEditor && (alvoEditor.calculo === 'resultadoBalancete'
+                ? <p className="text-sm text-muted-foreground">Resultado calculado automaticamente pelo saldo das contas dos grupos 3, 4, 5 e 6. O nome pode ser alterado; o cálculo não exige seleção manual de contas.</p>
+                : <>{alvoEditor.tipo === 'contas' ? <>
                 <p className="text-xs text-muted-foreground">{editor.demonstracao === 'dfc'
                   ? 'Configure prefixos para classificar as contas. Se houver mais de um prefixo correspondente, vence o mais longo. O efeito é sempre Crédito − Débito.'
+                  : alvoEditor.contasPorPrefixo
+                    ? 'Selecione contas ou prefixos. Um prefixo soma os saldos com sinal das contas analíticas abaixo dele, sem somar contas agrupadoras. O Ativo mantém o saldo importado; Passivo, PL e Endividamento invertem o saldo.'
                   : `Selecione apenas contas completas (analíticas). Contas incompletas/agrupadoras ficam desabilitadas para evitar dupla contagem. Uma conta não pode pertencer a dois grupos da mesma demonstração. ${editor.demonstracao === 'dre'
                     ? 'O sinal segue o movimento da conta no balancete, inclusive estornos, sem escolha manual.'
-                    : 'Os sinais são aplicados aos valores absolutos das contas.'}`}</p>
+                    : 'O Ativo mantém o saldo importado; Passivo, PL e Endividamento invertem o saldo. Redutoras e saldos contrários à natureza reduzem os totais, sem valor absoluto ou sinais manuais.'}`}</p>
                 <Input aria-label="Pesquisar contas" placeholder="Pesquisar por código ou descrição" value={busca} onChange={event => setBusca(event.target.value)} />
                 <div className="h-[45vh] min-h-64 space-y-1 overflow-y-auto rounded border p-2">
                   {catalogo.filter(conta => `${conta.codigo} ${conta.descricao}`.toLocaleLowerCase().includes(busca.toLocaleLowerCase())).map(conta => {
                     const grupoExistente = grupoDaConta(conta.codigo);
                     const incompleta = contasIncompletas.has(conta.codigo);
-                    const incompletaNaoSelecionavel = incompleta && editor.demonstracao !== 'dfc';
+                    const incompletaNaoSelecionavel = incompleta && editor.demonstracao !== 'dfc' && !alvoEditor.contasPorPrefixo;
                     const indisponivel = incompletaNaoSelecionavel || Boolean(grupoExistente);
                     return (
                       <label key={conta.codigo} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-3 py-2 text-base hover:bg-muted">
@@ -1618,10 +1616,10 @@ export function DemonstracoesFinanceiras({
                 <h4 className="text-sm font-semibold">Itens selecionados ({alvoEditor.itens.length})</h4>
                 {alvoEditor.itens.map(item => <div key={item.referencia} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-sm">
                   <span>{alvoEditor.tipo === 'contas' ? `${item.referencia} — ${catalogo.find(conta => conta.codigo === item.referencia)?.descricao ?? 'Conta não encontrada nos períodos carregados'}` : cadastro?.linhas.find(linha => linha.id === item.referencia)?.nome}</span>
-                  <div className="flex gap-2">{editor.demonstracao !== 'dre' && editor.demonstracao !== 'dfc' && operacao(item)}<Button variant="outline" size="sm" aria-label={`Remover item ${item.referencia}`} onClick={() => selecionar(item.referencia, false)}>Remover</Button></div>
+                  <Button variant="outline" size="sm" aria-label={`Remover item ${item.referencia}`} onClick={() => selecionar(item.referencia, false)}>Remover</Button>
                 </div>)}
               </div>
-              </>}
+              </>)}
               {erroEditor && <p role="alert" className="text-sm text-red-700">{erroEditor}</p>}
               <DialogFooter><Button variant="outline" onClick={() => setEditor(null)}>Cancelar</Button><Button onClick={confirmarLinha}>Aplicar linha</Button></DialogFooter>
             </>}

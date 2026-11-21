@@ -77,7 +77,6 @@ export const LINHA_PL_ID = 'passivo-pl';
 export const LINHA_RESULTADO_PERIODO_ID = 'passivo-resultado-periodo';
 
 const PREFIXOS_PL_SORANA = ['2.3.1', '2.3.2.01', '2.3.2.02', '2.3.2.03', '2.3.3'];
-const PREFIXOS_REDUTORAS_ATIVO = ['1.5.5.02.01', '1.5.5.02.02'];
 
 const normalizarNomeLinhaDre = (nome: string) =>
   nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
@@ -285,13 +284,6 @@ export function aplicarModeloBalancoSorana(cadastro: CadastroDemonstracoes): Cad
   let linhas = cadastro.linhas
     .filter(linha => !idsPlLegados.has(linha.id))
     .map(linha => {
-      if (linha.demonstracao === 'ativo' && linha.tipo === 'contas') {
-        const itens = linha.itens.map(item => PREFIXOS_REDUTORAS_ATIVO.some(prefixo =>
-          item.referencia === prefixo || item.referencia.startsWith(`${prefixo}.`))
-          ? { ...item, operacao: -1 as const }
-          : item);
-        return itens.some((item, index) => item !== linha.itens[index]) ? { ...linha, itens } : linha;
-      }
       if (linha.demonstracao !== 'passivo') return linha;
       if (linha.tipo === 'contas') {
         const itens = linha.itens.filter(item => !PREFIXOS_PL_SORANA.some(prefixo =>
@@ -325,7 +317,6 @@ export function aplicarModeloBalancoSorana(cadastro: CadastroDemonstracoes): Cad
       tipo: 'contas',
       sublinhaDe: LINHA_PL_ID,
       contasPorPrefixo: true,
-      saldoInvertido: true,
       modeloProtegido: true,
       itens: [{ referencia: '2.3.1', operacao: 1 }],
     },
@@ -336,7 +327,6 @@ export function aplicarModeloBalancoSorana(cadastro: CadastroDemonstracoes): Cad
       tipo: 'contas',
       sublinhaDe: LINHA_PL_ID,
       contasPorPrefixo: true,
-      saldoInvertido: true,
       modeloProtegido: true,
       itens: [{ referencia: '2.3.2.01', operacao: 1 }],
     },
@@ -347,7 +337,6 @@ export function aplicarModeloBalancoSorana(cadastro: CadastroDemonstracoes): Cad
       tipo: 'contas',
       sublinhaDe: LINHA_PL_ID,
       contasPorPrefixo: true,
-      saldoInvertido: true,
       modeloProtegido: true,
       itens: [
         { referencia: '2.3.2.02', operacao: 1 },
@@ -361,7 +350,6 @@ export function aplicarModeloBalancoSorana(cadastro: CadastroDemonstracoes): Cad
       tipo: 'contas',
       sublinhaDe: LINHA_PL_ID,
       contasPorPrefixo: true,
-      saldoInvertido: true,
       modeloProtegido: true,
       itens: [{ referencia: '2.3.3', operacao: 1 }],
     },
@@ -652,12 +640,19 @@ export function calcularDfcIndireto(
   return { valores, contasPorLinha, valoresContasPorLinha, contasOperacionaisSemLinha };
 }
 
+export function calcularSaldoPatrimonial(
+  saldo: number,
+  demonstracao: 'ativo' | 'passivo' | 'endividamento',
+): number {
+  return demonstracao === 'ativo' ? saldo : -saldo;
+}
+
 export function calcularConta(
   item: ItemDemonstracao,
   demonstracao: TipoDemonstracao,
   periodos: Array<ContasBalancete | null>,
   incompletas = identificarContasIncompletas(periodos),
-  opcoes: { contasPorPrefixo?: boolean; saldoInvertido?: boolean } = {},
+  opcoes: { contasPorPrefixo?: boolean } = {},
 ): number | null {
   if (!periodos.length || periodos.some(periodo => periodo === null)
     || (!opcoes.contasPorPrefixo && incompletas.has(item.referencia))) return null;
@@ -673,7 +668,7 @@ export function calcularConta(
     if (opcoes.contasPorPrefixo) {
       for (const conta of Object.values(periodo ?? {})) {
         if (incompletas.has(conta.conta) || !(conta.conta === item.referencia || conta.conta.startsWith(`${item.referencia}.`))) continue;
-        valor += opcoes.saldoInvertido ? -conta.saldoAtual : Math.abs(conta.saldoAtual);
+        valor += conta.saldoAtual;
       }
     } else {
       const conta = periodo?.[item.referencia];
@@ -682,9 +677,7 @@ export function calcularConta(
     }
   }
   if (demonstracao === 'dre') return Math.round(valor * 100) / 100;
-  return opcoes.saldoInvertido
-    ? Math.round(valor * 100) * item.operacao / 100
-    : Math.round(Math.abs(valor) * 100) * item.operacao / 100;
+  return Math.round(calcularSaldoPatrimonial(valor, demonstracao) * 100) / 100;
 }
 
 export function listarContasDaLinha(
@@ -1066,11 +1059,10 @@ export function calcularLinhas(
         const origem = porId.get(item.referencia);
         const valor = origem ? calcular(origem) : null;
         if (valor === null || valor === undefined) disponivel = false;
-        else total += Math.round(valor * 100) * (demonstracao === 'dre' ? 1 : item.operacao);
+        else total += Math.round(valor * 100);
       } else {
         const valor = calcularConta(item, demonstracao, periodos, incompletas, {
           contasPorPrefixo: linha.contasPorPrefixo,
-          saldoInvertido: linha.saldoInvertido,
         });
         if (valor === null) disponivel = false;
         else total += Math.round(valor * 100);

@@ -119,6 +119,12 @@ Na aba **Emissão de Demonstrações Financeiras**, abra **Conferências** para 
 
 Em **Cadastros**, os botões **Excluir** das linhas solicitam confirmação com o nome da linha e avisam quando sublinhas ou bancos vinculados também serão removidos. **Cancelar** mantém o cadastro intacto; confirmar aplica a exclusão apenas ao cadastro em edição, sendo necessário **Salvar cadastro** para gravá-la. Exclusões que invalidariam totalizações continuam bloqueadas. Os balancetes importados não são excluídos.
 
+O grupo **Patrimônio Líquido** permite editar, mover e excluir como os demais grupos. No editor, é possível alterar nomes, adicionar/remover sublinhas e ajustar contas ou prefixos, preservando o sinal contábil dos saldos. A sublinha **Resultado do Período** permanece calculada automaticamente pelos grupos 3 a 6; seu nome pode ser alterado sem selecionar contas. Enquanto houver essa sublinha calculada, a linha principal deve permanecer com sublinhas, para não perder o cálculo automático. As alterações dependem de **Salvar cadastro**.
+
+Os **sinais patrimoniais são automáticos**, na tela, no Excel e nos cálculos das conferências: **Ativo = saldo importado**; **Passivo, PL e Endividamento = −saldo importado**. Contas analíticas e prefixos preservam saldos de ambos os sinais, sem valor absoluto. Totais e subtotais somam esses valores com sinal. As operações manuais antigas de contas e totalizações não são reaplicadas e não aparecem mais no editor patrimonial. Isso evita inverter novamente contas já negativas, incluindo **1.1.3.01.03.003**, **1.1.3.01.03.006**, depreciações e amortizações do grupo **1.5.7.02**. Saldos contrários à natureza esperada não são corrigidos nem ocultados.
+
+O alerta de sinal invertido lista **todos os saldos não zero** contrários à natureza configurada, respeitando suas exceções e exclusões. O parâmetro **Destaque de sinal invertido (R$)** apenas destaca os maiores na tela e no Excel; não filtra os menores. Detalhes de balancetes e históricos mantêm os saldos originais para auditoria, enquanto os totais e contribuições patrimoniais seguem a convenção acima. Valores absolutos continuam sendo usados apenas para medir limites, ordenar alertas e formatar valores negativos entre parênteses, sem alterar o cálculo das demonstrações.
+
 O painel verifica:
 
 1. Fechamento do balancete (débitos, créditos e saldos).

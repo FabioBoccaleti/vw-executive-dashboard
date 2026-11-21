@@ -11,6 +11,7 @@ import type { CadastroDemonstracoes, ContasBalancete } from './modelo';
 import {
   construirConferencias,
   type ResultadoConferencia,
+  type ContaConferencia,
 } from './conferenciasModelo';
 import {
   carregarDadosPainel, carregarComparacoesSnapshots,
@@ -68,7 +69,7 @@ function TabelaContas({
   contas,
   modo = 'saldos',
 }: {
-  contas: Array<{ conta: string; descricao: string; saldoAnterior: number; debitos: number; creditos: number; saldoAtual: number; movimento: number; detalhe?: string }>;
+  contas: ContaConferencia[];
   modo?: 'saldos' | 'movimentos';
 }) {
   if (!contas.length) return <p className="text-sm text-muted-foreground">Nenhuma conta nesta conferência.</p>;
@@ -81,7 +82,7 @@ function TabelaContas({
         {modo === 'saldos' && <th className="p-2 text-right">Saldo atual</th>}
         <th className="p-2 text-right">Movimento</th>
       </tr></thead>
-      <tbody>{contas.map(conta => <tr key={`${conta.conta}-${conta.detalhe ?? ''}`} className="border-b last:border-0">
+      <tbody>{contas.map(conta => <tr key={`${conta.conta}-${conta.detalhe ?? ''}`} className={`border-b last:border-0 ${conta.destaque ? 'bg-amber-50 font-medium' : ''}`}>
         <td className="p-2 font-mono">{conta.conta}</td><td className="p-2">{conta.descricao}{conta.detalhe && <span className="block text-muted-foreground">{conta.detalhe}</span>}</td>
         {modo === 'saldos' && <td className="p-2 text-right tabular-nums">{moedas.format(conta.saldoAnterior)}</td>}
         <td className="p-2 text-right tabular-nums">{moedas.format(conta.debitos)}</td>
@@ -415,7 +416,7 @@ export function ConferenciasTab({ selectedYear, selectedMonth, cadastro, current
         <CampoLista titulo="Prefixos do ativo de direito de uso" descricao="Uma conta ou prefixo por linha." texto={textoAtivoDireitoUso} onChange={setTextoAtivoDireitoUso} />
         <div className="grid gap-3 sm:grid-cols-2">
           {[
-            ['limiteSinal', 'Sinal invertido (R$)'],
+            ['limiteSinal', 'Destaque de sinal invertido (R$)'],
             ['toleranciaConferencia', 'Tolerância de conferência (R$)'],
             ['toleranciaContinuidade', 'Tolerância de continuidade (R$)'],
             ['limiteVariacaoPercentual', 'Variação percentual (%)'],

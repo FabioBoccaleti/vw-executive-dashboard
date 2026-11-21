@@ -11,6 +11,91 @@ import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/Dem
 import type { ConferenciasExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
 
 describe('Exportação Excel das demonstrações financeiras', () => {
+  it('exporta redutoras de contas a receber e Passivo devedor com sinais, subtotais e conciliação corretos', async () => {
+    const cadastro = aplicarModeloBalancoSorana({
+      ...cadastroVazio(),
+      linhas: [
+        { id: 'receber', nome: 'Contas a receber', demonstracao: 'ativo', tipo: 'contas', contasPorPrefixo: true, saldoInvertido: true, itens: [{ referencia: '1.1.3', operacao: -1 }] },
+        { id: 'ativo-total', nome: 'Ativo total', demonstracao: 'ativo', tipo: 'total', itens: [{ referencia: 'receber', operacao: -1 }] },
+        { id: 'passivo', nome: 'Passivo Circulante', demonstracao: 'passivo', tipo: 'contas', contasPorPrefixo: true, itens: [{ referencia: '2.1', operacao: -1 }] },
+      ],
+    });
+    const contas = extractAccounts([
+      'A;1.1.3.01.03.001;Clientes;0;0;0;100',
+      'A;1.1.3.01.03.003;Débitos por devolução;0;0;0;-30',
+      'A;1.1.3.01.03.006;Créditos a identificar;0;0;0;-10',
+      'P;2.1.1.01;Fornecedores;0;0;0;-90',
+      'P;2.1.2.01;Encargos a incorrer;0;0;0;20',
+      'P;2.3.1.01;Capital;0;0;0;-25',
+      'P;2.3.3.02;Prejuízos acumulados;0;0;0;35',
+    ].join('\n'), { strict: true });
+    const config = { ...CONFERENCIAS_CONFIG_PADRAO, limiteSinalCentavos: 2500 };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual: contas, anterior: contas, proximo: null, acumulado: [contas],
+      mesesDoAno: [], mesesAnteriores: [], cadastro,
+      config,
+    });
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados: { [chavePeriodo({ ano: 2026, mes: 1 })]: contas },
+      anos: [2026], mesLimite: 1, incluirNotasAnuais: false, notas: [],
+      conferencias: [{ ano: 2026, mes: 1, resultados, config, snapshots: [], comparacoes: [] }],
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    const valor = (aba: string, nome: string) => {
+      const ws = reopened.getWorksheet(aba)!;
+      const linha = ws.getColumn(1).values.indexOf(nome);
+      expect(linha).toBeGreaterThan(0);
+      return ws.getCell(linha, 2).value;
+    };
+    expect(valor('Ativo', 'Contas a receber')).toBe(60);
+    expect(valor('Ativo', 'Ativo total')).toBe(60);
+    expect(valor('Ativo - Abertura', '1.1.3.01.03.003 — Débitos por devolução')).toBe(-30);
+    expect(valor('Ativo - Abertura', '1.1.3.01.03.006 — Créditos a identificar')).toBe(-10);
+    expect(valor('Passivo + PL', 'Passivo Circulante')).toBe(70);
+    expect(valor('Passivo + PL', 'Patrimônio Líquido')).toBe(-10);
+    expect(valor('Passivo + PL - Abertura', '2.1.2.01 — Encargos a incorrer')).toBe(-20);
+    expect(valor('Passivo + PL', 'Ativo – (Passivo + PL)')).toBe(0);
+    const ws = reopened.getWorksheet('Conferências')!;
+    const linhaMaior = ws.getColumn(2).values.indexOf('Débitos por devolução — Esperada devedora · Acima do limite de destaque');
+    const linhaMenor = ws.getColumn(2).values.indexOf('Créditos a identificar — Esperada devedora');
+    expect(linhaMaior).toBeGreaterThan(0);
+    expect(linhaMenor).toBeGreaterThan(0);
+    expect(ws.getCell(linhaMaior, 1).fill).toMatchObject({ fgColor: { argb: 'FFFEF3C7' } });
+    expect(ws.getCell(linhaMenor, 1).fill).not.toMatchObject({ fgColor: { argb: 'FFFEF3C7' } });
+  });
+
+  it('preserva sinais importados de amortizações 1.5.7.02 na demonstração, abertura e total do Ativo', async () => {
+    const cadastro = aplicarModeloBalancoSorana({
+      ...cadastroVazio(), modeloBalancoSoranaAplicado: true,
+      linhas: [
+        { id: 'intangivel', nome: 'Intangível', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.5.7.01.001', operacao: 1 }] },
+        { id: 'amortizacoes', nome: 'Amortizações acumuladas', demonstracao: 'ativo', tipo: 'contas', itens: [{ referencia: '1.5.7.02.001', operacao: 1 }] },
+        { id: 'nao-circulante', nome: 'Não Circulante', demonstracao: 'ativo', tipo: 'total', itens: [
+          { referencia: 'intangivel', operacao: 1 }, { referencia: 'amortizacoes', operacao: 1 },
+        ] },
+      ],
+    });
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, anos: [2026], mesLimite: 2, incluirNotasAnuais: false, notas: [],
+      dados: {
+        [chavePeriodo({ ano: 2026, mes: 1 })]: extractAccounts('A;1.5.7.01.001;Intangível;0;0;0;100\nA;1.5.7.02.001;Amortização intangível;0;0;0;-20', { strict: true }),
+        [chavePeriodo({ ano: 2026, mes: 2 })]: extractAccounts('A;1.5.7.01.001;Intangível;0;0;0;120\nA;1.5.7.02.001;Amortização intangível;0;0;0;35', { strict: true }),
+      },
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    const ativo = reopened.getWorksheet('Ativo')!;
+    const amortizacoes = ativo.getColumn(1).values.indexOf('Amortizações acumuladas');
+    const total = ativo.getColumn(1).values.indexOf('Não Circulante');
+    expect([ativo.getCell(amortizacoes, 2).value, ativo.getCell(amortizacoes, 3).value]).toEqual([-20, 35]);
+    expect([ativo.getCell(total, 2).value, ativo.getCell(total, 3).value]).toEqual([80, 155]);
+    const abertura = reopened.getWorksheet('Ativo - Abertura')!;
+    const conta = abertura.getColumn(1).values.indexOf('1.5.7.02.001 — Amortização intangível');
+    expect([abertura.getCell(conta, 2).value, abertura.getCell(conta, 3).value]).toEqual([-20, 35]);
+    expect(abertura.getCell(conta, 2).numFmt).toContain('[Red]');
+  });
+
   it('inclui resumo de todos os períodos e detalhes completos, com semáforos, valores numéricos e versões', async () => {
     const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
     const antes = extractAccounts('A;1.1.1.01;Caixa;100;20;0;120', { strict: true });
@@ -163,7 +248,7 @@ describe('Exportação Excel das demonstrações financeiras', () => {
         'D;3.2;Custos;0;20;0;0',
         'A;1.1.1.01;Bancos;100;0;0;100',
         'A;1.1.1.02;Banco sem saldo;0;0;0;0',
-        'P;2.1.1.01;Fornecedores;10;0;20;30',
+        'P;2.1.1.01;Fornecedores;-10;0;20;-30',
         'P;2.1.1.02;Fornecedor sem saldo;0;0;0;0',
       ].join('\n'), { strict: true }),
       [chavePeriodo({ ano: 2026, mes: 2 })]: extractAccounts([
@@ -173,7 +258,7 @@ describe('Exportação Excel das demonstrações financeiras', () => {
         'D;3.2;Custos;0;10;0;0',
         'A;1.1.1.01;Bancos;100;0;0;150',
         'A;1.1.1.02;Banco sem saldo;0;0;0;0',
-        'P;2.1.1.01;Fornecedores;30;0;10;40',
+        'P;2.1.1.01;Fornecedores;-30;0;10;-40',
         'P;2.1.1.02;Fornecedor sem saldo;0;0;0;0',
       ].join('\n'), { strict: true }),
     };
@@ -305,7 +390,7 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     });
     const criarBalancete = (mes: number) => extractAccounts([
       'A;1.1.1.01;Caixa;0;0;0;1000',
-      'A;1.5.5.02.01.001;Depreciação acumulada;0;0;0;10',
+      'A;1.5.5.02.01.001;Depreciação acumulada;0;0;0;-10',
       'P;2.1.1;Passivo;0;0;0;-100',
       `P;2.3.1;Capital social totalizador;0;0;0;${mes === 1 ? -810 : -740}`,
       `P;2.3.1.01.01.001;Capital social;0;0;0;${mes === 1 ? -810 : -740}`,

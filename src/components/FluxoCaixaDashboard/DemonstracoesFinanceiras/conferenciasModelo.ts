@@ -1,6 +1,7 @@
 import {
   calcularDfcIndireto,
   calcularLinhas,
+  calcularSaldoPatrimonial,
   calcularSaldosCaixaEquivalentes,
   identificarContasIncompletas,
   linhaPai,
@@ -23,6 +24,7 @@ export interface ContaConferencia {
   saldoAtual: number;
   movimento: number;
   detalhe?: string;
+  destaque?: boolean;
 }
 
 export interface GrupoConferencia {
@@ -166,13 +168,9 @@ function linhaCorrespondente(linha: LinhaDemonstracao, conta: string) {
 function valorContaNaLinha(
   linha: LinhaDemonstracao,
   conta: ContasBalancete[string],
-  operacao: 1 | -1,
 ): number {
   if (linha.demonstracao === 'dfc' || linha.demonstracao === 'dre') return reais(movimentoConta(conta));
-  if (linha.contasPorPrefixo) {
-    return reais((linha.saldoInvertido ? -centavos(conta.saldoAtual) : centavos(Math.abs(conta.saldoAtual))) * operacao / 100);
-  }
-  return reais((linha.saldoInvertido ? centavos(conta.saldoAtual) : centavos(Math.abs(conta.saldoAtual))) * operacao / 100);
+  return reais(calcularSaldoPatrimonial(conta.saldoAtual, linha.demonstracao));
 }
 
 function valorLinhasPorGrupo(
@@ -194,9 +192,7 @@ function valorLinhasPorGrupo(
         total -= centavos(conta.saldoAtual);
         continue;
       }
-      for (const item of linhaCorrespondente(linha, conta.conta)) {
-        total += centavos(valorContaNaLinha(linha, conta, item.operacao));
-      }
+      total += linhaCorrespondente(linha, conta.conta).length * centavos(valorContaNaLinha(linha, conta));
     }
   }
   return total / 100;
@@ -449,11 +445,13 @@ function conferirNatureza(
       }
       continue;
     }
-    if (natureza && Math.abs(centavos(conta.saldoAtual)) > config.limiteSinalCentavos
+    if (natureza && centavos(conta.saldoAtual) !== 0
       && contaComSinalInvertido(conta, natureza)) {
+      const destaque = Math.abs(centavos(conta.saldoAtual)) > config.limiteSinalCentavos;
       divergentes.push({
-        ...montarConta(conta, `Esperada ${natureza}`),
+        ...montarConta(conta, `Esperada ${natureza}${destaque ? ' · Acima do limite de destaque' : ''}`),
         saldoAnterior,
+        destaque,
       });
     }
     const correspondePalavraRedutora = config.palavrasRedutoras.some(palavra =>
@@ -746,13 +744,11 @@ function analisarVariacoes(
           const item = periodo.contas?.[conta.conta];
           if (!item) return 0;
           return demo.codigo === 'ativo' || demo.codigo === 'passivo'
-            || linha.calculo === 'resultadoBalancete'
-            ? centavos(item.saldoAtual)
+            ? centavos(calcularSaldoPatrimonial(item.saldoAtual, demo.codigo))
             : centavos(movimentoConta(item));
         });
         const valorAtualConta = demo.codigo === 'ativo' || demo.codigo === 'passivo'
-          || linha.calculo === 'resultadoBalancete'
-          ? centavos(conta.saldoAtual)
+          ? centavos(calcularSaldoPatrimonial(conta.saldoAtual, demo.codigo))
           : centavos(movimentoConta(conta));
         const mediaConta = metricasAnteriores.length
           ? metricasAnteriores.reduce((total, valor) => total + valor, 0) / metricasAnteriores.length
@@ -1065,6 +1061,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
         contasDireitoUso: arrendamentos.contasDireitoUso,
       },
       observacoes: [
+        `Todos os saldos não zero contrários à natureza esperada são listados. ${sinais.divergentes.filter(conta => conta.destaque).length} acima do limite de destaque de R$ ${(config.limiteSinalCentavos / 100).toFixed(2)}.`,
         ...resultadoPL.movimentos.map(item => `${item.estado}: ${item.grupo}, variação líquida R$ ${item.variacao.toFixed(2)}.`),
         ...variacoesAtipicas.map(item => `${item.demonstracao} · ${item.linha}: ${item.motivo}`),
         ...arrendamentos.candidatos.map(conta => `Possível conta de arrendamento para revisar: ${conta.conta} — ${conta.descricao}.`),
