@@ -16,6 +16,8 @@ import {
 } from './modelo';
 import { DFC_INDIRETO_CATEGORIAS_MAPEAVEIS } from './dfcMetodoIndireto';
 import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
+import { ConferenciasTab } from './ConferenciasTab';
+import type { ImportActor } from '../importHistoryStorage';
 import {
   loadCadastroDemonstracoes, loadDadosDemonstracoes, loadNotasDfc, saveCadastroDemonstracoes, saveNotasDfc,
   type DocumentoNotasDfc, type EscopoNotaDfc, type NotaDfc,
@@ -72,8 +74,16 @@ type EditorCaptacao = {
 };
 type EditorNotaDfc = { id?: string; linhaId: string; linhaNome?: string; texto: string };
 
-export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { selectedYear: number; selectedMonth: number }) {
-  const [aba, setAba] = useState<TipoDemonstracao | 'cadastros'>('dre');
+export function DemonstracoesFinanceiras({
+  selectedYear,
+  selectedMonth,
+  currentUser,
+}: {
+  selectedYear: number;
+  selectedMonth: number;
+  currentUser?: ImportActor;
+}) {
+  const [aba, setAba] = useState<TipoDemonstracao | 'cadastros' | 'conferencias'>('dre');
   const [cadastro, setCadastro] = useState<CadastroDemonstracoes | null>(null);
   const [erroCadastro, setErroCadastro] = useState('');
   const [tentativaCadastro, setTentativaCadastro] = useState(0);
@@ -118,7 +128,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
   const [tipoCadastro, setTipoCadastro] = useState<TipoDemonstracao>('dre');
   const [cadastrosExpandidos, setCadastrosExpandidos] = useState<Set<string>>(new Set());
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(new Set());
-  const escopoDados = aba === 'cadastros' ? 'cadastros'
+  const escopoDados = aba === 'cadastros' || aba === 'conferencias' ? 'cadastros'
     : aba === 'dre' || aba === 'dfc' ? aba
       : aba === 'passivo' ? 'balanco' : 'patrimonial';
   const periodosComparados = useMemo(
@@ -153,12 +163,13 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
     let ativo = true;
     setDados(null);
     setErroDados('');
+    if (aba === 'conferencias') return () => { ativo = false; };
     const principal = periodosParaCarregar[0] ?? { ano: selectedYear, mes: selectedMonth };
     loadDadosDemonstracoes(principal, periodosParaCarregar, escopoDados, acumuladoDados).then(value => {
       if (ativo) setDados(value);
     }).catch(error => { if (ativo) setErroDados(mensagem(error)); });
     return () => { ativo = false; };
-  }, [selectedYear, selectedMonth, periodosParaCarregar, tentativaDados, escopoDados, acumuladoDados]);
+  }, [aba, selectedYear, selectedMonth, periodosParaCarregar, tentativaDados, escopoDados, acumuladoDados]);
 
   useEffect(() => {
     if (aba !== 'dfc') return;
@@ -602,7 +613,7 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
           : Array.from({ length: periodo.mes }, (_, index) => ({ ano: periodo.ano, mes: index + 1 })),
       }))
       : periodosComparados.map(periodo => ({ titulo: rotuloPeriodo(periodo), periodos: [periodo] }));
-  const valores = aba !== 'cadastros' && cadastro && dados
+  const valores = aba !== 'cadastros' && aba !== 'conferencias' && cadastro && dados
     ? colunas.map(coluna => calcularLinhas(cadastro.linhas, aba, coluna.periodos.map(periodo => dados[chavePeriodo(periodo)] ?? null)))
     : [];
   const linhaLucroDre = cadastro
@@ -799,9 +810,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
       <CardContent className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
           <div role="tablist" aria-label="Demonstrações financeiras" className="flex flex-wrap gap-2">
-            {([...Object.keys(TIPOS), 'cadastros'] as Array<TipoDemonstracao | 'cadastros'>).map(tipo => (
+            {([...Object.keys(TIPOS), 'cadastros', 'conferencias'] as Array<TipoDemonstracao | 'cadastros' | 'conferencias'>).map(tipo => (
               <Button key={tipo} role="tab" aria-selected={aba === tipo} variant={aba === tipo ? 'default' : 'outline'} onClick={() => setAba(tipo)}>
-                {tipo === 'cadastros' ? 'Cadastros' : TIPOS[tipo]}
+                {tipo === 'cadastros' ? 'Cadastros' : tipo === 'conferencias' ? 'Conferências' : TIPOS[tipo]}
               </Button>
             ))}
           </div>
@@ -823,7 +834,9 @@ export function DemonstracoesFinanceiras({ selectedYear, selectedMonth }: { sele
               <p>Não foi possível carregar os balancetes: {erroDados}</p>
               <Button variant="outline" onClick={() => setTentativaDados(value => value + 1)}>Tentar carregar balancetes novamente</Button>
             </div>}
-            {aba === 'cadastros' ? (
+            {aba === 'conferencias' ? (
+              <ConferenciasTab selectedYear={selectedYear} selectedMonth={selectedMonth} cadastro={cadastro} currentUser={currentUser} />
+            ) : aba === 'cadastros' ? (
               <fieldset disabled={salvando} className="space-y-6">
                 <section className="space-y-3">
                   <h3 className="font-semibold">Empresa</h3>

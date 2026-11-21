@@ -113,6 +113,27 @@ Cada indicador mostra:
 - 📝 Descrição
 - 🎯 Referência de mercado
 
+### 7. Emissão de Demonstrações Financeiras — Conferências
+
+Na aba **Emissão de Demonstrações Financeiras**, abra **Conferências** para revisar os balancetes e demonstrações do período. Cada verificação mostra um semáforo; expanda o item para consultar contas, linhas e diferenças que explicam o resultado.
+
+O painel verifica:
+
+1. Fechamento do balancete (débitos, créditos e saldos).
+2. Continuidade dos saldos anteriores, incluindo divergências no mês seguinte.
+3. Alterações em reimportações, comparadas à versão emitida e à importação anterior. Cada importação mantém um snapshot; versões importadas podem ser marcadas como emitidas, com usuário e horário.
+4. Equação patrimonial: Ativo − (Passivo + PL).
+5. Lucro líquido da DRE em relação aos grupos 3 a 6.
+6. Variação da DFC e conciliação do caixa com o balanço.
+7. Caixa operacional pelos métodos direto e indireto, no mês e no acumulado.
+8. Acumulado da DRE/DFC em relação à soma dos meses disponíveis.
+9. Contas sem classificação ou classificadas em mais de uma linha.
+10. Contas novas no plano em relação ao período anterior.
+11. Soma das linhas em relação aos totais dos grupos do balancete.
+12. Sinais invertidos, movimentos no PL, variações atípicas e passivos de arrendamento.
+
+As comparações de continuidade e reimportação ignoram diferenças de até **R$ 1,00**. Os critérios de natureza, tolerâncias, limites de variação e prefixos de arrendamento podem ser ajustados em **Parâmetros das conferências**. Variações atípicas exigem pelo menos dois meses anteriores disponíveis; verificações que dependem de períodos ausentes aparecem como indisponíveis.
+
 ## Upload de Arquivo
 
 ### Por Drag & Drop

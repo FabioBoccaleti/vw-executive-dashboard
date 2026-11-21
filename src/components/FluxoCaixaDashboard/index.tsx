@@ -8,6 +8,7 @@ import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, Ba
 import * as XLSX from 'xlsx';
 import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData, loadFluxoCaixaIndex } from "./fluxoCaixaStorage";
+import type { ImportActor } from './importHistoryStorage';
 import { ComparativosTab } from "./ComparativosTab";
 import { DespesasTab } from "./DespesasTab";
 import { ValoresReceberCharts } from "./ValoresReceberCharts";
@@ -452,9 +453,10 @@ const StatusBadge = ({ label, status }: any) => {
 // ─── MAIN COMPONENT ─────────────────────────────────────────────────────────────────
 interface FluxoCaixaDashboardProps {
   onChangeBrand?: () => void;
+  currentUser?: ImportActor;
 }
 
-export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps) {
+export function FluxoCaixaDashboard({ onChangeBrand, currentUser }: FluxoCaixaDashboardProps) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -685,7 +687,8 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         // Se o mês importado for Janeiro, atualiza janAccounts para cálculo acumulado
         if (selectedMonth === 1) setJanAccounts(parsed.accounts);
 
-        const saved = await saveFluxoCaixaData(text, file.name, selectedYear, selectedMonth);
+        if (!currentUser) throw new Error('Não foi possível registrar quem importou o balancete.');
+        const saved = await saveFluxoCaixaData(text, file.name, selectedYear, selectedMonth, currentUser);
         if (saved) {
           console.log(`✅ Balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} salvo no Redis com sucesso:`, file.name);
           setRedisWarning(null);
@@ -731,7 +734,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       setLoading(false);
     };
     reader.readAsText(file, 'latin1');
-  }, [selectedYear, selectedMonth, savedFileKey]);
+  }, [selectedYear, selectedMonth, savedFileKey, currentUser]);
 
   const TABS = [
     { id: 'overview', label: selectedMonth === 0 ? 'Visão Geral Ano' : 'Visão Geral Mês', icon: <BarChart3 className="w-4 h-4" />, requiresData: true },
@@ -945,7 +948,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               <PerguntasRespostasTab data={data} selectedMonth={selectedMonth} selectedYear={selectedYear} prevMonthAccounts={prevMonthAccounts} janAccounts={janAccounts} />
             </div>
           ) : activeTab === 'emissaoDemonstracoes' ? (
-            <DemonstracoesFinanceiras selectedYear={selectedYear} selectedMonth={selectedMonth} />
+            <DemonstracoesFinanceiras selectedYear={selectedYear} selectedMonth={selectedMonth} currentUser={currentUser} />
           ) : loading && !data ? (
             <div className="flex flex-col items-center justify-center py-32 gap-4 text-slate-500">
               <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />

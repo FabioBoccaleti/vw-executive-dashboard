@@ -719,7 +719,7 @@ it('cadastra Endividamento separadamente do Passivo e compara os saldos após re
     { id: 'passivo', nome: 'Obrigações', demonstracao: 'passivo', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }] },
   ] };
   const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
-  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['DRE', 'Ativo', 'Passivo', 'DFC', 'Endividamento', 'Cadastros']);
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['DRE', 'Ativo', 'Passivo', 'DFC', 'Endividamento', 'Cadastros', 'Conferências']);
   await abrirCadastros();
   fireEvent.change(screen.getByLabelText('Demonstração do cadastro'), { target: { value: 'endividamento' } });
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar linha' }));

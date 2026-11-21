@@ -244,7 +244,10 @@ function AppContent() {
       {brand === 'aprovacao_despesas' ? (
         <DespesasDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'fluxo_caixa' ? (
-        <FluxoCaixaDashboard onChangeBrand={handleChangeBrand} />
+        <FluxoCaixaDashboard
+          onChangeBrand={handleChangeBrand}
+          currentUser={{ userId: session.userId, username: session.username, name: session.name }}
+        />
       ) : brand === 'folha_pagamento' ? (
         folhaSubPage === 'selection' ? (
           <FolhaSelectionPage

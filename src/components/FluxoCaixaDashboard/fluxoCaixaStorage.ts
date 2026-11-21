@@ -6,6 +6,10 @@
 // Chave legada do dez/25 (migração automática): fluxo_caixa_raw_v2
 
 import { kvGet, kvSet, kvDelete, kvKeys, kvBulkGet } from '@/lib/kvClient';
+import {
+  createImportSnapshot, markImportSnapshotFailed, markImportSnapshotImported,
+  type ImportActor,
+} from './importHistoryStorage';
 
 // Chave legada usada antes da separação por mês
 const LEGACY_KEY_2025 = 'fluxo_caixa_raw_v2';
@@ -19,19 +23,38 @@ export interface FluxoCaixaRaw {
   rawText: string;
   fileName?: string;
   timestamp?: number;
+  snapshotId?: string;
 }
 
 /**
  * Salva o texto bruto do balancete no Redis para o mês/ano selecionado.
  */
-export async function saveFluxoCaixaData(rawText: string, fileName?: string, year = 2025, month = 12): Promise<boolean> {
+export async function saveFluxoCaixaData(
+  rawText: string,
+  fileName: string | undefined,
+  year: number,
+  month: number,
+  importedBy: ImportActor,
+): Promise<boolean> {
+  const snapshot = await createImportSnapshot(rawText, year, month, fileName, importedBy);
+  let saved: boolean;
   try {
-    const payload: FluxoCaixaRaw = { rawText, fileName, timestamp: Date.now() };
-    return await kvSet(getKey(year, month), payload);
+    const payload: FluxoCaixaRaw = { rawText, fileName, timestamp: snapshot.importedAt, snapshotId: snapshot.id };
+    saved = await kvSet(getKey(year, month), payload);
   } catch (error) {
-    console.error('Erro ao salvar balancete no Redis:', error);
-    return false;
+    await markImportSnapshotFailed(snapshot);
+    throw error;
   }
+  if (!saved) {
+    await markImportSnapshotFailed(snapshot);
+    throw new Error('O snapshot foi registrado, mas não foi possível salvar o balancete atual.');
+  }
+  try {
+    await markImportSnapshotImported(snapshot);
+  } catch (error) {
+    throw new Error(`O balancete foi salvo, mas o histórico não pôde ser finalizado: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return true;
 }
 
 /**
