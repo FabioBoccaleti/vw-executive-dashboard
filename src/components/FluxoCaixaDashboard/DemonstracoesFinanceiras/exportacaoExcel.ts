@@ -1,8 +1,8 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import {
-  DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO, MESES, calcularDfcIndireto, calcularLinhas,
-  calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, linhaPai,
+  DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO, MESES, calcularConta, calcularDfcIndireto, calcularLinhas,
+  calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, identificarContasIncompletas, linhaPai,
   type CadastroDemonstracoes, type DadosDemonstracoes, type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
 import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
@@ -259,6 +259,55 @@ function adicionarDemonstracao(
   return resultados;
 }
 
+function adicionarAberturaDemonstracao(
+  ws: ExcelJS.Worksheet,
+  cadastro: CadastroDemonstracoes,
+  dados: DadosDemonstracoes,
+  demonstracao: 'dre' | 'ativo' | 'passivo',
+  colunas: ColunaExportacao[],
+) {
+  const periodosPorColuna = colunas.map(coluna => periodosDaColuna(dados, coluna));
+  const resultadosPorColuna = periodosPorColuna.map(periodos =>
+    calcularLinhas(cadastro.linhas, demonstracao, periodos));
+  const incompletasPorColuna = periodosPorColuna.map(identificarContasIncompletas);
+  const descricoes = new Map<string, string>();
+  for (const periodo of periodosPorColuna.flat()) {
+    for (const conta of Object.values(periodo ?? {})) {
+      if (conta.desc.trim() && !descricoes.has(conta.conta)) descricoes.set(conta.conta, conta.desc);
+    }
+  }
+
+  for (const linhaExportacao of linhasTabela(cadastro, demonstracao)) {
+    adicionarLinhaDados(
+      ws,
+      linhaExportacao.nome,
+      colunas.map((_, indice) => linhaExportacao.ocultarValores
+        ? null
+        : resultadosPorColuna[indice].get(linhaExportacao.id) ?? null),
+      linhaExportacao.estilo,
+      linhaExportacao.recuo,
+    );
+
+    const linha = cadastro.linhas.find(item =>
+      item.id === linhaExportacao.id && item.demonstracao === demonstracao && item.tipo === 'contas');
+    if (!linha) continue;
+
+    for (const item of linha.itens) {
+      const valores = periodosPorColuna.map((periodos, indice) =>
+        calcularConta(item, demonstracao, periodos, incompletasPorColuna[indice]));
+      if (valores.every(valor => valor !== null && valor === 0)) continue;
+      const descricao = descricoes.get(item.referencia);
+      adicionarLinhaDados(
+        ws,
+        descricao ? `${item.referencia} — ${descricao}` : item.referencia,
+        valores,
+        'normal',
+        true,
+      );
+    }
+  }
+}
+
 function variacaoDireta(linhas: LinhaDemonstracao[], valores: Map<string, number | null>): number | null {
   const raizes = linhas.filter(linha => linha.demonstracao === 'dfc' && !linhaPai(linha) && !linha.foraDfc);
   const totalizadas = new Set(raizes.filter(linha => linha.tipo === 'total')
@@ -473,12 +522,25 @@ export function criarWorkbookDemonstracoesFinanceiras(parametros: ParametrosExpo
     if (tipo === 'endividamento') adicionarDetalhesCaptacoes(ws, parametros.cadastro, parametros.anos, parametros.mesLimite, colunas.length + 1);
     adicionarRodape(ws, (incluirPercentualDre ? colunas.length * 2 : colunas.length) + 1);
   };
+  const criarAbaAbertura = (
+    nome: string,
+    titulo: string,
+    demonstracao: 'dre' | 'ativo' | 'passivo',
+    colunas: ColunaExportacao[],
+  ) => {
+    const ws = configurarPlanilha(workbook, nome, titulo, parametros.cadastro, colunas);
+    adicionarAberturaDemonstracao(ws, parametros.cadastro, parametros.dados, demonstracao, colunas);
+    adicionarRodape(ws, colunas.length + 1);
+  };
   criarAba('DRE', 'Demonstração do Resultado do Exercício', 'dre', colunasFluxo);
-  criarAba('Ativo', 'Balanço Patrimonial — Ativo', 'ativo', colunasSaldo);
-  criarAba('Passivo + PL', 'Balanço Patrimonial — Passivo + Patrimônio Líquido', 'passivo', colunasSaldo);
-  criarAba('Endividamento', 'Demonstrativo de Endividamento', 'endividamento', colunasSaldo);
   adicionarPlanilhaFluxo(workbook, parametros, 'direto', colunasFluxo);
   adicionarPlanilhaFluxo(workbook, parametros, 'indireto', colunasFluxo);
+  criarAba('Endividamento', 'Demonstrativo de Endividamento', 'endividamento', colunasSaldo);
+  criarAba('Ativo', 'Balanço Patrimonial — Ativo', 'ativo', colunasSaldo);
+  criarAba('Passivo + PL', 'Balanço Patrimonial — Passivo + Patrimônio Líquido', 'passivo', colunasSaldo);
+  criarAbaAbertura('DRE - Abertura', 'Demonstração do Resultado do Exercício — Abertura de contas', 'dre', colunasFluxo);
+  criarAbaAbertura('Ativo - Abertura', 'Balanço Patrimonial — Ativo — Abertura de contas', 'ativo', colunasSaldo);
+  criarAbaAbertura('Passivo + PL - Abertura', 'Balanço Patrimonial — Passivo + Patrimônio Líquido — Abertura de contas', 'passivo', colunasSaldo);
   return workbook;
 }
 
