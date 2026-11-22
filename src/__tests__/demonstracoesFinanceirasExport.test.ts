@@ -11,6 +11,45 @@ import { CONFERENCIAS_CONFIG_PADRAO } from '@/components/FluxoCaixaDashboard/Dem
 import type { ConferenciasExportacao } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasDados';
 
 describe('Exportação Excel das demonstrações financeiras', () => {
+  it('exporta Erro e divergências numéricas do item 8 na DFC Indireta em setembro e outubro', async () => {
+    const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
+    const mesesDoAno = Array.from({ length: 12 }, (_, index) => {
+      const saldo = index < 8 ? '0' : '-3.419,87';
+      return {
+        ano: 2026, mes: index + 1,
+        contas: extractAccounts(`A;1.1.3.01.03.001;Clientes;${saldo};0;0;${saldo}`, { strict: true }),
+      };
+    });
+    const config = CONFERENCIAS_CONFIG_PADRAO;
+    const conferencias = [9, 10].map(mes => ({
+      ano: 2026, mes, config, snapshots: [], comparacoes: [],
+      resultados: construirConferencias({
+        ano: 2026, mes, atual: mesesDoAno[mes - 1].contas, anterior: mesesDoAno[mes - 2].contas,
+        proximo: null, acumulado: mesesDoAno.slice(0, mes).map(periodo => periodo.contas),
+        mesesDoAno, mesesAnteriores: [], cadastro, config,
+      }),
+    }));
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados: Object.fromEntries(mesesDoAno.map(periodo => [chavePeriodo(periodo), periodo.contas])),
+      anos: [2026], mesLimite: 10, incluirNotasAnuais: false, notas: [], conferencias,
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+    const ws = reopened.getWorksheet('Conferências')!;
+    const divergencias: ExcelJS.Row[] = [];
+    const resumos: ExcelJS.Row[] = [];
+    ws.eachRow(row => {
+      if (row.getCell(1).value === 'DFC Indireta' && row.getCell(2).value === 'Clientes e créditos de vendas') divergencias.push(row);
+      if (row.getCell(1).value === '8. Acumulado = soma dos meses' && row.getCell(2).value === 'Erro') resumos.push(row);
+    });
+    expect(resumos).toHaveLength(2);
+    expect(divergencias).toHaveLength(2);
+    for (const row of divergencias) {
+      expect([3, 4, 5].map(coluna => row.getCell(coluna).value)).toEqual([3419.87, 0, 3419.87]);
+      expect(row.getCell(5).numFmt).toContain('0.00');
+    }
+  });
+
   it('oculta detalhes zerados da DFC nos dois métodos, conserva períodos com valores e não altera o cadastro', async () => {
     const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
     const ids = cadastro.linhas.map(linha => linha.id);

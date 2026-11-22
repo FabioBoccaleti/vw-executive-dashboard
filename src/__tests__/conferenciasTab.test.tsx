@@ -41,6 +41,25 @@ describe('ConferenciasTab', () => {
 
   afterEach(cleanup);
 
+  it.each([9, 10])('mostra Erro e lista acumulado, soma mensal e diferença da DFC Indireta no mês %s', async mesSelecionado => {
+    mocks.raw.mockImplementation(async (ano: number, mes: number) => {
+      if (ano !== 2026 || mes < 1 || mes > 12) return null;
+      const saldo = mes < 9 ? '0' : '-3.419,87';
+      return { rawText: `A;1.1.3.01.03.001;Clientes;${saldo};0;0;${saldo}` };
+    });
+    render(<ConferenciasTab selectedYear={2026} selectedMonth={mesSelecionado} cadastro={aplicarModeloDfcPadrao(cadastroVazio())} />);
+    const titulo = await screen.findByText('8. Acumulado = soma dos meses');
+    const conferencia = within(titulo.closest('details')!);
+    expect(conferencia.getByText('Erro')).toBeInTheDocument();
+    const tabela = within(conferencia.getByRole('table'));
+    expect(tabela.getAllByRole('columnheader').map(celula => celula.textContent))
+      .toEqual(['Demonstração', 'Linha', 'Acumulado', 'Soma dos meses', 'Diferença']);
+    const linha = within(tabela.getByRole('row', { name: /Clientes e créditos de vendas/ }));
+    expect(linha.getAllByRole('cell').map(celula => celula.textContent?.replace(/\u00a0/g, ' ')))
+      .toEqual(['DFC Indireta', 'Clientes e créditos de vendas', 'R$ 3.419,87', 'R$ 0,00', 'R$ 3.419,87']);
+    expect(tabela.getAllByRole('row')).toHaveLength(5);
+  });
+
   it('atualiza parâmetros antigos de sinal sem perder ajustes e preserva a versão para salvar', async () => {
     const antigos = {
       ...CONFERENCIAS_CONFIG_PADRAO,

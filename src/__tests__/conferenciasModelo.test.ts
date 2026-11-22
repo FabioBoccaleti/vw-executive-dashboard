@@ -379,6 +379,101 @@ describe('conferenciasModelo', () => {
     expect(alteracoes.every(item => item.diferenca === 100.02)).toBe(true);
   });
 
+  it.each([
+    { mes: 9, valor: 3419.87 },
+    { mes: 10, valor: 3419.87 },
+    { mes: 9, valor: 0.01 },
+  ])('identifica linhas e totais da DFC Indireta que não acumulam em $mes, inclusive diferenças de $valor reais', ({ mes, valor }) => {
+    const mesesDoAno = Array.from({ length: 12 }, (_, indice) => {
+      const saldo = indice < 8 ? 0 : -valor;
+      return {
+        ano: 2026, mes: indice + 1,
+        contas: { '1.1.3.01.03.001': conta('1.1.3.01.03.001', saldo, 0, 0, saldo) },
+      };
+    });
+    const resultados = construirConferencias({
+      ano: 2026, mes, atual: mesesDoAno[mes - 1].contas, anterior: mesesDoAno[mes - 2].contas,
+      proximo: null, acumulado: mesesDoAno.slice(0, mes).map(periodo => periodo.contas),
+      mesesDoAno, mesesAnteriores: [], cadastro: aplicarModeloDfcPadrao(cadastroVazio()),
+      config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    if (valor === 3419.87) {
+      expect(resultados.find(item => item.id === 'direto-indireto')!.resumo.replace(/\u00a0/g, ' '))
+        .toBe('Mês: R$ 0,00; acumulado: -R$ 3.419,87.');
+    }
+    const item8 = resultados.find(item => item.id === 'acumulado-mensal')!;
+    expect(item8.estado).toBe('erro');
+    expect(item8.divergenciasAcumulado).toEqual([
+      'Clientes e créditos de vendas', 'Variações do capital de giro',
+      'CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS', 'VARIAÇÃO DE CAIXA PELA DFC',
+    ].map(linha => ({
+      demonstracao: 'DFC Indireta', linha, valorAcumulado: valor, somaMeses: 0, diferenca: valor,
+    })));
+  });
+
+  it('compara DRE, DFC Direta e DFC Indireta com os meses na seleção anual', () => {
+    const base = aplicarModeloDfcPadrao(cadastroVazio());
+    const cadastro: CadastroDemonstracoes = {
+      ...base,
+      linhas: [...base.linhas, {
+        id: 'receita', nome: 'Receita', demonstracao: 'dre', tipo: 'contas',
+        itens: [{ referencia: '3.1.01', operacao: 1 }],
+      }],
+    };
+    const mensal = { '3.1.01': conta('3.1.01', 0, 0, 1, -1) };
+    const anual = { '3.1.01': conta('3.1.01', 0, 0, 14, -14) };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 0, atual: anual, anterior: null, proximo: null, acumulado: [anual],
+      mesesDoAno: Array.from({ length: 12 }, (_, index) => ({ ano: 2026, mes: index + 1, contas: mensal })),
+      mesesAnteriores: [], cadastro, config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    const item8 = resultados.find(item => item.id === 'acumulado-mensal')!;
+    expect(item8.estado).toBe('erro');
+    expect(item8.divergenciasAcumulado).toEqual(expect.arrayContaining([
+      { demonstracao: 'DRE', linha: 'Receita', valorAcumulado: 14, somaMeses: 12, diferenca: 2 },
+      { demonstracao: 'DFC Direta', linha: 'Recebimentos de clientes', valorAcumulado: 14, somaMeses: 12, diferenca: 2 },
+      { demonstracao: 'DFC Indireta', linha: 'Resultado líquido do período (lucro + / prejuízo –)', valorAcumulado: 14, somaMeses: 12, diferenca: 2 },
+    ]));
+  });
+
+  it('não usa o erro entre métodos do item 7 como substituto da comparação do item 8', () => {
+    const atual = { '1.1.3.01.03.001': conta('1.1.3.01.03.001', 0, 0, 0, 3419.87) };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: null, proximo: null, acumulado: [atual],
+      mesesDoAno: [{ ano: 2026, mes: 1, contas: atual }], mesesAnteriores: [],
+      cadastro: aplicarModeloDfcPadrao(cadastroVazio()), config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    expect(resultados.find(item => item.id === 'direto-indireto')!.estado).toBe('erro');
+    expect(resultados.find(item => item.id === 'acumulado-mensal')).toMatchObject({
+      estado: 'ok', divergenciasAcumulado: [],
+    });
+  });
+
+  it.each(['ausente', 'não listado'])('não considera OK o acumulado quando um mês está %s', condicao => {
+    const atual = { '3.1.01': conta('3.1.01') };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 2, atual, anterior: atual, proximo: null, acumulado: [atual, atual],
+      mesesDoAno: [
+        { ano: 2026, mes: 1, contas: atual },
+        ...(condicao === 'ausente' ? [{ ano: 2026, mes: 2, contas: null }] : []),
+      ],
+      mesesAnteriores: [], cadastro: aplicarModeloDfcPadrao(cadastroVazio()), config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    expect(resultados.find(item => item.id === 'acumulado-mensal')).toMatchObject({
+      estado: 'indisponivel', divergenciasAcumulado: [],
+    });
+  });
+
+  it('não ignora valores calculados indisponíveis na verificação do acumulado', () => {
+    const atual = { '3.1.01': conta('3.1.01') };
+    const resultados = construirConferencias({
+      ano: 2026, mes: 1, atual, anterior: null, proximo: null, acumulado: [atual],
+      mesesDoAno: [{ ano: 2026, mes: 1, contas: atual }], mesesAnteriores: [],
+      cadastro: cadastroVazio(), config: CONFERENCIAS_CONFIG_PADRAO,
+    });
+    expect(resultados.find(item => item.id === 'acumulado-mensal')!.estado).toBe('indisponivel');
+  });
+
   it('mantém a diferença operacional negativa no mês e no acumulado em reais', () => {
     const cadastro: CadastroDemonstracoes = {
       ...cadastroVazio(),

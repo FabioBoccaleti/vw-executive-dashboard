@@ -15,6 +15,7 @@ import {
 import { PREFIXOS_COMPENSACAO, type ConferenciasConfig } from './conferenciasStorage';
 import { LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID } from './modelo';
 import { DFC_INDIRETO_AJUSTES, DFC_INDIRETO_VARIACOES } from './dfcMetodoIndireto';
+import { criarLinhasDfcIndiretoTabela } from './dfcTabela';
 
 export type EstadoConferencia = 'ok' | 'atencao' | 'erro' | 'informativo' | 'indisponivel';
 
@@ -51,6 +52,13 @@ export interface ResultadoConferencia {
   contasMesSeguinte?: ContaConferencia[];
   variacoesAtipicas?: AlteracaoAtipica[];
   movimentosPL?: Array<{ grupo: string; variacao: number; estado: string }>;
+  divergenciasAcumulado?: Array<{
+    demonstracao: string;
+    linha: string;
+    valorAcumulado: number;
+    somaMeses: number;
+    diferenca: number;
+  }>;
   conciliacoesDfc?: Array<{
     metodo: 'DFC Direta' | 'DFC Indireta';
     diferenca: number | null;
@@ -554,31 +562,51 @@ function compararAcumuladoComMeses(
   cadastro: CadastroDemonstracoes,
   periodos: PeriodoComContas[],
   acumulado: Array<ContasBalancete | null>,
-): { diferencas: Array<{ demonstracao: string; linha: string; valorAcumulado: number; somaMeses: number; diferenca: number }>; disponivel: boolean } {
-  if (!periodos.length || periodos.some(periodo => !periodo.contas) || acumulado.some(periodo => !periodo)) {
+  mesLimite: number,
+): { diferencas: NonNullable<ResultadoConferencia['divergenciasAcumulado']>; disponivel: boolean } {
+  if (periodos.length !== mesLimite || periodos.some((periodo, index) => periodo.mes !== index + 1 || !periodo.contas)
+    || !acumulado.length || acumulado.some(periodo => !periodo)) {
     return { diferencas: [], disponivel: false };
   }
   const demos: Array<{ id: 'dre' | 'dfc'; nome: string }> = [
     { id: 'dre', nome: 'DRE' },
     { id: 'dfc', nome: 'DFC Direta' },
   ];
-  const diferencas: Array<{ demonstracao: string; linha: string; valorAcumulado: number; somaMeses: number; diferenca: number }> = [];
-  for (const demo of demos) {
-    const linhaDemos = cadastro.linhas.filter(linha => linha.demonstracao === demo.id);
-    const total = calcularLinhas(cadastro.linhas, demo.id, acumulado);
-    const porMes = periodos.map(periodo => calcularLinhas(cadastro.linhas, demo.id, [periodo.contas]));
-    for (const linha of linhaDemos) {
-      const valorAcumulado = total.get(linha.id);
-      const somaMeses = porMes.reduce((soma, mapa) => soma + centavos(mapa.get(linha.id) ?? 0), 0) / 100;
-      if (valorAcumulado === null || valorAcumulado === undefined) continue;
+  const demonstracoes = [
+    ...demos.map(demo => ({
+      nome: demo.nome,
+      linhas: cadastro.linhas.filter(linha => linha.demonstracao === demo.id),
+      total: calcularLinhas(cadastro.linhas, demo.id, acumulado),
+      porMes: periodos.map(periodo => calcularLinhas(cadastro.linhas, demo.id, [periodo.contas])),
+    })),
+    {
+      nome: 'DFC Indireta',
+      linhas: criarLinhasDfcIndiretoTabela(cadastro.linhas)
+        .filter(linha => linha.tipo !== 'titulo' && linha.tipo !== 'grupo'),
+      total: calcularDfcIndireto(cadastro.linhas, cadastro.dfcIndiretoRegras ?? [], acumulado).valores,
+      porMes: periodos.map(periodo =>
+        calcularDfcIndireto(cadastro.linhas, cadastro.dfcIndiretoRegras ?? [], [periodo.contas]).valores),
+    },
+  ];
+  const diferencas: NonNullable<ResultadoConferencia['divergenciasAcumulado']> = [];
+  let disponivel = true;
+  for (const demo of demonstracoes) {
+    for (const linha of demo.linhas) {
+      const valorAcumulado = demo.total.get(linha.id);
+      const valoresMensais = demo.porMes.map(mapa => mapa.get(linha.id))
+        .filter((valor): valor is number => valor !== null && valor !== undefined);
+      if (valorAcumulado === null || valorAcumulado === undefined || valoresMensais.length !== periodos.length) {
+        disponivel = false;
+        continue;
+      }
+      const somaMeses = valoresMensais.reduce((soma, valor) => soma + centavos(valor), 0) / 100;
       const diferenca = reais(centavos(valorAcumulado) - centavos(somaMeses));
       if (Math.abs(centavos(diferenca)) > 0) {
         diferencas.push({ demonstracao: demo.nome, linha: linha.nome, valorAcumulado, somaMeses, diferenca });
       }
     }
   }
-  const todosMeses = periodos.length > 0 && periodos.every((periodo, index) => periodo.mes === index + 1);
-  return { diferencas, disponivel: todosMeses };
+  return { diferencas, disponivel };
 }
 
 function identificarContasNovas(atual: ContasBalancete | null, anterior: ContasBalancete | null) {
@@ -935,7 +963,7 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
     && arrendamentos.fluxoDfcCentavos >= 0;
   const arrendamentoSemAtivo = aumentoArrendamentoSemCaixa && arrendamentos.variacaoDireitoUsoCentavos <= 0;
   const mesesDoAcumulado = mes === 0 ? mesesDoAno : mesesDoAno.filter(periodo => periodo.mes <= mes);
-  const acumuladoMensal = compararAcumuladoComMeses(cadastro, mesesDoAcumulado, acumulado);
+  const acumuladoMensal = compararAcumuladoComMeses(cadastro, mesesDoAcumulado, acumulado, mes === 0 ? 12 : mes);
   const gruposErrados = grupos.filter(grupo => grupo.diferenca !== null
     && Math.abs(centavos(grupo.diferenca)) > config.toleranciaConferenciaCentavos);
   const estadoGrupo = gruposErrados.length ? 'erro' : grupos.some(grupo => grupo.diferenca === null) ? 'indisponivel' : 'ok';
@@ -1012,12 +1040,13 @@ export function construirConferencias(entrada: EntradaConferencias): ResultadoCo
     {
       id: 'acumulado-mensal',
       titulo: '8. Acumulado = soma dos meses',
-      estado: !acumuladoMensal.disponivel ? 'indisponivel' : acumuladoMensal.diferencas.length ? 'erro' : 'ok',
-      resumo: !acumuladoMensal.disponivel
-        ? 'São necessários os 12 balancetes mensais para validar as linhas acumuladas.'
-        : acumuladoMensal.diferencas.length
-          ? `${acumuladoMensal.diferencas.length} linhas de DRE/DFC diferem da soma dos meses.`
-          : 'As linhas de movimento da DRE e DFC acumulam corretamente; balanço continua sendo posição na data.',
+      estado: acumuladoMensal.diferencas.length ? 'erro' : !acumuladoMensal.disponivel ? 'indisponivel' : 'ok',
+      resumo: acumuladoMensal.diferencas.length
+        ? `${acumuladoMensal.diferencas.length} linhas de DRE/DFC Direta/DFC Indireta diferem da soma dos meses.${acumuladoMensal.disponivel ? '' : ' Outras linhas não puderam ser verificadas.'}`
+        : !acumuladoMensal.disponivel
+          ? `São necessários os ${mes === 0 ? 12 : mes} balancetes mensais de janeiro até o período selecionado e cálculos disponíveis para validar todas as linhas acumuladas.`
+          : 'As linhas da DRE, DFC Direta e DFC Indireta acumulam corretamente; balanço continua sendo posição na data.',
+      divergenciasAcumulado: acumuladoMensal.diferencas,
       contas: [],
     },
     {

@@ -697,6 +697,13 @@ function adicionarPlanilhaConferencias(
     for (const resultado of conferencias.resultados) {
       adicionarSecao(ws, resultado.titulo, ultimaColuna);
       texto(`${estados[resultado.estado].nome} · ${resultado.resumo}`);
+      if (resultado.divergenciasAcumulado?.length) {
+        cabecalho(['Demonstração', 'Linha', 'Acumulado', 'Soma dos meses', 'Diferença']);
+        for (const divergencia of resultado.divergenciasAcumulado) {
+          linha([divergencia.demonstracao, divergencia.linha, divergencia.valorAcumulado,
+            divergencia.somaMeses, divergencia.diferenca], [3, 4, 5]);
+        }
+      }
       tabelaContas(resultado.contas ?? []);
       if (resultado.conciliacoesDfc?.length) {
         cabecalho(['Método DFC', 'Diferença do item 6', 'Efeitos das contas sem linha', 'Valor não explicado']);

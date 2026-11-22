@@ -274,6 +274,23 @@ export function ConferenciasTab({ selectedYear, selectedMonth, cadastro, current
   }
 
   function renderizarDetalhes(resultado: ResultadoConferencia) {
+    if (resultado.id === 'acumulado-mensal' && resultado.divergenciasAcumulado?.length) {
+      return <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-left text-xs">
+          <thead><tr className="border-b text-muted-foreground">
+            <th className="p-2">Demonstração</th><th className="p-2">Linha</th>
+            <th className="p-2 text-right">Acumulado</th><th className="p-2 text-right">Soma dos meses</th>
+            <th className="p-2 text-right">Diferença</th>
+          </tr></thead>
+          <tbody>{resultado.divergenciasAcumulado.map((linha, index) => <tr key={`${linha.demonstracao}-${linha.linha}-${index}`} className="border-b last:border-0">
+            <td className="p-2">{linha.demonstracao}</td><td className="p-2">{linha.linha}</td>
+            <td className="p-2 text-right tabular-nums">{moedas.format(linha.valorAcumulado)}</td>
+            <td className="p-2 text-right tabular-nums">{moedas.format(linha.somaMeses)}</td>
+            <td className="p-2 text-right tabular-nums">{moedas.format(linha.diferenca)}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>;
+    }
     if (resultado.id === 'reimportacao') {
       return <div className="space-y-3">
         {erroHistorico && <p role="alert" className="text-sm text-red-700">{erroHistorico}</p>}
