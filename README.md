@@ -46,8 +46,9 @@ proporcionalmente aos seus recebimentos; na regra de pagamento único, fica
 associado à primeira parcela. O arredondamento acumulado distribui os centavos
 entre parcelas e entre recebimentos, que são considerados na ordem de registro.
 Após um estorno, os valores das baixas restantes são recalculados e podem
-variar em centavos. As colunas de percentual e situação da comissão do vendedor
-permanecem em branco. Ao estornar
+variar em centavos. O percentual da comissão do vendedor é o valor exibido da
+comissão dividido pelo valor da cota, com duas casas decimais. A coluna de
+situação da comissão do vendedor permanece em branco. Ao estornar
 um recebimento, sua linha deixa de aparecer na próxima abertura ou atualização.
 Cada item do histórico pode ser estornado individualmente na coluna **Ação**.
 O item é removido e

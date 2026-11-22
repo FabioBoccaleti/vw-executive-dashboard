@@ -99,6 +99,7 @@ function montarLinhasTabela(vendas: VendaConsorcio[]): LinhaTabela[] {
           totalComissaoLiquida: formatCurrency(liquidoCentavos / 100),
           pctRentabilidadeLiquida: rentabilidade(liquidoCentavos),
           valorComissaoVendedor: formatCurrency(comissaoRecebimento / 100),
+          pctComissaoVendedor: rentabilidade(comissaoRecebimento),
         };
         return { id: `${venda.id}-${parcela.numero}-${recebimento.id}`, valores };
       });
