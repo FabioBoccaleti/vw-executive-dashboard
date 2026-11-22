@@ -119,8 +119,12 @@ describe('persistência e contas a receber de consorcio', () => {
     expect(linhas).toHaveLength(2);
     const valores = (linha: HTMLElement) => within(linha).getAllByRole('cell').map(cell => (cell.textContent ?? '').replace(/\s/g, ' '));
     expect(tabela.getByRole('columnheader', { name: '% Total da Comissão s/ Venda' })).toBeInTheDocument();
-    expect(valores(linhas[0])).toEqual(['1', '18/11/2026', '17/11/2026', '', 'Automovel', '2', '1', '123/456', 'Cliente teste', 'R$ 100.000,00', '6%', 'R$ 100,00', '0,10%', 'R$ 14,25', 'R$ 85,75', '0,09%']);
-    expect(valores(linhas[1])).toEqual(['2', '18/11/2026', '19/11/2026', '001-A', 'Automovel', '2', '1', '123/456', 'Cliente teste', 'R$ 100.000,00', '6%', 'R$ 200,00', '0,20%', 'R$ 28,50', 'R$ 171,50', '0,17%']);
+    const cabecalho = tabela.getAllByRole('row')[0];
+    expect(Array.from(cabecalho.children).slice(-4).map(item => item.textContent)).toEqual([
+      '% Rentabilidade Líquida da Parcela', 'Valor da Comissão do Vendedor', '% da comissão do Vendedor', 'Sit. Comissão vendedor',
+    ]);
+    expect(valores(linhas[0])).toEqual(['1', '18/11/2026', '17/11/2026', '', 'Automovel', '2', '1', '123/456', 'Cliente teste', 'R$ 100.000,00', '6%', 'R$ 100,00', '0,10%', 'R$ 14,25', 'R$ 85,75', '0,09%', '', '', '']);
+    expect(valores(linhas[1])).toEqual(['2', '18/11/2026', '19/11/2026', '001-A', 'Automovel', '2', '1', '123/456', 'Cliente teste', 'R$ 100.000,00', '6%', 'R$ 200,00', '0,20%', 'R$ 28,50', 'R$ 171,50', '0,17%', '', '', '']);
     expect(screen.queryByText('Sem baixa')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Vendas$/ }));
@@ -153,10 +157,10 @@ describe('persistência e contas a receber de consorcio', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
     await screen.findByText('principal');
     const principal = within(screen.getByRole('row', { name: /principal/ }));
-    expect(principal.getAllByRole('cell').slice(12).map(cell => (cell.textContent ?? '').replace(/\s/g, ' ')))
+    expect(principal.getAllByRole('cell').slice(12, 16).map(cell => (cell.textContent ?? '').replace(/\s/g, ' ')))
       .toEqual(['1,00%', 'R$ 356,25', 'R$ 2.143,75', '0,86%']);
     const fracao = within(screen.getByRole('row', { name: /fracao/ }));
-    expect(fracao.getAllByRole('cell').slice(12).map(cell => (cell.textContent ?? '').replace(/\s/g, ' ')))
+    expect(fracao.getAllByRole('cell').slice(12, 16).map(cell => (cell.textContent ?? '').replace(/\s/g, ' ')))
       .toEqual(['0,00%', 'R$ 0,01', 'R$ 0,04', '0,00%']);
   });
 

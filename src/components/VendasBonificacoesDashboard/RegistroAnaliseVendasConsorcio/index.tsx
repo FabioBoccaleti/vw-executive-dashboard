@@ -15,7 +15,8 @@ interface RegistroAnaliseVendasConsorcioDashboardProps {
 
 type ColKey = 'dataVenda' | 'dataBordero' | 'numeroBordero' | 'tipoVenda' | 'parcelasTotal' | 'parcelaRecebida'
   | 'grupoCota' | 'cliente' | 'valorCota' | 'pctComissaoVenda' | 'valorComissaoVenda'
-  | 'pctRentabilidadeBruta' | 'impostosComissao' | 'totalComissaoLiquida' | 'pctRentabilidadeLiquida';
+  | 'pctRentabilidadeBruta' | 'impostosComissao' | 'totalComissaoLiquida' | 'pctRentabilidadeLiquida'
+  | 'valorComissaoVendedor' | 'pctComissaoVendedor' | 'situacaoComissaoVendedor';
 interface ColDef { key: ColKey; label: string; width: number; align?: 'right' }
 interface LinhaTabela { id: string; valores: Partial<Record<ColKey, string>> }
 
@@ -36,6 +37,9 @@ const COLUMNS: ColDef[] = [
   { key: 'impostosComissao',        label: 'Impostos s/ a Parcela da Comissão',    width: 150, align: 'right' },
   { key: 'totalComissaoLiquida',    label: 'Total da Parcela da Comissão Líquida', width: 180, align: 'right' },
   { key: 'pctRentabilidadeLiquida', label: '% Rentabilidade Líquida da Parcela',    width: 150, align: 'right' },
+  { key: 'valorComissaoVendedor',   label: 'Valor da Comissão do Vendedor',          width: 180, align: 'right' },
+  { key: 'pctComissaoVendedor',     label: '% da comissão do Vendedor',             width: 160, align: 'right' },
+  { key: 'situacaoComissaoVendedor', label: 'Sit. Comissão vendedor',               width: 160 },
 ];
 
 function montarLinhasTabela(vendas: VendaConsorcio[]): LinhaTabela[] {

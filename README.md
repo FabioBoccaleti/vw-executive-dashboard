@@ -37,7 +37,8 @@ o percentual total de comissão é o cadastrado no produto no momento da venda.
 Para cada recebimento, o imposto aplica a alíquota vigente na venda ao valor
 recebido e é arredondado em centavos; o líquido deduz esse imposto. As
 rentabilidades bruta e líquida dividem esses valores pela carta e são exibidas
-com duas casas decimais. Ao estornar
+com duas casas decimais. As colunas de comissão do vendedor permanecem em
+branco até a definição do preenchimento. Ao estornar
 um recebimento, sua linha deixa de aparecer na próxima abertura ou atualização.
 Cada item do histórico pode ser estornado individualmente na coluna **Ação**.
 O item é removido e
