@@ -10,14 +10,10 @@ import {
 } from './cadastroStorage';
 import { calcularComissaoVendedor, validarCronograma } from './comissaoVendedor';
 import { criarVendaConsorcio, saveNovaVendaConsorcio } from './vendasStorage';
-import { formatCurrency, parseValorMonetario } from './valores';
+import { formatCurrency, formatPercentLabel, parseValorMonetario } from './valores';
 
 function parsePercent(value: string): number {
   return parsePercentualCadastro(value) ?? 0;
-}
-
-function formatPercentLabel(value: string): string {
-  return `${value.trim().replace(/\s*%+$/, '') || '0'}%`;
 }
 
 function getRegraBaseLabel(base: 'valor_carta' | 'bruta' | 'liquida'): string {

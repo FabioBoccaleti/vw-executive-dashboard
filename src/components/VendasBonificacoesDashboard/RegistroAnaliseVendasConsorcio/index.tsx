@@ -1,33 +1,78 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
 import { Handshake, TableProperties, BarChart2, BookOpen, LogOut, ShoppingCart, Clock, CheckCircle2, FilePlus2 } from 'lucide-react';
 import { LancarVendaForm } from './LancarVendaForm';
 import { VendasReceber } from './VendasReceber';
+import { loadVendasConsorcio, type VendaConsorcio } from './vendasStorage';
+import { parsePercentualCadastro } from './cadastroStorage';
+import { formatCurrency, formatPercentLabel } from './valores';
 
 interface RegistroAnaliseVendasConsorcioDashboardProps {
   onChangeBrand: () => void;
   onOpenCadastros: () => void;
 }
 
-interface ColDef { key: string; label: string; width: number; align?: 'right' }
+type ColKey = 'dataVenda' | 'dataBordero' | 'numeroBordero' | 'tipoVenda' | 'parcelasTotal' | 'parcelaRecebida'
+  | 'grupoCota' | 'cliente' | 'valorCota' | 'pctComissaoVenda' | 'valorComissaoVenda'
+  | 'pctRentabilidadeBruta' | 'impostosComissao' | 'totalComissaoLiquida' | 'pctRentabilidadeLiquida';
+interface ColDef { key: ColKey; label: string; width: number; align?: 'right' }
+interface LinhaTabela { id: string; valores: Partial<Record<ColKey, string>> }
 
 // Colunas-folha da tabela (as duas de parcelas ficam sob o grupo "Quantidade de Parcelas")
 const COLUMNS: ColDef[] = [
+  { key: 'dataVenda',               label: 'Data da Venda',               width: 140 },
   { key: 'dataBordero',             label: 'Data do Borderô',             width: 140 },
-  { key: 'tipoVenda',               label: 'Tipo da Venda',               width: 160 },
+  { key: 'numeroBordero',           label: 'Número do Borderô',           width: 140 },
+  { key: 'tipoVenda',               label: 'Produto',                     width: 160 },
   { key: 'parcelasTotal',           label: 'Total de Parcelas',           width: 120 },
   { key: 'parcelaRecebida',         label: 'Parcela Recebida',            width: 120 },
   { key: 'grupoCota',               label: 'Grupo / Cota',                width: 130 },
   { key: 'cliente',                 label: 'Cliente',                     width: 190 },
   { key: 'valorCota',               label: 'Valor da Cota de Consorcio',  width: 180, align: 'right' },
-  { key: 'pctComissaoVenda',        label: '% Comissão s/ Venda',         width: 150, align: 'right' },
+  { key: 'pctComissaoVenda',        label: '% Total da Comissão s/ Venda', width: 150, align: 'right' },
   { key: 'valorComissaoVenda',      label: 'Valor da Parcela de Comissão de Venda', width: 185, align: 'right' },
   { key: 'pctRentabilidadeBruta',   label: '% Rentabilidade Bruta da Parcela',      width: 150, align: 'right' },
   { key: 'impostosComissao',        label: 'Impostos s/ a Parcela da Comissão',    width: 150, align: 'right' },
   { key: 'totalComissaoLiquida',    label: 'Total da Parcela da Comissão Líquida', width: 180, align: 'right' },
   { key: 'pctRentabilidadeLiquida', label: '% Rentabilidade Líquida da Parcela',    width: 150, align: 'right' },
 ];
+
+function montarLinhasTabela(vendas: VendaConsorcio[]): LinhaTabela[] {
+  return vendas.flatMap(venda => venda.parcelas.flatMap(parcela =>
+    parcela.recebimentos.map(recebimento => {
+      const aliquota = typeof venda.aliquotaImposto === 'string' ? parsePercentualCadastro(venda.aliquotaImposto) : null;
+      if (aliquota === null || aliquota < 0 || aliquota > 100) {
+        throw new Error(`Alíquota de imposto inválida na venda de ${venda.cliente}.`);
+      }
+      if (!Number.isSafeInteger(venda.valorCartaCentavos) || venda.valorCartaCentavos <= 0 ||
+          !Number.isSafeInteger(recebimento.valorCentavos) || recebimento.valorCentavos <= 0) {
+        throw new Error(`Valor da carta ou do recebimento inválido na venda de ${venda.cliente}.`);
+      }
+      const impostoCentavos = Math.round(recebimento.valorCentavos * aliquota / 100);
+      const liquidoCentavos = recebimento.valorCentavos - impostoCentavos;
+      const rentabilidade = (valorCentavos: number) => `${(valorCentavos / venda.valorCartaCentavos * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+      const valores: Partial<Record<ColKey, string>> = {
+        dataVenda: venda.dataVenda.split('-').reverse().join('/'),
+        dataBordero: recebimento.data.split('-').reverse().join('/'),
+        numeroBordero: recebimento.numeroBordero,
+        tipoVenda: venda.produto.nome,
+        parcelasTotal: String(venda.parcelas.length),
+        parcelaRecebida: String(parcela.numero),
+        grupoCota: venda.grupoCota,
+        cliente: venda.cliente,
+        valorCota: formatCurrency(venda.valorCartaCentavos / 100),
+        pctComissaoVenda: formatPercentLabel(venda.produto.percentualSorana),
+        valorComissaoVenda: formatCurrency(recebimento.valorCentavos / 100),
+        pctRentabilidadeBruta: rentabilidade(recebimento.valorCentavos),
+        impostosComissao: formatCurrency(impostoCentavos / 100),
+        totalComissaoLiquida: formatCurrency(liquidoCentavos / 100),
+        pctRentabilidadeLiquida: rentabilidade(liquidoCentavos),
+      };
+      return { id: `${venda.id}-${parcela.numero}-${recebimento.id}`, valores };
+    }),
+  ));
+}
 
 export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenCadastros }: RegistroAnaliseVendasConsorcioDashboardProps) {
   const { canAccessVendasSub, isAdmin } = useAuth();
@@ -40,6 +85,25 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
     canTabela ? 'tabela' : canVendas ? 'vendas' : 'analise',
   );
   const [vendasSubTab, setVendasSubTab] = useState<'a_receber' | 'recebida'>('a_receber');
+  const [linhasTabela, setLinhasTabela] = useState<LinhaTabela[]>([]);
+  const [tabelaLoading, setTabelaLoading] = useState(false);
+  const [tabelaError, setTabelaError] = useState('');
+  const [tabelaAtualizacao, setTabelaAtualizacao] = useState(0);
+
+  useEffect(() => {
+    if (activeTab !== 'tabela' || !canTabela) return;
+    let active = true;
+    setTabelaLoading(true);
+    setTabelaError('');
+    loadVendasConsorcio().then(vendas => {
+      if (active) setLinhasTabela(montarLinhasTabela(vendas));
+    }).catch(error => {
+      if (active) setTabelaError(error instanceof Error ? error.message : String(error));
+    }).finally(() => {
+      if (active) setTabelaLoading(false);
+    });
+    return () => { active = false; };
+  }, [activeTab, canTabela, tabelaAtualizacao]);
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -144,6 +208,7 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
       {/* ── Content ── */}
       {activeTab === 'tabela' && canTabela && (
         <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
+          <Button variant="outline" className="self-end" disabled={tabelaLoading} onClick={() => setTabelaAtualizacao(value => value + 1)}>Atualizar</Button>
           <div
             className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-auto flex-1"
             style={{ maxHeight: 'calc(100vh - 180px)' }}
@@ -205,11 +270,17 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
               </thead>
 
               <tbody>
-                <tr>
-                  <td colSpan={COLUMNS.length + 1} className="text-center text-sm text-slate-400 py-10">
-                    Nenhum registro cadastrado
-                  </td>
-                </tr>
+                {tabelaLoading ? <tr><td colSpan={COLUMNS.length + 1} className="text-center text-sm text-slate-400 py-10">Carregando recebimentos...</td></tr>
+                  : tabelaError ? <tr><td colSpan={COLUMNS.length + 1} className="p-4 text-sm text-red-700" role="alert">Não foi possível carregar os recebimentos: {tabelaError}. Use Atualizar para tentar novamente.</td></tr>
+                    : linhasTabela.length === 0 ? <tr><td colSpan={COLUMNS.length + 1} className="text-center text-sm text-slate-400 py-10">Nenhum registro cadastrado</td></tr>
+                      : linhasTabela.map((linha, index) => (
+                        <tr key={linha.id} className="border-t border-slate-200">
+                          <td className="sticky left-0 bg-white px-2 py-3 text-center">{index + 1}</td>
+                          {COLUMNS.map(col => (
+                            <td key={col.key} className={`px-3 py-3 ${col.align === 'right' ? 'text-right' : 'text-center'}`}>{linha.valores[col.key] ?? ''}</td>
+                          ))}
+                        </tr>
+                      ))}
               </tbody>
             </table>
           </div>

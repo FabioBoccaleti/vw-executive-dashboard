@@ -28,6 +28,14 @@ Em **Vendas > Recebida**, a coluna Data do recebimento mostra a data de cada
 baixa, também mantida no histórico. A coluna Número do borderô lista os números
 de cada recebimento da parcela; recebimentos antigos sem número aparecem com um traço.
 O valor da carta da venda é exibido em cada parcela com recebimento.
+A aba **Tabela** apresenta uma linha por recebimento, inclusive parciais e
+recebimentos anteriores. A data do borderô corresponde à data do recebimento;
+o percentual total de comissão é o cadastrado no produto no momento da venda.
+Para cada recebimento, o imposto aplica a alíquota vigente na venda ao valor
+recebido e é arredondado em centavos; o líquido deduz esse imposto. As
+rentabilidades bruta e líquida dividem esses valores pela carta e são exibidas
+com duas casas decimais. Ao estornar
+um recebimento, sua linha deixa de aparecer na próxima abertura ou atualização.
 Cada item do histórico pode ser estornado individualmente na coluna **Ação**.
 O item é removido e
 o valor volta ao saldo a receber.

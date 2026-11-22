@@ -11,6 +11,10 @@ export function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+export function formatPercentLabel(value: string): string {
+  return `${value.trim().replace(/\s*%+$/, '') || '0'}%`;
+}
+
 export function emCentavos(value: number): number {
   const centavos = Math.round((value + Number.EPSILON) * 100);
   if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(centavos)) {
