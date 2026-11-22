@@ -31,7 +31,7 @@ const COLUMNS: ColDef[] = [
   { key: 'cliente',                 label: 'Cliente',                     width: 190 },
   { key: 'valorCota',               label: 'Valor da Cota de Consorcio',  width: 180, align: 'right' },
   { key: 'pctComissaoVenda',        label: '% Total da Comissão s/ Venda', width: 150, align: 'right' },
-  { key: 'valorComissaoVenda',      label: 'Valor da Parcela de Comissão de Venda', width: 185, align: 'right' },
+  { key: 'valorComissaoVenda',      label: 'Valor da Parcela de Comissão de Venda Bruta', width: 185, align: 'right' },
   { key: 'pctRentabilidadeBruta',   label: '% Rentabilidade Bruta da Parcela',      width: 150, align: 'right' },
   { key: 'impostosComissao',        label: 'Impostos s/ a Parcela da Comissão',    width: 150, align: 'right' },
   { key: 'totalComissaoLiquida',    label: 'Total da Parcela da Comissão Líquida', width: 180, align: 'right' },

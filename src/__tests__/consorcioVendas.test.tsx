@@ -58,7 +58,7 @@ describe('persistência e contas a receber de consorcio', () => {
   it('identifica os valores e rentabilidades das parcelas nos cabeçalhos da tabela', () => {
     render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
     for (const nome of [
-      'Valor da Parcela de Comissão de Venda',
+      'Valor da Parcela de Comissão de Venda Bruta',
       '% Rentabilidade Bruta da Parcela',
       'Impostos s/ a Parcela da Comissão',
       'Total da Parcela da Comissão Líquida',
