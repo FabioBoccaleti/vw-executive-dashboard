@@ -1,4 +1,10 @@
-import { parsePercentualCadastro, type ProdutoConsorcio, type RegraComissaoConsorcio } from './cadastroStorage';
+import { parsePercentualCadastro, type BaseComissaoConsorcio, type ProdutoConsorcio, type RegraComissaoConsorcio } from './cadastroStorage';
+
+export const BASE_COMISSAO_LABELS: Record<BaseComissaoConsorcio, string> = {
+  valor_carta: 'Valor da Cota de Consorcio',
+  bruta: 'Valor da Parcela de Comissão de Venda Bruta',
+  liquida: 'Total da Parcela da Comissão Líquida',
+};
 
 export function validarCronograma(regra: RegraComissaoConsorcio, parcelasSorana: number): string | null {
   if (regra.pagamento !== 'cronograma') return null;

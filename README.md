@@ -34,11 +34,20 @@ O valor da carta da venda é exibido em cada parcela com recebimento.
 A aba **Tabela** apresenta uma linha por recebimento, inclusive parciais e
 recebimentos anteriores. A data do borderô corresponde à data do recebimento;
 o percentual total de comissão é o cadastrado no produto no momento da venda.
+No cadastro das regras do vendedor, as bases são chamadas **Valor da Cota de
+Consorcio**, **Valor da Parcela de Comissão de Venda Bruta** e **Total da
+Parcela da Comissão Líquida**; a alteração dos nomes não modifica os cálculos.
 Para cada recebimento, o imposto aplica a alíquota vigente na venda ao valor
 recebido e é arredondado em centavos; o líquido deduz esse imposto. As
 rentabilidades bruta e líquida dividem esses valores pela carta e são exibidas
-com duas casas decimais. As colunas de comissão do vendedor permanecem em
-branco até a definição do preenchimento. Ao estornar
+com duas casas decimais. A comissão do vendedor usa a regra, o produto e a
+alíquota registrados na venda. O valor previsto para cada parcela é atribuído
+proporcionalmente aos seus recebimentos; na regra de pagamento único, fica
+associado à primeira parcela. O arredondamento acumulado distribui os centavos
+entre parcelas e entre recebimentos, que são considerados na ordem de registro.
+Após um estorno, os valores das baixas restantes são recalculados e podem
+variar em centavos. As colunas de percentual e situação da comissão do vendedor
+permanecem em branco. Ao estornar
 um recebimento, sua linha deixa de aparecer na próxima abertura ou atualização.
 Cada item do histórico pode ser estornado individualmente na coluna **Ação**.
 O item é removido e

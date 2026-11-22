@@ -72,6 +72,37 @@ describe('cronograma de comissao do consorcio', () => {
     expect(() => calcularComissaoVendedor(invalid, produto, 100000, 14.25)).toThrow();
   });
 
+  it('mostra os nomes das bases no cadastro, edição e lançamento sem mudar os valores cadastrados', async () => {
+    const config = cadastro([{ ...regra, base: 'bruta' }]);
+    vi.mocked(loadCadastroConsorcio).mockResolvedValue(config);
+    const nomes = [
+      'Valor da Cota de Consorcio',
+      'Valor da Parcela de Comissão de Venda Bruta',
+      'Total da Parcela da Comissão Líquida',
+    ];
+    const view = render(<ConsorcioCadastros />);
+    await screen.findByText('Comissão do vendedor por cargo e produto');
+    const baseNova = screen.getAllByRole('combobox')[3];
+    expect(within(baseNova).getAllByRole('option').map(option => option.textContent)).toEqual(nomes);
+    const tabela = within(screen.getAllByRole('table')[1]);
+    expect(tabela.getByText(nomes[1])).toBeInTheDocument();
+    fireEvent.click(tabela.getByRole('button', { name: 'Editar' }));
+    const baseEdicao = tabela.getAllByRole('combobox')[2];
+    expect(within(baseEdicao).getAllByRole('option').map(option => option.textContent)).toEqual(nomes);
+    fireEvent.change(baseEdicao, { target: { value: 'liquida' } });
+    fireEvent.click(tabela.getByRole('button', { name: /^Salvar$/ }));
+    expect(tabela.getByText(nomes[2])).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+    await waitFor(() => expect(saveCadastroConsorcio).toHaveBeenCalledOnce());
+    expect(vi.mocked(saveCadastroConsorcio).mock.calls[0][0].regrasComissao[0].base).toBe('liquida');
+
+    view.unmount();
+    render(<LancarVendaForm onOpenCadastros={vi.fn()} />);
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Produto / tipo de carta *' }), { target: { value: 'produto' } });
+    fireEvent.change(screen.getByRole('combobox', { name: /Vendedor/ }), { target: { value: 'vendedor' } });
+    expect(screen.getByText(`Cronograma por parcela sobre ${nomes[1]}`)).toBeInTheDocument();
+  });
+
   it('creates, saves and reloads a schedule, then displays its total and installments in the sale form', async () => {
     vi.mocked(loadCadastroConsorcio).mockResolvedValue(cadastro([]));
     const view = render(<ConsorcioCadastros />);

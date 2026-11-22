@@ -123,8 +123,8 @@ describe('persistência e contas a receber de consorcio', () => {
     expect(Array.from(cabecalho.children).slice(-4).map(item => item.textContent)).toEqual([
       '% Rentabilidade Líquida da Parcela', 'Valor da Comissão do Vendedor', '% da comissão do Vendedor', 'Sit. Comissão vendedor',
     ]);
-    expect(valores(linhas[0])).toEqual(['1', '18/11/2026', '17/11/2026', '', 'Automovel', '2', '1', '123/456', 'Cliente teste', 'R$ 100.000,00', '6%', 'R$ 100,00', '0,10%', 'R$ 14,25', 'R$ 85,75', '0,09%', '', '', '']);
-    expect(valores(linhas[1])).toEqual(['2', '18/11/2026', '19/11/2026', '001-A', 'Automovel', '2', '1', '123/456', 'Cliente teste', 'R$ 100.000,00', '6%', 'R$ 200,00', '0,20%', 'R$ 28,50', 'R$ 171,50', '0,17%', '', '', '']);
+    expect(valores(linhas[0])).toEqual(['1', '18/11/2026', '17/11/2026', '', 'Automovel', '2', '1', '123/456', 'Cliente teste', 'R$ 100.000,00', '6%', 'R$ 100,00', '0,10%', 'R$ 14,25', 'R$ 85,75', '0,09%', 'R$ 133,33', '', '']);
+    expect(valores(linhas[1])).toEqual(['2', '18/11/2026', '19/11/2026', '001-A', 'Automovel', '2', '1', '123/456', 'Cliente teste', 'R$ 100.000,00', '6%', 'R$ 200,00', '0,20%', 'R$ 28,50', 'R$ 171,50', '0,17%', 'R$ 266,67', '', '']);
     expect(screen.queryByText('Sem baixa')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Vendas$/ }));
@@ -140,7 +140,67 @@ describe('persistência e contas a receber de consorcio', () => {
     linhas = tabela.getAllByRole('row').slice(2);
     expect(linhas).toHaveLength(1);
     expect(valores(linhas[0])[11]).toBe('R$ 100,00');
+    expect(valores(linhas[0])[16]).toBe('R$ 133,33');
     expect(tabela.queryByText('001-A')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['valor_carta', 'unica', undefined, ['R$ 4.000,00', 'R$ 0,00']],
+    ['bruta', 'por_parcela', undefined, ['R$ 300,00', 'R$ 300,00']],
+    ['liquida', 'cronograma', ['10', '20'], ['R$ 257,25', 'R$ 514,50']],
+    ['valor_carta', 'cronograma', ['1', '0'], ['R$ 1.000,00', 'R$ 0,00']],
+  ] as const)('calcula comissão com base %s e pagamento %s usando a regra da venda', async (base, pagamento, percentuaisParcelas, esperados) => {
+    const config = cadastro(2);
+    config.regrasComissao[0] = {
+      ...config.regrasComissao[0], base, pagamento, percentual: pagamento === 'unica' ? '4' : '10',
+      ...(percentuaisParcelas ? { percentuaisParcelas: [...percentuaisParcelas] } : {}),
+    };
+    const venda = criarVendaConsorcio(dados(), config);
+    venda.parcelas.forEach(parcela => parcela.recebimentos.push({
+      id: `baixa-${parcela.numero}`, data: '2026-11-18', valorCentavos: parcela.valorCentavos, numeroBordero: `bordero-${parcela.numero}`,
+    }));
+    await saveNovaVendaConsorcio(venda);
+    config.regrasComissao[0].percentual = '99';
+    config.regrasComissao[0].percentuaisParcelas = ['99', '99'];
+    config.produtos[0].percentualSorana = '99';
+    config.aliquotaImposto = '99';
+    records.set('consorcio_cadastros', config);
+    render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
+    await screen.findByText('bordero-1');
+    for (let index = 0; index < 2; index++) {
+      const celulas = within(screen.getByRole('row', { name: new RegExp(`bordero-${index + 1}`) })).getAllByRole('cell');
+      expect((celulas[16].textContent ?? '').replace(/\s/g, ' ')).toBe(esperados[index]);
+      expect(celulas[17]).toBeEmptyDOMElement();
+      expect(celulas[18]).toBeEmptyDOMElement();
+    }
+  });
+
+  it('distribui centavos entre parcelas e baixas parciais sem alterar o total', async () => {
+    const config = cadastro(3);
+    config.produtos[0].percentualSorana = '100';
+    config.regrasComissao[0].pagamento = 'por_parcela';
+    config.regrasComissao[0].percentual = '1';
+    const venda = criarVendaConsorcio({ ...dados(), valorCarta: 1 }, config);
+    venda.parcelas.forEach(parcela => parcela.recebimentos.push({
+      id: `baixa-${parcela.numero}`, data: '2026-11-18', valorCentavos: parcela.valorCentavos, numeroBordero: `centavos-${parcela.numero}`,
+    }));
+    const configParcial = cadastro(1);
+    configParcial.produtos[0].percentualSorana = '100';
+    configParcial.regrasComissao[0].percentual = '2';
+    const parcial = criarVendaConsorcio({ ...dados(), id: 'parcial', valorCarta: 1 }, configParcial);
+    [33, 33, 34].forEach((valorCentavos, index) => parcial.parcelas[0].recebimentos.push({
+      id: `parcial-${index}`, data: '2026-11-18', valorCentavos, numeroBordero: `parcial-${index}`,
+    }));
+    await saveNovaVendaConsorcio(venda);
+    await saveNovaVendaConsorcio(parcial);
+    render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
+    await screen.findByText('centavos-1');
+    const comissao = (bordero: string) => within(screen.getByRole('row', { name: new RegExp(bordero) }))
+      .getAllByRole('cell')[16].textContent?.replace(/\s/g, ' ');
+    expect([1, 2, 3].map(index => comissao(`centavos-${index}`))).toEqual(['R$ 0,00', 'R$ 0,01', 'R$ 0,00']);
+    expect([0, 1, 2].map(index => comissao(`parcial-${index}`))).toEqual(['R$ 0,01', 'R$ 0,00', 'R$ 0,01']);
   });
 
   it('calcula rentabilidades e imposto sobre cada baixa, arredondando imposto em centavos', async () => {

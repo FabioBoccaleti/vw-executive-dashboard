@@ -6,7 +6,8 @@ import { LancarVendaForm } from './LancarVendaForm';
 import { VendasReceber } from './VendasReceber';
 import { loadVendasConsorcio, type VendaConsorcio } from './vendasStorage';
 import { parsePercentualCadastro } from './cadastroStorage';
-import { formatCurrency, formatPercentLabel } from './valores';
+import { calcularComissaoVendedor } from './comissaoVendedor';
+import { emCentavos, formatCurrency, formatPercentLabel } from './valores';
 
 interface RegistroAnaliseVendasConsorcioDashboardProps {
   onChangeBrand: () => void;
@@ -43,39 +44,66 @@ const COLUMNS: ColDef[] = [
 ];
 
 function montarLinhasTabela(vendas: VendaConsorcio[]): LinhaTabela[] {
-  return vendas.flatMap(venda => venda.parcelas.flatMap(parcela =>
-    parcela.recebimentos.map(recebimento => {
-      const aliquota = typeof venda.aliquotaImposto === 'string' ? parsePercentualCadastro(venda.aliquotaImposto) : null;
-      if (aliquota === null || aliquota < 0 || aliquota > 100) {
-        throw new Error(`Alíquota de imposto inválida na venda de ${venda.cliente}.`);
+  return vendas.flatMap(venda => {
+    if (!venda.parcelas.some(parcela => parcela.recebimentos.length > 0)) return [];
+    const aliquota = typeof venda.aliquotaImposto === 'string' ? parsePercentualCadastro(venda.aliquotaImposto) : null;
+    if (aliquota === null || aliquota < 0 || aliquota > 100) {
+      throw new Error(`Alíquota de imposto inválida na venda de ${venda.cliente}.`);
+    }
+    if (!Number.isSafeInteger(venda.valorCartaCentavos) || venda.valorCartaCentavos <= 0) {
+      throw new Error(`Valor da carta inválido na venda de ${venda.cliente}.`);
+    }
+    const comissao = calcularComissaoVendedor(venda.regraComissao, venda.produto, venda.valorCartaCentavos / 100, aliquota);
+    let acumuladoComissao = 0;
+    const comissoesCentavos = comissao.parcelas.map(valor => {
+      const anterior = emCentavos(acumuladoComissao);
+      acumuladoComissao += valor;
+      return emCentavos(acumuladoComissao) - anterior;
+    });
+
+    return venda.parcelas.flatMap(parcela => {
+      if (parcela.recebimentos.length === 0) return [];
+      if (!Number.isInteger(parcela.numero) || parcela.numero < 1 || parcela.numero > comissoesCentavos.length ||
+          !Number.isSafeInteger(parcela.valorCentavos) || parcela.valorCentavos <= 0) {
+        throw new Error(`Parcela inválida na venda de ${venda.cliente}.`);
       }
-      if (!Number.isSafeInteger(venda.valorCartaCentavos) || venda.valorCartaCentavos <= 0 ||
-          !Number.isSafeInteger(recebimento.valorCentavos) || recebimento.valorCentavos <= 0) {
-        throw new Error(`Valor da carta ou do recebimento inválido na venda de ${venda.cliente}.`);
-      }
-      const impostoCentavos = Math.round(recebimento.valorCentavos * aliquota / 100);
-      const liquidoCentavos = recebimento.valorCentavos - impostoCentavos;
-      const rentabilidade = (valorCentavos: number) => `${(valorCentavos / venda.valorCartaCentavos * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-      const valores: Partial<Record<ColKey, string>> = {
-        dataVenda: venda.dataVenda.split('-').reverse().join('/'),
-        dataBordero: recebimento.data.split('-').reverse().join('/'),
-        numeroBordero: recebimento.numeroBordero,
-        tipoVenda: venda.produto.nome,
-        parcelasTotal: String(venda.parcelas.length),
-        parcelaRecebida: String(parcela.numero),
-        grupoCota: venda.grupoCota,
-        cliente: venda.cliente,
-        valorCota: formatCurrency(venda.valorCartaCentavos / 100),
-        pctComissaoVenda: formatPercentLabel(venda.produto.percentualSorana),
-        valorComissaoVenda: formatCurrency(recebimento.valorCentavos / 100),
-        pctRentabilidadeBruta: rentabilidade(recebimento.valorCentavos),
-        impostosComissao: formatCurrency(impostoCentavos / 100),
-        totalComissaoLiquida: formatCurrency(liquidoCentavos / 100),
-        pctRentabilidadeLiquida: rentabilidade(liquidoCentavos),
-      };
-      return { id: `${venda.id}-${parcela.numero}-${recebimento.id}`, valores };
-    }),
-  ));
+      const comissaoParcelaCentavos = comissoesCentavos[parcela.numero - 1];
+      let recebidoCentavos = 0;
+      return parcela.recebimentos.map(recebimento => {
+        if (!Number.isSafeInteger(recebimento.valorCentavos) || recebimento.valorCentavos <= 0) {
+          throw new Error(`Valor do recebimento inválido na venda de ${venda.cliente}.`);
+        }
+        const comissaoAnterior = Math.round(comissaoParcelaCentavos * recebidoCentavos / parcela.valorCentavos);
+        recebidoCentavos += recebimento.valorCentavos;
+        if (!Number.isSafeInteger(recebidoCentavos) || recebidoCentavos > parcela.valorCentavos) {
+          throw new Error(`Recebimentos excedem o valor da parcela na venda de ${venda.cliente}.`);
+        }
+        const comissaoRecebimento = Math.round(comissaoParcelaCentavos * recebidoCentavos / parcela.valorCentavos) - comissaoAnterior;
+        const impostoCentavos = Math.round(recebimento.valorCentavos * aliquota / 100);
+        const liquidoCentavos = recebimento.valorCentavos - impostoCentavos;
+        const rentabilidade = (valorCentavos: number) => `${(valorCentavos / venda.valorCartaCentavos * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+        const valores: Partial<Record<ColKey, string>> = {
+          dataVenda: venda.dataVenda.split('-').reverse().join('/'),
+          dataBordero: recebimento.data.split('-').reverse().join('/'),
+          numeroBordero: recebimento.numeroBordero,
+          tipoVenda: venda.produto.nome,
+          parcelasTotal: String(venda.parcelas.length),
+          parcelaRecebida: String(parcela.numero),
+          grupoCota: venda.grupoCota,
+          cliente: venda.cliente,
+          valorCota: formatCurrency(venda.valorCartaCentavos / 100),
+          pctComissaoVenda: formatPercentLabel(venda.produto.percentualSorana),
+          valorComissaoVenda: formatCurrency(recebimento.valorCentavos / 100),
+          pctRentabilidadeBruta: rentabilidade(recebimento.valorCentavos),
+          impostosComissao: formatCurrency(impostoCentavos / 100),
+          totalComissaoLiquida: formatCurrency(liquidoCentavos / 100),
+          pctRentabilidadeLiquida: rentabilidade(liquidoCentavos),
+          valorComissaoVendedor: formatCurrency(comissaoRecebimento / 100),
+        };
+        return { id: `${venda.id}-${parcela.numero}-${recebimento.id}`, valores };
+      });
+    });
+  });
 }
 
 export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenCadastros }: RegistroAnaliseVendasConsorcioDashboardProps) {

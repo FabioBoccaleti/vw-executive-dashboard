@@ -8,17 +8,12 @@ import {
   parsePercentualCadastro,
   type CadastroConsorcio,
 } from './cadastroStorage';
-import { calcularComissaoVendedor, validarCronograma } from './comissaoVendedor';
+import { BASE_COMISSAO_LABELS, calcularComissaoVendedor, validarCronograma } from './comissaoVendedor';
 import { criarVendaConsorcio, saveNovaVendaConsorcio } from './vendasStorage';
 import { formatCurrency, formatPercentLabel, parseValorMonetario } from './valores';
 
 function parsePercent(value: string): number {
   return parsePercentualCadastro(value) ?? 0;
-}
-
-function getRegraBaseLabel(base: 'valor_carta' | 'bruta' | 'liquida'): string {
-  if (base === 'valor_carta') return 'Valor da carta';
-  return base === 'bruta' ? 'Comissão Sorana bruta' : 'Comissão Sorana líquida';
 }
 
 export function LancarVendaForm({ onOpenCadastros, onVendaRegistrada }: {
@@ -221,7 +216,7 @@ export function LancarVendaForm({ onOpenCadastros, onVendaRegistrada }: {
                   readOnly
                   className="bg-slate-50 font-semibold text-cyan-800"
                 />
-                {regra && <span className="mt-1 block text-xs text-slate-500">{regra.pagamento === 'cronograma' ? 'Cronograma por parcela' : formatPercentLabel(regra.percentual)} sobre {getRegraBaseLabel(regra.base)}</span>}
+                {regra && <span className="mt-1 block text-xs text-slate-500">{regra.pagamento === 'cronograma' ? 'Cronograma por parcela' : formatPercentLabel(regra.percentual)} sobre {BASE_COMISSAO_LABELS[regra.base]}</span>}
                 {erroCronograma && <span role="alert" className="mt-1 block text-xs text-red-700">{erroCronograma} Corrija a regra no cadastro.</span>}
               </Field>
               <Field label="Parcelas em que a Sorana receberá a comissão">

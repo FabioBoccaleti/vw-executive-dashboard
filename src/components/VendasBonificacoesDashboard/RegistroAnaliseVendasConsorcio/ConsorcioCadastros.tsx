@@ -13,7 +13,7 @@ import {
   type RegraComissaoConsorcio,
   type VendedorConsorcio,
 } from './cadastroStorage';
-import { validarCronograma } from './comissaoVendedor';
+import { BASE_COMISSAO_LABELS, validarCronograma } from './comissaoVendedor';
 
 type SecaoCadastro = 'produtos' | 'equipe' | 'impostos';
 
@@ -371,7 +371,7 @@ function ProdutosSection({
         {(cargos.length === 0 || produtos.length === 0) && (
           <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">Cadastre ao menos um cargo e um produto antes de configurar as comissões.</p>
         )}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <select value={novoCargoId} onChange={event => setNovoCargoId(event.target.value)} disabled={disabled || cargos.length === 0} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
             <option value="">Cargo...</option>{cargos.map(cargo => <option key={cargo.id} value={cargo.id}>{cargo.nome}</option>)}
           </select>
@@ -384,10 +384,8 @@ function ProdutosSection({
           {novoPagamento === 'cronograma'
             ? <p className="self-center text-xs text-cyan-800">Percentuais por parcela abaixo</p>
             : <Input value={novoPercentual} onChange={event => setNovoPercentual(event.target.value)} placeholder="% comissão" inputMode="decimal" disabled={disabled} />}
-          <select value={novaBase} onChange={event => setNovaBase(event.target.value as RegraComissaoConsorcio['base'])} disabled={disabled} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
-            <option value="valor_carta">Valor da carta</option>
-            <option value="bruta">Comissão Sorana bruta</option>
-            <option value="liquida">Comissão Sorana líquida</option>
+          <select value={novaBase} onChange={event => setNovaBase(event.target.value as RegraComissaoConsorcio['base'])} disabled={disabled} className="min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm sm:col-span-2">
+            {Object.entries(BASE_COMISSAO_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
           <select value={novoPagamento} onChange={event => setNovoPagamento(event.target.value as RegraComissaoConsorcio['pagamento'])} disabled={disabled} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
             <option value="por_parcela">Por parcela recebida</option><option value="unica">Pagamento único</option>
@@ -432,7 +430,7 @@ function ProdutosSection({
                       : regra.pagamento === 'cronograma'
                         ? <div className="space-y-1 text-xs">{regra.percentuaisParcelas?.map((value, parcela) => <p key={parcela}>{parcela + 1}ª: {parsePercentualCadastro(value)}%</p>)}</div>
                         : `${regra.percentual}%`}</td>
-                    <td className="px-3 py-2 text-center">{editing ? <select value={editingRule.base} onChange={event => setEditingRule({ ...editingRule, base: event.target.value as RegraComissaoConsorcio['base'] })} disabled={disabled} className="rounded border px-2 py-1"><option value="valor_carta">Valor da carta</option><option value="bruta">Sorana bruta</option><option value="liquida">Sorana líquida</option></select> : regra.base === 'valor_carta' ? 'Valor da carta' : regra.base === 'bruta' ? 'Sorana bruta' : 'Sorana líquida'}</td>
+                    <td className="px-3 py-2 text-center">{editing ? <select value={editingRule.base} onChange={event => setEditingRule({ ...editingRule, base: event.target.value as RegraComissaoConsorcio['base'] })} disabled={disabled} className="max-w-full rounded border px-2 py-1">{Object.entries(BASE_COMISSAO_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : BASE_COMISSAO_LABELS[regra.base]}</td>
                     <td className="px-3 py-2 text-center">{editing ? <select value={editingRule.pagamento} onChange={event => setEditingRule({
                       ...editingRule,
                       pagamento: event.target.value as RegraComissaoConsorcio['pagamento'],
