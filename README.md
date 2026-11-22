@@ -24,6 +24,9 @@ The Spark Template files and resources from GitHub are licensed under the terms 
 
 ## Recebimentos de consórcio
 
+O módulo abre em **Lançar Vendas** para usuários com acesso a essa aba.
+Em **Vendas > A Receber**, o percentual da comissão do produto corresponde ao
+cadastro no momento da venda, mesmo que o produto seja alterado depois.
 Em **Vendas > Recebida**, a coluna Data do recebimento mostra a data de cada
 baixa, também mantida no histórico. A coluna Número do borderô lista os números
 de cada recebimento da parcela; recebimentos antigos sem número aparecem com um traço.

@@ -8,7 +8,7 @@ import {
   estornarRecebimentoConsorcio, loadVendasConsorcio, recebidoParcela, registrarRecebimentoConsorcio, resumoVenda, saldoParcela,
   type ParcelaConsorcio, type RecebimentoConsorcio, type VendaConsorcio,
 } from './vendasStorage';
-import { dataValida, emCentavos, formatCurrency, parseValorMonetario } from './valores';
+import { dataValida, emCentavos, formatCurrency, formatPercentLabel, parseValorMonetario } from './valores';
 
 const moeda = (centavos: number) => formatCurrency(centavos / 100);
 const dataBR = (data: string) => data.split('-').reverse().join('/');
@@ -202,12 +202,12 @@ export function VendasReceber({ situacao }: { situacao: 'a_receber' | 'recebida'
               ) : (
               <table className="w-full min-w-[1050px] text-sm">
                 <thead className="bg-cyan-800 text-white"><tr>
-                  {['Data da venda', 'Cliente / Grupo e cota', 'Produto', 'Valor da carta', 'Comissão bruta Sorana', 'Parcelas quitadas', 'Recebido', 'Saldo', 'Detalhes'].map(label => (
+                  {['Data da venda', 'Cliente / Grupo e cota', 'Produto', 'Valor da carta', '% Comissão do produto', 'Comissão bruta Sorana', 'Parcelas quitadas', 'Recebido', 'Saldo', 'Detalhes'].map(label => (
                     <th key={label} className="px-4 py-3 text-left text-xs">{label}</th>
                   ))}
                 </tr></thead>
                 <tbody>
-                  {pendentes.length === 0 && <tr><td colSpan={9} className="p-10 text-center text-slate-400">Nenhuma venda a receber.</td></tr>}
+                  {pendentes.length === 0 && <tr><td colSpan={10} className="p-10 text-center text-slate-400">Nenhuma venda a receber.</td></tr>}
                   {pendentes.map(venda => {
                     const resumo = resumoVenda(venda);
                     return (
@@ -217,6 +217,7 @@ export function VendasReceber({ situacao }: { situacao: 'a_receber' | 'recebida'
                           <td className="px-4 py-3"><p className="font-semibold">{venda.cliente}</p><p className="text-xs text-slate-500">{venda.grupoCota}</p></td>
                           <td className="px-4 py-3">{venda.produto.nome}</td>
                           <td className="whitespace-nowrap px-4 py-3">{moeda(venda.valorCartaCentavos)}</td>
+                          <td className="whitespace-nowrap px-4 py-3">{formatPercentLabel(venda.produto.percentualSorana)}</td>
                           <td className="whitespace-nowrap px-4 py-3">{moeda(venda.comissaoBrutaCentavos)}</td>
                           <td className="px-4 py-3">{resumo.parcelasRecebidas}/{venda.parcelas.length}</td>
                           <td className="whitespace-nowrap px-4 py-3 text-emerald-700">{moeda(resumo.recebidoCentavos)}</td>
@@ -225,7 +226,7 @@ export function VendasReceber({ situacao }: { situacao: 'a_receber' | 'recebida'
                             {expanded === venda.id ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}Parcelas
                           </Button></td>
                         </tr>
-                        {expanded === venda.id && <tr><td colSpan={9} className="bg-slate-50 p-4">
+                        {expanded === venda.id && <tr><td colSpan={10} className="bg-slate-50 p-4">
                           <p className="mb-3 text-xs text-slate-600">Imposto previsto: {moeda(venda.impostoCentavos)} · Comissão líquida prevista: {moeda(venda.comissaoLiquidaCentavos)}. O recebimento é controlado pelo valor bruto.</p>
                           <table className="w-full bg-white text-sm" aria-label={`Parcelas de ${venda.cliente}`}>
                             <thead className="bg-cyan-50 text-cyan-900"><tr>{['Parcela', 'Valor previsto', 'Recebido', 'Saldo', 'Situação', 'Ação'].map(label => <th key={label} className="px-3 py-2 text-left text-xs">{label}</th>)}</tr></thead>

@@ -10,7 +10,10 @@ import {
 } from '@/components/VendasBonificacoesDashboard/RegistroAnaliseVendasConsorcio/vendasStorage';
 import type { CadastroConsorcio } from '@/components/VendasBonificacoesDashboard/RegistroAnaliseVendasConsorcio/cadastroStorage';
 
-const { records } = vi.hoisted(() => ({ records: new Map<string, unknown>() }));
+const { records, auth } = vi.hoisted(() => ({
+  records: new Map<string, unknown>(),
+  auth: { admin: true, submodules: [] as string[] },
+}));
 
 vi.mock('@/lib/kvClient', () => ({
   kvGet: vi.fn(async (key: string) => structuredClone(records.get(key) ?? null)),
@@ -23,7 +26,10 @@ vi.mock('@/lib/kvClient', () => ({
   }),
   kvSet: vi.fn(),
 }));
-vi.mock('@/contexts/useAuth', () => ({ useAuth: () => ({ isAdmin: () => true, canAccessVendasSub: () => true }) }));
+vi.mock('@/contexts/useAuth', () => ({ useAuth: () => ({
+  isAdmin: () => auth.admin,
+  canAccessVendasSub: (submodule: string) => auth.submodules.includes(submodule),
+}) }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function cadastro(parcelas = 6): CadastroConsorcio {
@@ -45,6 +51,8 @@ function dados(): DadosNovaVendaConsorcio {
 
 beforeEach(() => {
   records.clear();
+  auth.admin = true;
+  auth.submodules = [];
   vi.clearAllMocks();
   records.set('consorcio_cadastros', cadastro());
 });
@@ -55,8 +63,27 @@ afterEach(() => {
 });
 
 describe('persistência e contas a receber de consorcio', () => {
+  it('abre em Lançar Vendas quando o usuário tem acesso', async () => {
+    render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    expect(await screen.findByLabelText('Data da venda *')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Data da Venda' })).not.toBeInTheDocument();
+  });
+
+  it('abre a aba disponível quando o usuário não tem acesso a vendas', () => {
+    auth.admin = false;
+    auth.submodules = ['consorcio.tabela'];
+    const view = render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    expect(screen.getByRole('columnheader', { name: 'Data da Venda' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Lançar Vendas' })).not.toBeInTheDocument();
+    view.unmount();
+    auth.submodules = ['consorcio.analise'];
+    render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    expect(screen.getByText('Em desenvolvimento')).toBeInTheDocument();
+  });
+
   it('identifica os valores e rentabilidades das parcelas nos cabeçalhos da tabela', () => {
     render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
     for (const nome of [
       'Valor da Parcela de Comissão de Venda Bruta',
       '% Rentabilidade Bruta da Parcela',
@@ -82,6 +109,7 @@ describe('persistência e contas a receber de consorcio', () => {
     cadastroAtualizado.aliquotaImposto = '99';
     records.set('consorcio_cadastros', cadastroAtualizado);
     render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
     await screen.findByText('001-A');
     let tabela = within(screen.getByRole('table'));
     expect(tabela.getAllByRole('columnheader').slice(0, 5).map(item => item.textContent)).toEqual([
@@ -122,6 +150,7 @@ describe('persistência e contas a receber de consorcio', () => {
     await saveNovaVendaConsorcio(venda);
     await saveNovaVendaConsorcio(vendaCentavos);
     render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
     await screen.findByText('principal');
     const principal = within(screen.getByRole('row', { name: /principal/ }));
     expect(principal.getAllByRole('cell').slice(12).map(cell => (cell.textContent ?? '').replace(/\s/g, ' ')))
@@ -137,6 +166,7 @@ describe('persistência e contas a receber de consorcio', () => {
     venda.parcelas[0].recebimentos.push({ id: 'baixa', data: '2026-11-18', valorCentavos: 10000 });
     await saveNovaVendaConsorcio(venda);
     render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Alíquota de imposto inválida');
     expect(screen.queryByText('Nenhum registro cadastrado')).not.toBeInTheDocument();
   });
@@ -148,12 +178,14 @@ describe('persistência e contas a receber de consorcio', () => {
     venda.parcelas[0].recebimentos.push({ id: 'antigo', data: '2026-11-17', valorCentavos: 10000 });
     await saveNovaVendaConsorcio(venda);
     render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
     expect(await screen.findByText('6,25%')).toBeInTheDocument();
   });
 
   it('informa falha de carregamento da tabela e permite tentar novamente', async () => {
     vi.mocked(kvKeys).mockRejectedValueOnce(new Error('Rede indisponível'));
     render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Tabela$/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Rede indisponível');
     expect(screen.queryByText('Nenhum registro cadastrado')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }));
@@ -325,6 +357,23 @@ describe('persistência e contas a receber de consorcio', () => {
     render(<VendasReceber situacao="recebida" />);
     expect(await screen.findByText('Nenhuma parcela com recebimento.')).toBeInTheDocument();
     expect(screen.queryByText('Cliente teste')).not.toBeInTheDocument();
+  });
+
+  it('mostra em A Receber o percentual do produto registrado na venda, mesmo após alterar o cadastro', async () => {
+    const config = cadastro(2);
+    config.produtos[0].percentualSorana = '6,25%';
+    const venda = criarVendaConsorcio(dados(), config);
+    await saveNovaVendaConsorcio(venda);
+    config.produtos[0].percentualSorana = '9';
+    records.set('consorcio_cadastros', config);
+    render(<VendasReceber situacao="a_receber" />);
+    expect(await screen.findByText('6,25%')).toBeInTheDocument();
+    const tabela = within(screen.getByRole('table'));
+    expect(tabela.getAllByRole('columnheader').slice(3, 6).map(item => item.textContent)).toEqual([
+      'Valor da carta', '% Comissão do produto', 'Comissão bruta Sorana',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Parcelas de Cliente teste' }));
+    expect(screen.getByRole('table', { name: 'Parcelas de Cliente teste' }).closest('td')).toHaveAttribute('colspan', '10');
   });
 
   it('estorna apenas o recebimento escolhido, atualizando saldo e histórico após validar a senha', async () => {

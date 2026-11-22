@@ -82,7 +82,7 @@ export function RegistroAnaliseVendasConsorcioDashboard({ onChangeBrand, onOpenC
   const canCadastro = isAdmin() || canAccessVendasSub('consorcio.cadastro');
 
   const [activeTab, setActiveTab] = useState<'tabela' | 'vendas' | 'lancar' | 'analise'>(
-    canTabela ? 'tabela' : canVendas ? 'vendas' : 'analise',
+    canVendas ? 'lancar' : canTabela ? 'tabela' : 'analise',
   );
   const [vendasSubTab, setVendasSubTab] = useState<'a_receber' | 'recebida'>('a_receber');
   const [linhasTabela, setLinhasTabela] = useState<LinhaTabela[]>([]);
