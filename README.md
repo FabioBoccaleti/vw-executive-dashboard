@@ -24,8 +24,10 @@ The Spark Template files and resources from GitHub are licensed under the terms 
 
 ## Recebimentos de consórcio
 
-Em **Vendas > Recebida**, a coluna Número do borderô lista os números de cada
-recebimento da parcela; recebimentos antigos sem número aparecem com um traço.
+Em **Vendas > Recebida**, a coluna Data do recebimento mostra a data de cada
+baixa, também mantida no histórico. A coluna Número do borderô lista os números
+de cada recebimento da parcela; recebimentos antigos sem número aparecem com um traço.
+O valor da carta da venda é exibido em cada parcela com recebimento.
 Cada item do histórico pode ser estornado individualmente na coluna **Ação**.
 O item é removido e
 o valor volta ao saldo a receber.

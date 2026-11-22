@@ -158,6 +158,7 @@ describe('persistência e contas a receber de consorcio', () => {
     const parcial = within(recebidas.getAllByRole('row')[1]);
     expect(parcial.getByText('Cliente teste')).toBeInTheDocument();
     expect(parcial.getByText('123/456')).toBeInTheDocument();
+    expect(parcial.getByText('R$ 100.000,00')).toBeInTheDocument();
     expect(parcial.getByText('1/2')).toBeInTheDocument();
     expect(parcial.queryByText('2/2')).not.toBeInTheDocument();
     expect(parcial.getByText('Parcial')).toBeInTheDocument();
@@ -170,19 +171,21 @@ describe('persistência e contas a receber de consorcio', () => {
     const quitadas = within(screen.getByRole('table', { name: 'Parcelas com recebimentos' }));
     expect(quitadas.getAllByRole('row')).toHaveLength(2);
     const primeira = within(quitadas.getAllByRole('row')[1]);
-    expect(quitadas.getAllByRole('columnheader').slice(0, 3).map(item => item.textContent)).toEqual([
-      'Data da venda', 'Número do borderô', 'Cliente / Grupo e cota',
+    expect(quitadas.getAllByRole('columnheader').slice(0, 4).map(item => item.textContent)).toEqual([
+      'Data da venda', 'Data do recebimento', 'Número do borderô', 'Cliente / Grupo e cota',
     ]);
-    expect(primeira.getAllByRole('cell')[1]).toHaveTextContent('001-A · 002');
+    expect(primeira.getAllByRole('cell')[2]).toHaveTextContent('001-A · 002');
     expect(primeira.getByText('Recebida', { exact: true })).toBeInTheDocument();
     expect(primeira.getByText('R$ 0,00')).toBeInTheDocument();
     expect(primeira.getByText('18/11/2026 — R$ 400,00')).toBeInTheDocument();
     expect(primeira.getByText('18/11/2026 — R$ 2.600,00')).toBeInTheDocument();
     expect(quitadas.getAllByRole('columnheader').slice(-2).map(item => item.textContent)).toEqual(['Histórico de recebimentos', 'Ação']);
     const celulas = primeira.getAllByRole('cell');
-    expect(celulas[9]).not.toHaveTextContent('Borderô');
-    expect(within(celulas[9]).queryByRole('button')).not.toBeInTheDocument();
-    const botoesEstorno = within(celulas[10]).getAllByRole('button');
+    expect(quitadas.getAllByRole('columnheader')[5]).toHaveTextContent('Valor da carta');
+    expect(celulas[5]).toHaveTextContent('R$ 100.000,00');
+    expect(celulas[11]).not.toHaveTextContent('Borderô');
+    expect(within(celulas[11]).queryByRole('button')).not.toBeInTheDocument();
+    const botoesEstorno = within(celulas[12]).getAllByRole('button');
     expect(botoesEstorno).toHaveLength(2);
     expect(botoesEstorno[0]).toHaveAccessibleName(/400,00 — Borderô: 001-A/);
     expect(botoesEstorno[1]).toHaveAccessibleName(/2\.600,00 — Borderô: 002/);
@@ -191,6 +194,7 @@ describe('persistência e contas a receber de consorcio', () => {
     expect(await screen.findByText('Nenhuma venda a receber.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Recebida$/ }));
     expect(await screen.findAllByText('Cliente teste')).toHaveLength(2);
+    expect(screen.getAllByText('R$ 100.000,00')).toHaveLength(2);
     expect(within(screen.getByRole('table', { name: 'Parcelas com recebimentos' })).getAllByRole('row')).toHaveLength(3);
     expect((await loadVendasConsorcio())[0].parcelas.flatMap(item => item.recebimentos)).toHaveLength(3);
 
@@ -225,7 +229,8 @@ describe('persistência e contas a receber de consorcio', () => {
     await saveNovaVendaConsorcio(venda);
     const view = render(<VendasReceber situacao="recebida" />);
     const row = within((await screen.findAllByRole('row'))[1]);
-    expect(row.getAllByRole('cell')[1]).toHaveTextContent('— · 001');
+    expect(within(row.getAllByRole('cell')[1]).getAllByText(/2026/).map(item => item.textContent)).toEqual(['17/11/2026', '18/11/2026']);
+    expect(row.getAllByRole('cell')[2]).toHaveTextContent('— · 001');
     fireEvent.click(row.getByRole('button', { name: /Estornar recebimento.*17\/11\/2026/ }));
     let dialog = within(screen.getByRole('dialog'));
     fireEvent.change(dialog.getByLabelText('Senha de estorno'), { target: { value: 'incorreta' } });
@@ -235,7 +240,9 @@ describe('persistência e contas a receber de consorcio', () => {
     fireEvent.change(dialog.getByLabelText('Senha de estorno'), { target: { value: 'senha-teste' } });
     fireEvent.click(dialog.getByRole('button', { name: 'Confirmar estorno' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(row.getAllByRole('cell')[1]).toHaveTextContent('001');
+    expect(row.getAllByRole('cell')[1]).toHaveTextContent('18/11/2026');
+    expect(row.getAllByRole('cell')[1]).not.toHaveTextContent('17/11/2026');
+    expect(row.getAllByRole('cell')[2]).toHaveTextContent('001');
     expect(row.queryByText('17/11/2026 — R$ 100,00')).not.toBeInTheDocument();
     expect(row.getByText('Parcial')).toBeInTheDocument();
     expect(resumoVenda((await loadVendasConsorcio())[0])).toMatchObject({ recebidoCentavos: 590000, saldoCentavos: 10000 });

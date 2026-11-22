@@ -166,18 +166,22 @@ export function VendasReceber({ situacao }: { situacao: 'a_receber' | 'recebida'
               {situacao === 'recebida' ? (
                 <table className="w-full min-w-[1050px] text-sm" aria-label="Parcelas com recebimentos">
                   <thead className="bg-cyan-800 text-white"><tr>
-                    {['Data da venda', 'Número do borderô', 'Cliente / Grupo e cota', 'Produto', 'Parcela', 'Valor previsto', 'Recebido', 'Saldo', 'Situação', 'Histórico de recebimentos', 'Ação'].map(label => (
+                    {['Data da venda', 'Data do recebimento', 'Número do borderô', 'Cliente / Grupo e cota', 'Produto', 'Valor da carta', 'Parcela', 'Valor previsto', 'Recebido', 'Saldo', 'Situação', 'Histórico de recebimentos', 'Ação'].map(label => (
                       <th key={label} className="px-4 py-3 text-left text-xs">{label}</th>
                     ))}
                   </tr></thead>
                   <tbody>
-                    {parcelasRecebidas.length === 0 && <tr><td colSpan={11} className="p-10 text-center text-slate-400">Nenhuma parcela com recebimento.</td></tr>}
+                    {parcelasRecebidas.length === 0 && <tr><td colSpan={13} className="p-10 text-center text-slate-400">Nenhuma parcela com recebimento.</td></tr>}
                     {parcelasRecebidas.map(({ venda, parcela }) => (
                       <tr key={`${venda.id}-${parcela.numero}`} className="border-t border-slate-100">
                         <td className="px-4 py-3">{dataBR(venda.dataVenda)}</td>
+                        <td className="px-4 py-3 align-top">{parcela.recebimentos.map(item => (
+                          <div key={item.id} className="flex h-8 items-center whitespace-nowrap">{dataBR(item.data)}</div>
+                        ))}</td>
                         <td className="px-4 py-3">{parcela.recebimentos.map(item => item.numeroBordero || '—').join(' · ')}</td>
                         <td className="px-4 py-3"><p className="font-semibold">{venda.cliente}</p><p className="text-xs text-slate-500">{venda.grupoCota}</p></td>
                         <td className="px-4 py-3">{venda.produto.nome}</td>
+                        <td className="whitespace-nowrap px-4 py-3">{moeda(venda.valorCartaCentavos)}</td>
                         <td className="px-4 py-3">{parcela.numero}/{venda.parcelas.length}</td>
                         <td className="whitespace-nowrap px-4 py-3">{moeda(parcela.valorCentavos)}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-emerald-700">{moeda(recebidoParcela(parcela))}</td>
