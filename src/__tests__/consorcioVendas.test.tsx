@@ -55,6 +55,19 @@ afterEach(() => {
 });
 
 describe('persistência e contas a receber de consorcio', () => {
+  it('identifica os valores e rentabilidades das parcelas nos cabeçalhos da tabela', () => {
+    render(<RegistroAnaliseVendasConsorcioDashboard onChangeBrand={vi.fn()} onOpenCadastros={vi.fn()} />);
+    for (const nome of [
+      'Valor da Parcela de Comissão de Venda',
+      '% Rentabilidade Bruta da Parcela',
+      'Impostos s/ a Parcela da Comissão',
+      'Total da Parcela da Comissão Líquida',
+      '% Rentabilidade Líquida da Parcela',
+    ]) {
+      expect(screen.getByRole('columnheader', { name: nome })).toBeInTheDocument();
+    }
+  });
+
   it('congela o cadastro e distribui centavos restantes na última parcela da comissão bruta', async () => {
     const config = cadastro();
     const venda = criarVendaConsorcio({ ...dados(), valorCarta: 100000.17 }, config);
