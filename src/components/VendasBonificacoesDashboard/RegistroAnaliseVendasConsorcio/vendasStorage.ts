@@ -1,4 +1,5 @@
 import { kvCompareAndSet, kvGet, kvKeys } from '@/lib/kvClient';
+import { getSessionToken } from '@/lib/authClient';
 import { parsePercentualCadastro, type CadastroConsorcio, type ProdutoConsorcio, type RegraComissaoConsorcio, type VendedorConsorcio } from './cadastroStorage';
 import { calcularComissaoVendedor } from './comissaoVendedor';
 import { dataValida, emCentavos } from './valores';
@@ -9,6 +10,7 @@ export interface RecebimentoConsorcio {
   id: string;
   data: string;
   valorCentavos: number;
+  numeroBordero?: string;
 }
 
 export interface ParcelaConsorcio {
@@ -140,7 +142,7 @@ export async function saveNovaVendaConsorcio(venda: VendaConsorcio): Promise<voi
 export async function registrarRecebimentoConsorcio(
   vendaId: string,
   numeroParcela: number,
-  recebimento: RecebimentoConsorcio,
+  recebimento: RecebimentoConsorcio & { numeroBordero: string },
 ): Promise<VendaConsorcio> {
   const key = `${PREFIX}${vendaId}`;
   const venda = await kvGet<VendaConsorcio>(key, { throwOnError: true });
@@ -148,9 +150,11 @@ export async function registrarRecebimentoConsorcio(
   const parcela = venda.parcelas.find(item => item.numero === numeroParcela);
   if (!parcela) throw new Error('Parcela não encontrada.');
   if (!recebimento.id || !dataValida(recebimento.data)) throw new Error('Informe uma data de recebimento válida.');
+  const numeroBordero = recebimento.numeroBordero?.trim();
+  if (!numeroBordero) throw new Error('Informe o número do borderô.');
   const existente = venda.parcelas.flatMap(item => item.recebimentos).find(item => item.id === recebimento.id);
   if (existente) {
-    if (parcela.recebimentos.some(item => item.id === existente.id) && existente.data === recebimento.data && existente.valorCentavos === recebimento.valorCentavos) return venda;
+    if (parcela.recebimentos.some(item => item.id === existente.id) && existente.data === recebimento.data && existente.valorCentavos === recebimento.valorCentavos && existente.numeroBordero === numeroBordero) return venda;
     throw new Error('Este recebimento já foi registrado com outros dados. Atualize a listagem.');
   }
   if (!Number.isSafeInteger(recebimento.valorCentavos) || recebimento.valorCentavos <= 0 || recebimento.valorCentavos > saldoParcela(parcela)) {
@@ -160,7 +164,44 @@ export async function registrarRecebimentoConsorcio(
     ...venda,
     version: crypto.randomUUID(),
     parcelas: venda.parcelas.map(item => item.numero === numeroParcela
-      ? { ...item, recebimentos: [...item.recebimentos, { ...recebimento }] }
+      ? { ...item, recebimentos: [...item.recebimentos, { ...recebimento, numeroBordero }] }
+      : item),
+  };
+  await kvCompareAndSet(key, atualizada, venda.version);
+  return atualizada;
+}
+
+export async function estornarRecebimentoConsorcio(
+  vendaId: string,
+  numeroParcela: number,
+  recebimentoId: string,
+  senha: string,
+): Promise<VendaConsorcio> {
+  if (!senha) throw new Error('Informe a senha de estorno.');
+  const response = await fetch('/api/auth/consorcio-estorno-check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getSessionToken()}` },
+    body: JSON.stringify({ password: senha }),
+  });
+  if (response.status === 403) throw new Error('Senha de estorno incorreta.');
+  if (response.status === 401) throw new Error('Sessão inválida ou sem acesso ao módulo.');
+  if (response.status === 503) throw new Error('Senha de estorno não configurada no servidor.');
+  if (!response.ok) throw new Error(`Não foi possível validar a senha de estorno (${response.status}).`);
+  const result: { ok?: boolean } = await response.json();
+  if (result?.ok !== true) throw new Error('Resposta inválida ao validar a senha de estorno.');
+
+  const key = `${PREFIX}${vendaId}`;
+  const venda = await kvGet<VendaConsorcio>(key, { throwOnError: true });
+  if (!venda) throw new Error('Venda não encontrada. Atualize a listagem.');
+  const parcela = venda.parcelas.find(item => item.numero === numeroParcela);
+  if (!parcela || !parcela.recebimentos.some(item => item.id === recebimentoId)) {
+    throw new Error('Recebimento não encontrado. Atualize a listagem.');
+  }
+  const atualizada: VendaConsorcio = {
+    ...venda,
+    version: crypto.randomUUID(),
+    parcelas: venda.parcelas.map(item => item.numero === numeroParcela
+      ? { ...item, recebimentos: item.recebimentos.filter(recebimento => recebimento.id !== recebimentoId) }
       : item),
   };
   await kvCompareAndSet(key, atualizada, venda.version);

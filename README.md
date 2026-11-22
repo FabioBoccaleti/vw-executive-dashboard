@@ -22,6 +22,24 @@ No problem! If you were just checking things out and don’t need to keep this c
 
 The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
 
+## Recebimentos de consórcio
+
+Em **Vendas > Recebida**, a coluna Número do borderô lista os números de cada
+recebimento da parcela; recebimentos antigos sem número aparecem com um traço.
+Cada item do histórico pode ser estornado individualmente na coluna **Ação**.
+O item é removido e
+o valor volta ao saldo a receber.
+
+Para habilitar o estorno, configure a variável secreta de servidor
+`CONSORCIO_ESTORNO_PASSWORD` na Vercel e faça um novo deploy. A senha não deve
+ser incluída no código. A confirmação pela interface exige uma sessão válida;
+as APIs genéricas de armazenamento continuam podendo alterar os dados sem a
+senha, portanto esse bloqueio não é uma proteção contra acesso direto à API.
+Para testar localmente, configure `CONSORCIO_ESTORNO_PASSWORD` em
+`.env.development.local` e reinicie o servidor de desenvolvimento. A validação
+local só aceita conexões da própria máquina; os dados locais usam IndexedDB e
+não alteram os dados de produção. A autenticação local é simulada.
+
 ## Multas a Receber
 
 Em **Análise Financeira > Multas a Receber**, importe o TXT delimitado por `;`

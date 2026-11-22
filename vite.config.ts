@@ -1,16 +1,18 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
-import { defineConfig, PluginOption } from "vite";
+import { defineConfig, loadEnv, PluginOption } from "vite";
 
 import sparkPlugin from "@github/spark/spark-vite-plugin";
 import createIconImportProxy from "@github/spark/vitePhosphorIconProxyPlugin";
 import { resolve } from 'path'
+import { devConsorcioEstorno } from './devConsorcioEstorno'
 
 const projectRoot = process.env.PROJECT_ROOT || import.meta.dirname
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
+    devConsorcioEstorno(loadEnv(mode, projectRoot, 'CONSORCIO_ESTORNO_PASSWORD').CONSORCIO_ESTORNO_PASSWORD),
     react(),
     tailwindcss(),
     // DO NOT REMOVE
@@ -47,4 +49,4 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
-});
+}));

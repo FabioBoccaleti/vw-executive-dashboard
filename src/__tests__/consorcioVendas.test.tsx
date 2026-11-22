@@ -5,7 +5,7 @@ import { RegistroAnaliseVendasConsorcioDashboard } from '@/components/VendasBoni
 import { LancarVendaForm } from '@/components/VendasBonificacoesDashboard/RegistroAnaliseVendasConsorcio/LancarVendaForm';
 import { VendasReceber } from '@/components/VendasBonificacoesDashboard/RegistroAnaliseVendasConsorcio/VendasReceber';
 import {
-  criarVendaConsorcio, loadVendasConsorcio, registrarRecebimentoConsorcio, resumoVenda, saveNovaVendaConsorcio,
+  criarVendaConsorcio, estornarRecebimentoConsorcio, loadVendasConsorcio, registrarRecebimentoConsorcio, resumoVenda, saveNovaVendaConsorcio,
   type DadosNovaVendaConsorcio,
 } from '@/components/VendasBonificacoesDashboard/RegistroAnaliseVendasConsorcio/vendasStorage';
 import type { CadastroConsorcio } from '@/components/VendasBonificacoesDashboard/RegistroAnaliseVendasConsorcio/cadastroStorage';
@@ -48,7 +48,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   records.set('consorcio_cadastros', cadastro());
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 describe('persistência e contas a receber de consorcio', () => {
   it('congela o cadastro e distribui centavos restantes na última parcela da comissão bruta', async () => {
@@ -71,11 +75,13 @@ describe('persistência e contas a receber de consorcio', () => {
 
   it('mantém recebimentos parciais, impede excesso e torna uma repetição da mesma baixa idempotente', async () => {
     await saveNovaVendaConsorcio(criarVendaConsorcio(dados(), cadastro(1)));
-    const recebimento = { id: 'baixa-1', data: '2026-11-18', valorCentavos: 200000 };
+    const recebimento = { id: 'baixa-1', data: '2026-11-18', valorCentavos: 200000, numeroBordero: ' 001-A ' };
     const parcial = await registrarRecebimentoConsorcio('venda-teste', 1, recebimento);
     expect(resumoVenda(parcial)).toMatchObject({ recebidoCentavos: 200000, saldoCentavos: 400000, quitada: false });
+    expect(parcial.parcelas[0].recebimentos[0].numeroBordero).toBe('001-A');
     const repetida = await registrarRecebimentoConsorcio('venda-teste', 1, recebimento);
     expect(repetida).toEqual(parcial);
+    await expect(registrarRecebimentoConsorcio('venda-teste', 1, { ...recebimento, numeroBordero: 'outro' })).rejects.toThrow('outros dados');
     await expect(registrarRecebimentoConsorcio('venda-teste', 1, { ...recebimento, id: 'excesso', valorCentavos: 400001 })).rejects.toThrow('não pode ultrapassar');
     const quitada = await registrarRecebimentoConsorcio('venda-teste', 1, { ...recebimento, id: 'baixa-2', valorCentavos: 400000 });
     expect(resumoVenda(quitada)).toMatchObject({ recebidoCentavos: 600000, saldoCentavos: 0, quitada: true });
@@ -85,7 +91,7 @@ describe('persistência e contas a receber de consorcio', () => {
   it('rejeita baixas concorrentes em vez de sobrescrever recebimentos', async () => {
     await saveNovaVendaConsorcio(criarVendaConsorcio(dados(), cadastro(1)));
     const results = await Promise.allSettled(['a', 'b'].map(id =>
-      registrarRecebimentoConsorcio('venda-teste', 1, { id, data: '2026-11-18', valorCentavos: 400000 })));
+      registrarRecebimentoConsorcio('venda-teste', 1, { id, data: '2026-11-18', valorCentavos: 400000, numeroBordero: '123' })));
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
     const [persistida] = await loadVendasConsorcio();
@@ -95,8 +101,20 @@ describe('persistência e contas a receber de consorcio', () => {
 
   it.each([0, -1, 1.5, 600001])('rejeita valor de recebimento inválido em centavos: %s', async valorCentavos => {
     await saveNovaVendaConsorcio(criarVendaConsorcio(dados(), cadastro(1)));
-    await expect(registrarRecebimentoConsorcio('venda-teste', 1, { id: 'baixa', data: '2026-11-18', valorCentavos })).rejects.toThrow();
+    await expect(registrarRecebimentoConsorcio('venda-teste', 1, { id: 'baixa', data: '2026-11-18', valorCentavos, numeroBordero: '123' })).rejects.toThrow();
     expect(resumoVenda((await loadVendasConsorcio())[0]).recebidoCentavos).toBe(0);
+  });
+
+  it('rejeita borderô vazio e mantém recebimentos antigos sem borderô', async () => {
+    const venda = criarVendaConsorcio(dados(), cadastro(1));
+    venda.parcelas[0].recebimentos.push({ id: 'antigo', data: '2026-11-17', valorCentavos: 10000 });
+    await saveNovaVendaConsorcio(venda);
+    await expect(registrarRecebimentoConsorcio('venda-teste', 1, {
+      id: 'novo', data: '2026-11-18', valorCentavos: 10000, numeroBordero: '   ',
+    })).rejects.toThrow('Informe o número do borderô');
+    render(<VendasReceber situacao="recebida" />);
+    expect(await screen.findByText('17/11/2026 — R$ 100,00')).toBeInTheDocument();
+    expect((await loadVendasConsorcio())[0].parcelas[0].recebimentos).toHaveLength(1);
   });
 
   it('não exibe uma lista vazia ou informa sucesso quando o armazenamento falha', async () => {
@@ -125,9 +143,15 @@ describe('persistência e contas a receber de consorcio', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Parcelas de Cliente teste' }));
     expect(screen.queryByRole('columnheader', { name: /vencimento/i })).not.toBeInTheDocument();
 
-    await receber('400,00');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Registrar recebimento' })[0]);
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar recebimento' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Informe o número do borderô');
+    expect((await loadVendasConsorcio())[0].parcelas[0].recebimentos).toHaveLength(0);
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }));
+    await receber('400,00', '001-A');
     expect(screen.getByText('Parcial')).toBeInTheDocument();
     expect(screen.getByText('Histórico:', { exact: false })).toHaveTextContent('R$ 400,00');
+    expect(screen.getByText('Histórico:', { exact: false })).toHaveTextContent('Borderô: 001-A');
     fireEvent.click(screen.getByRole('button', { name: /^Recebida$/ }));
     const recebidas = within(screen.getByRole('table', { name: 'Parcelas com recebimentos' }));
     expect(recebidas.getAllByRole('row')).toHaveLength(2);
@@ -140,18 +164,30 @@ describe('persistência e contas a receber de consorcio', () => {
     expect(parcial.getByText('R$ 400,00', { exact: true })).toBeInTheDocument();
     expect(parcial.getByText('R$ 2.600,00')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'A Receber' }));
-    await receber('2.600,00');
+    await receber('2.600,00', '002');
     expect(screen.getByText('Cliente teste')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Recebida$/ }));
     const quitadas = within(screen.getByRole('table', { name: 'Parcelas com recebimentos' }));
     expect(quitadas.getAllByRole('row')).toHaveLength(2);
     const primeira = within(quitadas.getAllByRole('row')[1]);
+    expect(quitadas.getAllByRole('columnheader').slice(0, 3).map(item => item.textContent)).toEqual([
+      'Data da venda', 'Número do borderô', 'Cliente / Grupo e cota',
+    ]);
+    expect(primeira.getAllByRole('cell')[1]).toHaveTextContent('001-A · 002');
     expect(primeira.getByText('Recebida', { exact: true })).toBeInTheDocument();
     expect(primeira.getByText('R$ 0,00')).toBeInTheDocument();
     expect(primeira.getByText('18/11/2026 — R$ 400,00')).toBeInTheDocument();
     expect(primeira.getByText('18/11/2026 — R$ 2.600,00')).toBeInTheDocument();
+    expect(quitadas.getAllByRole('columnheader').slice(-2).map(item => item.textContent)).toEqual(['Histórico de recebimentos', 'Ação']);
+    const celulas = primeira.getAllByRole('cell');
+    expect(celulas[9]).not.toHaveTextContent('Borderô');
+    expect(within(celulas[9]).queryByRole('button')).not.toBeInTheDocument();
+    const botoesEstorno = within(celulas[10]).getAllByRole('button');
+    expect(botoesEstorno).toHaveLength(2);
+    expect(botoesEstorno[0]).toHaveAccessibleName(/400,00 — Borderô: 001-A/);
+    expect(botoesEstorno[1]).toHaveAccessibleName(/2\.600,00 — Borderô: 002/);
     fireEvent.click(screen.getByRole('button', { name: 'A Receber' }));
-    await receber('3.000,00');
+    await receber('3.000,00', '003');
     expect(await screen.findByText('Nenhuma venda a receber.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Recebida$/ }));
     expect(await screen.findAllByText('Cliente teste')).toHaveLength(2);
@@ -165,6 +201,7 @@ describe('persistência e contas a receber de consorcio', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Recebida$/ }));
     expect(await screen.findAllByText('Cliente teste')).toHaveLength(2);
     expect(screen.getByText('2/2')).toBeInTheDocument();
+    expect(screen.getByText('18/11/2026 — R$ 400,00')).toBeInTheDocument();
     expect(kvGet).toHaveBeenCalledWith(expect.stringContaining('consorcio_venda_'), { throwOnError: true });
   });
 
@@ -173,6 +210,69 @@ describe('persistência e contas a receber de consorcio', () => {
     render(<VendasReceber situacao="recebida" />);
     expect(await screen.findByText('Nenhuma parcela com recebimento.')).toBeInTheDocument();
     expect(screen.queryByText('Cliente teste')).not.toBeInTheDocument();
+  });
+
+  it('estorna apenas o recebimento escolhido, atualizando saldo e histórico após validar a senha', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ status: 403, ok: false })
+      .mockResolvedValueOnce({ status: 200, ok: true, json: async () => ({ ok: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const venda = criarVendaConsorcio(dados(), cadastro(1));
+    venda.parcelas[0].recebimentos.push(
+      { id: 'antigo', data: '2026-11-17', valorCentavos: 10000 },
+      { id: 'novo', data: '2026-11-18', valorCentavos: 590000, numeroBordero: '001' },
+    );
+    await saveNovaVendaConsorcio(venda);
+    const view = render(<VendasReceber situacao="recebida" />);
+    const row = within((await screen.findAllByRole('row'))[1]);
+    expect(row.getAllByRole('cell')[1]).toHaveTextContent('— · 001');
+    fireEvent.click(row.getByRole('button', { name: /Estornar recebimento.*17\/11\/2026/ }));
+    let dialog = within(screen.getByRole('dialog'));
+    fireEvent.change(dialog.getByLabelText('Senha de estorno'), { target: { value: 'incorreta' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Confirmar estorno' }));
+    expect(await dialog.findByRole('alert')).toHaveTextContent('Senha de estorno incorreta');
+    expect((await loadVendasConsorcio())[0].parcelas[0].recebimentos).toHaveLength(2);
+    fireEvent.change(dialog.getByLabelText('Senha de estorno'), { target: { value: 'senha-teste' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Confirmar estorno' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(row.getAllByRole('cell')[1]).toHaveTextContent('001');
+    expect(row.queryByText('17/11/2026 — R$ 100,00')).not.toBeInTheDocument();
+    expect(row.getByText('Parcial')).toBeInTheDocument();
+    expect(resumoVenda((await loadVendasConsorcio())[0])).toMatchObject({ recebidoCentavos: 590000, saldoCentavos: 10000 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    view.unmount();
+    render(<VendasReceber situacao="a_receber" />);
+    expect(await screen.findByText('Cliente teste')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 100,00').length).toBeGreaterThan(0);
+  });
+
+  it('não estorna quando o armazenamento detecta alteração concorrente', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200, ok: true, json: async () => ({ ok: true }) }));
+    const venda = criarVendaConsorcio(dados(), cadastro(1));
+    venda.parcelas[0].recebimentos.push({ id: 'baixa', data: '2026-11-18', valorCentavos: 10000 });
+    await saveNovaVendaConsorcio(venda);
+    vi.mocked(kvCompareAndSet).mockRejectedValueOnce(new Error('Conflito de versão'));
+    await expect(estornarRecebimentoConsorcio(venda.id, 1, 'baixa', 'senha-teste')).rejects.toThrow('Conflito');
+    expect((await loadVendasConsorcio())[0].parcelas[0].recebimentos).toHaveLength(1);
+  });
+
+  it('não estorna se a validação retornar uma resposta inválida e remove a parcela de Recebida após o último estorno', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ status: 200, ok: true, json: async () => ({}) })
+      .mockResolvedValueOnce({ status: 200, ok: true, json: async () => ({ ok: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const venda = criarVendaConsorcio(dados(), cadastro(1));
+    venda.parcelas[0].recebimentos.push({ id: 'baixa', data: '2026-11-18', valorCentavos: 600000, numeroBordero: '123' });
+    await saveNovaVendaConsorcio(venda);
+    await expect(estornarRecebimentoConsorcio(venda.id, 1, 'baixa', 'senha-teste')).rejects.toThrow('Resposta inválida');
+    expect((await loadVendasConsorcio())[0].parcelas[0].recebimentos).toHaveLength(1);
+    render(<VendasReceber situacao="recebida" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Estornar recebimento/ }));
+    const dialog = within(screen.getByRole('dialog'));
+    fireEvent.change(dialog.getByLabelText('Senha de estorno'), { target: { value: 'senha-teste' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Confirmar estorno' }));
+    expect(await screen.findByText('Nenhuma parcela com recebimento.')).toBeInTheDocument();
+    expect(resumoVenda((await loadVendasConsorcio())[0])).toMatchObject({ recebidoCentavos: 0, saldoCentavos: 600000, quitada: false });
   });
 });
 
@@ -185,11 +285,12 @@ async function preencherVenda() {
   fireEvent.change(screen.getByRole('textbox', { name: /Valor da carta de crédito/ }), { target: { value: '100.000,00' } });
 }
 
-async function receber(valor: string) {
+async function receber(valor: string, numeroBordero: string) {
   fireEvent.click(screen.getAllByRole('button', { name: 'Registrar recebimento' })[0]);
   const dialog = within(screen.getByRole('dialog'));
   fireEvent.change(dialog.getByRole('textbox', { name: 'Valor recebido (R$)' }), { target: { value: valor } });
   fireEvent.change(dialog.getByLabelText('Data do recebimento'), { target: { value: '2026-11-18' } });
+  fireEvent.change(dialog.getByRole('textbox', { name: 'Número do borderô *' }), { target: { value: numeroBordero } });
   fireEvent.click(dialog.getByRole('button', { name: 'Confirmar recebimento' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 }
