@@ -1131,8 +1131,9 @@ it('preserva parcelas e juros provisionados por mês sem detalhar as colunas com
     { id: 'itau', nome: banco, demonstracao: 'endividamento', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }], bancoDe: 'principal' },
   ] };
   const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
-  const abrirCap = async () => {
-    fireEvent.click(await screen.findByRole('button', { name: `Editar captação de ${banco}` }));
+  const abrirCap = async (existente = false) => {
+    if (existente) fireEvent.click(await screen.findByText('1 captação'));
+    fireEvent.click(await screen.findByRole('button', { name: existente ? `Editar captação 1 de ${banco}` : `Adicionar captação de ${banco}` }));
     return within(await screen.findByRole('dialog'));
   };
   const salvarCap = async (dialogo: ReturnType<typeof within>) => {
@@ -1150,25 +1151,25 @@ it('preserva parcelas e juros provisionados por mês sem detalhar as colunas com
   expect(dialogo.getByRole('alert')).toHaveTextContent('não podem exceder');
   expect(mocks.cas).not.toHaveBeenCalled();
   fireEvent.change(dialogo.getByLabelText('Parcelas restantes'), { target: { value: '8' } });
-  fireEvent.change(dialogo.getByLabelText('Juros Provisionados (R$)'), { target: { value: '100,123' } });
+  fireEvent.change(dialogo.getByLabelText('Juros Provisionados / IOF (R$)'), { target: { value: '100,123' } });
   fireEvent.click(dialogo.getByRole('button', { name: 'Salvar captação' }));
-  expect(dialogo.getByRole('alert')).toHaveTextContent('Informe os juros provisionados');
+  expect(dialogo.getByRole('alert')).toHaveTextContent('Informe os juros provisionados / IOF');
   expect(mocks.cas).not.toHaveBeenCalled();
-  fireEvent.change(dialogo.getByLabelText('Juros Provisionados (R$)'), { target: { value: '1.234,56' } });
+  fireEvent.change(dialogo.getByLabelText('Juros Provisionados / IOF (R$)'), { target: { value: '1.234,56' } });
   await salvarCap(dialogo);
 
   tela.unmount();
   const recarregada = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={3} />);
   fireEvent.click(screen.getByRole('tab', { name: 'Endividamento' }));
-  const marco = await abrirCap();
+  const marco = await abrirCap(true);
   expect(marco.getByLabelText('Parcelas restantes')).toHaveValue(null);
   expect(marco.getByLabelText('Taxa')).toHaveValue('CDI + 2% a.a.');
-  expect(marco.getByLabelText('Juros Provisionados (R$)')).toHaveValue('');
+  expect(marco.getByLabelText('Juros Provisionados / IOF (R$)')).toHaveValue('');
   fireEvent.change(marco.getByLabelText('Parcelas restantes'), { target: { value: '0' } });
-  fireEvent.change(marco.getByLabelText('Juros Provisionados (R$)'), { target: { value: '0' } });
+  fireEvent.change(marco.getByLabelText('Juros Provisionados / IOF (R$)'), { target: { value: '0' } });
   await salvarCap(marco);
   expect(screen.getByText('Parcelas restantes: 0')).toBeInTheDocument();
-  expect(screen.getByText('Juros Provisionados: R$ 0,00')).toBeInTheDocument();
+  expect(screen.getByText('Juros Provisionados / IOF: R$ 0,00')).toBeInTheDocument();
 
   recarregada.rerender(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
   await screen.findByText('Parcelas restantes: 8');
@@ -1183,11 +1184,72 @@ it('preserva parcelas e juros provisionados por mês sem detalhar as colunas com
   expect(atual).toHaveTextContent('Taxa: CDI + 2% a.a.');
   expect(atual).toHaveTextContent('Total de parcelas: 24');
   expect(atual).toHaveTextContent('Parcelas restantes: 8');
-  expect(atual).toHaveTextContent('Juros Provisionados: R$ 1.234,56');
+  expect(atual).toHaveTextContent('Juros Provisionados / IOF: R$ 1.234,56');
   expect(within(atual).getByText('1.250')).toBeInTheDocument();
   recarregada.rerender(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={0} />);
   await screen.findByRole('columnheader', { name: 'Ano/2026' });
   expect(screen.queryByRole('button', { name: /Editar captação/ })).not.toBeInTheDocument();
+});
+
+it('preserva a captação legada e permite adicionar, editar e excluir captações independentes', async () => {
+  mocks.raw.mockResolvedValue({ rawText: 'P;2.1;Empréstimos;0;0;0;-1250,25' });
+  persistido = { ...cadastroVazio(), version: 'v1', empresa: { nome: 'Empresa exemplo', cnpj: 'exemplo', nire: '' }, linhas: [
+    { id: 'principal', nome: 'Dívida bancária', demonstracao: 'endividamento', tipo: 'total', itens: [{ referencia: 'banco', operacao: 1 }] },
+    { id: 'banco', nome: 'Banco Exemplo', demonstracao: 'endividamento', tipo: 'contas', itens: [{ referencia: '2.1', operacao: 1 }], bancoDe: 'principal',
+      captacao: { data: '2025-01-01', valorCentavos: 100000, parcelasTotais: 12, restantesPorMes: { '2026_1': 10, '2026_2': 9 }, jurosProvisionadosPorMes: { '2026_1': 500 } } },
+  ] };
+  const tela = render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={2} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Endividamento' }));
+  fireEvent.click(await screen.findByText('1 captação'));
+  expect(screen.getByText('Parcelas restantes: 9')).toBeInTheDocument();
+  for (const [valor, restantes] of [['2.000,00', '6'], ['3.000,00', '3']]) {
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar captação de Banco Exemplo' }));
+    const dialogo = within(await screen.findByRole('dialog'));
+    fireEvent.change(dialogo.getByLabelText('Valor da captação (R$)'), { target: { value: valor } });
+    fireEvent.change(dialogo.getByLabelText('Parcelas restantes'), { target: { value: restantes } });
+    fireEvent.click(dialogo.getByRole('button', { name: 'Salvar captação' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  }
+  expect(screen.getByText('3 captações')).toBeInTheDocument();
+  expect(screen.getByText('Valor da captação: R$ 1.000,00')).toBeInTheDocument();
+  expect(screen.getByText('Valor da captação: R$ 2.000,00')).toBeInTheDocument();
+  expect(screen.getByText('Valor da captação: R$ 3.000,00')).toBeInTheDocument();
+  expect(within(screen.getByRole('row', { name: /Banco Exemplo/ })).getByText('1.250')).toBeInTheDocument();
+  expect(persistido?.linhas.find(linha => linha.id === 'banco')?.captacao).toBeUndefined();
+  expect(persistido?.linhas.find(linha => linha.id === 'banco')?.captacoes).toHaveLength(3);
+
+  tela.unmount();
+  render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={1} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Endividamento' }));
+  fireEvent.click(await screen.findByText('3 captações'));
+  expect(screen.getByText('Parcelas restantes: 10')).toBeInTheDocument();
+  expect(screen.getByText('Juros Provisionados / IOF: R$ 5,00')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Editar captação 2 de Banco Exemplo' }));
+  const edicao = within(await screen.findByRole('dialog'));
+  expect(edicao.getByLabelText('Parcelas restantes')).toHaveValue(null);
+  fireEvent.change(edicao.getByLabelText('Parcelas restantes'), { target: { value: '7' } });
+  fireEvent.click(edicao.getByRole('button', { name: 'Salvar captação' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  const captacoes = persistido?.linhas.find(linha => linha.id === 'banco')?.captacoes;
+  expect(captacoes?.[1].restantesPorMes).toEqual({ '2026_1': 7, '2026_2': 6 });
+  expect(captacoes?.[0].restantesPorMes).toEqual({ '2026_1': 10, '2026_2': 9 });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir captação 2 de Banco Exemplo' }));
+  const confirmacao = within(await screen.findByRole('alertdialog'));
+  expect(confirmacao.getByText(/todos os meses/)).toBeInTheDocument();
+  fireEvent.click(confirmacao.getByRole('button', { name: 'Cancelar' }));
+  expect(screen.getByText('3 captações')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir captação 2 de Banco Exemplo' }));
+  const exclusao = within(await screen.findByRole('alertdialog'));
+  mocks.cas.mockRejectedValueOnce(new Error('Erro ao salvar'));
+  fireEvent.click(exclusao.getByRole('button', { name: 'Excluir captação' }));
+  expect(await exclusao.findByRole('alert')).toHaveTextContent('Erro ao salvar');
+  expect(persistido?.linhas.find(linha => linha.id === 'banco')?.captacoes).toHaveLength(3);
+  fireEvent.click(exclusao.getByRole('button', { name: 'Excluir captação' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+  expect(screen.getByText('2 captações')).toBeInTheDocument();
+  expect(persistido?.linhas.find(linha => linha.id === 'banco')?.captacoes?.map(item => item.valorCentavos)).toEqual([100000, 300000]);
+  expect(within(screen.getByRole('row', { name: /Banco Exemplo/ })).getByText('1.250')).toBeInTheDocument();
 });
 
 it('considera conta ausente em um balancete importado como zero e mantém o saldo do grupo', async () => {

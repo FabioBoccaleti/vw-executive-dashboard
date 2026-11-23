@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import {
   DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID, MESES, calcularConta, calcularDfcIndireto, calcularLinhas,
-  calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasIncompletas, identificarContasNaoClassificadas, linhaPai, listarContasDaLinha,
+  calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasIncompletas, identificarContasNaoClassificadas, linhaPai, listarCaptacoes, listarContasDaLinha,
   type CadastroDemonstracoes, type DadosDemonstracoes, type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
 import { criarLinhasDfcIndiretoTabela, deveExibirLinhaDfc } from './dfcTabela';
@@ -471,12 +471,12 @@ function adicionarDetalhesCaptacoes(
   mesLimite: number,
   ultimaColuna: number,
 ) {
-  const linhas = cadastro.linhas.filter(linha => linha.demonstracao === 'endividamento' && linha.captacao);
+  const linhas = cadastro.linhas.filter(linha => linha.demonstracao === 'endividamento' && listarCaptacoes(linha).length > 0);
   if (!linhas.length) return;
   adicionarSecao(ws, 'Detalhes das captações', ultimaColuna);
   const cabecalho = ws.addRow([
     'Linha / banco', 'Período', 'Data da captação', 'Valor captado (R$)', 'Taxa',
-    'Parcelas totais', 'Parcelas restantes', 'Juros provisionados (R$)',
+    'Parcelas totais', 'Parcelas restantes', 'Juros Provisionados / IOF (R$)',
   ]);
   cabecalho.eachCell(celula => {
     celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CORES.verde } };
@@ -485,26 +485,27 @@ function adicionarDetalhesCaptacoes(
     celula.border = { top: BORDA_FINA, bottom: BORDA_FINA, left: BORDA_FINA, right: BORDA_FINA };
   });
   for (const linha of linhas) {
-    const captacao = linha.captacao!;
-    for (const ano of anos) {
-      for (let mes = 1; mes <= mesLimite; mes++) {
-        const chave = chavePeriodo({ ano, mes });
-        const juros = captacao.jurosProvisionadosPorMes?.[chave];
-        const row = ws.addRow([
-          linha.nome,
-          `${MESES[mes]}/${ano}`,
-          captacao.data ? captacao.data.split('-').reverse().join('/') : '',
-          captacao.valorCentavos === undefined ? null : captacao.valorCentavos / 100,
-          captacao.taxa ?? '',
-          captacao.parcelasTotais ?? null,
-          captacao.restantesPorMes[chave] ?? null,
-          juros === undefined ? null : juros / 100,
-        ]);
-        row.eachCell({ includeEmpty: true }, (celula, indice) => {
-          celula.border = { bottom: BORDA_FINA };
-          celula.alignment = { vertical: 'middle', horizontal: indice < 4 || indice === 5 ? 'left' : 'right', wrapText: indice === 1 || indice === 5 };
-          if (indice === 4 || indice === 8) celula.numFmt = FORMATO_MOEDA;
-        });
+    for (const [indiceCaptacao, captacao] of listarCaptacoes(linha).entries()) {
+      for (const ano of anos) {
+        for (let mes = 1; mes <= mesLimite; mes++) {
+          const chave = chavePeriodo({ ano, mes });
+          const juros = captacao.jurosProvisionadosPorMes?.[chave];
+          const row = ws.addRow([
+            `${linha.nome} — Captação ${indiceCaptacao + 1}`,
+            `${MESES[mes]}/${ano}`,
+            captacao.data ? captacao.data.split('-').reverse().join('/') : '',
+            captacao.valorCentavos === undefined ? null : captacao.valorCentavos / 100,
+            captacao.taxa ?? '',
+            captacao.parcelasTotais ?? null,
+            captacao.restantesPorMes[chave] ?? null,
+            juros === undefined ? null : juros / 100,
+          ]);
+          row.eachCell({ includeEmpty: true }, (celula, indice) => {
+            celula.border = { bottom: BORDA_FINA };
+            celula.alignment = { vertical: 'middle', horizontal: indice < 4 || indice === 5 ? 'left' : 'right', wrapText: indice === 1 || indice === 5 };
+            if (indice === 4 || indice === 8) celula.numFmt = FORMATO_MOEDA;
+          });
+        }
       }
     }
   }

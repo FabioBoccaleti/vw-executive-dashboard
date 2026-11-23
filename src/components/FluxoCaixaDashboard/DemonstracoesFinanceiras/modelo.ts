@@ -43,6 +43,7 @@ const linhaSchema = z.object({
   foraDfc: z.boolean().optional(),
   dfcSubtotalNome: z.string().trim().min(1).optional(),
   captacao: captacaoSchema.optional(),
+  captacoes: z.array(captacaoSchema).optional(),
   contasPorPrefixo: z.boolean().optional(),
   saldoInvertido: z.boolean().optional(),
   calculo: z.enum(['resultadoBalancete']).optional(),
@@ -72,6 +73,8 @@ export type ItemDemonstracao = z.infer<typeof itemSchema>;
 export type ContasBalancete = Record<string, ContaBalancete>;
 export interface PeriodoDemonstracao { ano: number; mes: number }
 export type DadosDemonstracoes = Record<string, ContasBalancete | null>;
+export const listarCaptacoes = (linha: LinhaDemonstracao): Captacao[] =>
+  linha.captacoes ?? (linha.captacao ? [linha.captacao] : []);
 export const linhaPai = (linha: LinhaDemonstracao) => linha.bancoDe ?? linha.sublinhaDe;
 export const LINHA_PL_ID = 'passivo-pl';
 export const LINHA_RESULTADO_PERIODO_ID = 'passivo-resultado-periodo';

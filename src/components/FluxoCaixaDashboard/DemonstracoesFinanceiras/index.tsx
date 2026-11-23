@@ -10,7 +10,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  TIPOS, MESES, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, chavePeriodo, rotuloPeriodo, validarCadastro, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasNaoClassificadas, listarContasDaLinha, listarContasDfcDaLinha, identificarContasDfcPendentes,
+  TIPOS, MESES, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID, calcularConta, calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, captacaoSchema, listarCaptacoes, chavePeriodo, rotuloPeriodo, validarCadastro, validarLinhas, validarRegrasDfcIndireto, identificarContasIncompletas, validarContasCompletas, mesmaHierarquia, linhaPai, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasNaoClassificadas, listarContasDaLinha, listarContasDfcDaLinha, identificarContasDfcPendentes,
   type CadastroDemonstracoes, type DadosDemonstracoes, type ItemDemonstracao,
   type ContaDfcPendente, type LinhaDemonstracao, type PeriodoDemonstracao, type RegraDfcIndireto, type TipoDemonstracao,
 } from './modelo';
@@ -65,11 +65,12 @@ const camposCaptacao = [
   { campo: 'taxa', rotulo: 'Taxa', tipo: 'text', placeholder: 'Ex.: CDI + 2% a.a.' },
   { campo: 'total', rotulo: 'Total de parcelas', tipo: 'number', min: 1 },
   { campo: 'restantes', rotulo: 'Parcelas restantes', tipo: 'number', min: 0 },
-  { campo: 'juros', rotulo: 'Juros Provisionados (R$)', tipo: 'text', placeholder: 'Ex.: 1.000,00' },
+  { campo: 'juros', rotulo: 'Juros Provisionados / IOF (R$)', tipo: 'text', placeholder: 'Ex.: 1.000,00' },
 ] as const;
 type EditorCaptacao = {
   id: string;
   nome: string;
+  indice: number | null;
   periodo: PeriodoDemonstracao;
   campos: Record<(typeof camposCaptacao)[number]['campo'], string>;
 };
@@ -121,6 +122,7 @@ export function DemonstracoesFinanceiras({
   const [editor, setEditor] = useState<LinhaDemonstracao | null>(null);
   const [linhaExcluir, setLinhaExcluir] = useState<LinhaDemonstracao | null>(null);
   const [editorCaptacao, setEditorCaptacao] = useState<EditorCaptacao | null>(null);
+  const [captacaoExcluir, setCaptacaoExcluir] = useState<{ id: string; nome: string; indice: number } | null>(null);
   const [erroCaptacao, setErroCaptacao] = useState('');
   const [bancosEditor, setBancosEditor] = useState<LinhaDemonstracao[] | null>(null);
   const [bancoAtivo, setBancoAtivo] = useState('');
@@ -318,12 +320,12 @@ export function DemonstracoesFinanceiras({
     }
   }
 
-  function abrirCaptacao(linha: LinhaDemonstracao) {
-    const captacao = linha.captacao;
+  function abrirCaptacao(linha: LinhaDemonstracao, indice: number | null) {
+    const captacao = indice === null ? undefined : listarCaptacoes(linha)[indice];
     const chave = chavePeriodo(principal);
     const juros = captacao?.jurosProvisionadosPorMes?.[chave];
     setErroCaptacao('');
-    setEditorCaptacao({ id: linha.id, nome: linha.nome, periodo: principal, campos: {
+    setEditorCaptacao({ id: linha.id, nome: linha.nome, indice, periodo: principal, campos: {
       data: captacao?.data ?? '',
       valor: captacao?.valorCentavos === undefined ? '' : moedaComCentavos.format(captacao.valorCentavos / 100),
       taxa: captacao?.taxa ?? '',
@@ -335,9 +337,12 @@ export function DemonstracoesFinanceiras({
 
   async function salvarCaptacao() {
     if (!editorCaptacao || !cadastro || salvando) return;
-    const { id, periodo, campos } = editorCaptacao;
+    const { id, indice, periodo, campos } = editorCaptacao;
     const linha = cadastro.linhas.find(item => item.id === id);
     if (!linha?.bancoDe) { setErroCaptacao('O banco ou dívida não está mais no cadastro.'); return; }
+    const captacoes = listarCaptacoes(linha);
+    const captacao = indice === null ? undefined : captacoes[indice];
+    if (indice !== null && !captacao) { setErroCaptacao('A captação não está mais no cadastro.'); return; }
     const valorCentavos = lerCentavos(campos.valor);
     if (valorCentavos === null) {
       setErroCaptacao('Informe o valor da captação no formato 1.000,00.');
@@ -345,14 +350,14 @@ export function DemonstracoesFinanceiras({
     }
     const juros = lerCentavos(campos.juros);
     if (juros === null) {
-      setErroCaptacao('Informe os juros provisionados no formato 1.000,00.');
+      setErroCaptacao('Informe os juros provisionados / IOF no formato 1.000,00.');
       return;
     }
     const chave = chavePeriodo(periodo);
-    const restantesPorMes = { ...linha.captacao?.restantesPorMes };
+    const restantesPorMes = { ...captacao?.restantesPorMes };
     if (campos.restantes === '') delete restantesPorMes[chave];
     else restantesPorMes[chave] = Number(campos.restantes);
-    const jurosProvisionadosPorMes = { ...linha.captacao?.jurosProvisionadosPorMes };
+    const jurosProvisionadosPorMes = { ...captacao?.jurosProvisionadosPorMes };
     if (juros === undefined) delete jurosProvisionadosPorMes[chave];
     else jurosProvisionadosPorMes[chave] = juros;
     const resultado = captacaoSchema.safeParse({
@@ -368,8 +373,26 @@ export function DemonstracoesFinanceiras({
       return;
     }
     setErroCaptacao('');
-    if (await salvar({ ...cadastro, linhas: cadastro.linhas.map(item => item.id === id ? { ...item, captacao: resultado.data } : item) }, setErroCaptacao)) {
+    const atualizadas = [...captacoes];
+    if (indice === null) atualizadas.push(resultado.data);
+    else atualizadas[indice] = resultado.data;
+    if (await salvar({ ...cadastro, linhas: cadastro.linhas.map(item => item.id === id ? { ...item, captacao: undefined, captacoes: atualizadas } : item) }, setErroCaptacao)) {
       setEditorCaptacao(null);
+    }
+  }
+
+  async function excluirCaptacao() {
+    if (!captacaoExcluir || !cadastro || salvando) return;
+    const { id, indice } = captacaoExcluir;
+    const linha = cadastro.linhas.find(item => item.id === id);
+    if (!linha?.bancoDe || !listarCaptacoes(linha)[indice]) {
+      setErroCaptacao('A captação não está mais no cadastro.');
+      return;
+    }
+    const captacoes = listarCaptacoes(linha).filter((_, index) => index !== indice);
+    setErroCaptacao('');
+    if (await salvar({ ...cadastro, linhas: cadastro.linhas.map(item => item.id === id ? { ...item, captacao: undefined, captacoes } : item) }, setErroCaptacao)) {
+      setCaptacaoExcluir(null);
     }
   }
 
@@ -1130,9 +1153,7 @@ export function DemonstracoesFinanceiras({
                               const periodo = coluna.periodos[0];
                               const podeEditarCaptacao = aba === 'endividamento' && linha.bancoDe && principal.mes > 0
                                 && periodo.ano === principal.ano && periodo.mes === principal.mes;
-                              const captacao = linha.captacao;
-                              const restantes = captacao?.restantesPorMes[chavePeriodo(principal)];
-                              const juros = captacao?.jurosProvisionadosPorMes?.[chavePeriodo(principal)];
+                              const captacoes = listarCaptacoes(linha);
                               const receitaLiquida = linhaBasePercentualDre
                                 ? valores[index]?.get(linhaBasePercentualDre.id)
                                 : null;
@@ -1146,15 +1167,25 @@ export function DemonstracoesFinanceiras({
                                 {!ocultarValor && <span className={valor !== null && valor !== undefined && valor < 0 ? 'text-red-700' : undefined}>{valor === null || valor === undefined ? '—' : formatarMoeda(valor)}</span>}
                                 {percentualReceitaLiquida && <div className="text-xs font-normal text-muted-foreground">{percentualReceitaLiquida}</div>}
                                 {podeEditarCaptacao && <>
-                                  {captacao && <div className="mt-1 whitespace-normal text-xs text-muted-foreground">
-                                    {captacao.data && <p>Data da captação: {captacao.data.split('-').reverse().join('/')}</p>}
-                                    {captacao.valorCentavos !== undefined && <p>Valor da captação: R$ {moedaComCentavos.format(captacao.valorCentavos / 100)}</p>}
-                                    {captacao.taxa && <p>Taxa: {captacao.taxa}</p>}
-                                    {captacao.parcelasTotais !== undefined && <p>Total de parcelas: {captacao.parcelasTotais}</p>}
-                                    {restantes !== undefined && <p>Parcelas restantes: {restantes}</p>}
-                                    {juros !== undefined && <p>Juros Provisionados: R$ {moedaComCentavos.format(juros / 100)}</p>}
-                                  </div>}
-                                  <Button variant="ghost" size="sm" aria-label={`Editar captação de ${linha.nome}`} onClick={() => abrirCaptacao(linha)}>Editar captação</Button>
+                                  {captacoes.length > 0 && <details className="mt-1 whitespace-normal text-xs text-muted-foreground">
+                                    <summary className="cursor-pointer">{captacoes.length} {captacoes.length === 1 ? 'captação' : 'captações'}</summary>
+                                    {captacoes.map((captacao, indice) => {
+                                      const restantes = captacao.restantesPorMes[chavePeriodo(principal)];
+                                      const juros = captacao.jurosProvisionadosPorMes?.[chavePeriodo(principal)];
+                                      return <div key={indice} className="mt-2 border-t pt-2">
+                                        <p className="font-semibold">Captação {indice + 1}</p>
+                                        {captacao.data && <p>Data da captação: {captacao.data.split('-').reverse().join('/')}</p>}
+                                        {captacao.valorCentavos !== undefined && <p>Valor da captação: R$ {moedaComCentavos.format(captacao.valorCentavos / 100)}</p>}
+                                        {captacao.taxa && <p>Taxa: {captacao.taxa}</p>}
+                                        {captacao.parcelasTotais !== undefined && <p>Total de parcelas: {captacao.parcelasTotais}</p>}
+                                        {restantes !== undefined && <p>Parcelas restantes: {restantes}</p>}
+                                        {juros !== undefined && <p>Juros Provisionados / IOF: R$ {moedaComCentavos.format(juros / 100)}</p>}
+                                        <Button variant="ghost" size="sm" aria-label={`Editar captação ${indice + 1} de ${linha.nome}`} onClick={() => abrirCaptacao(linha, indice)}>Editar</Button>
+                                        <Button variant="ghost" size="sm" aria-label={`Excluir captação ${indice + 1} de ${linha.nome}`} onClick={() => { setErroCaptacao(''); setCaptacaoExcluir({ id: linha.id, nome: linha.nome, indice }); }}>Excluir</Button>
+                                      </div>;
+                                    })}
+                                  </details>}
+                                  <Button variant="ghost" size="sm" aria-label={`Adicionar captação de ${linha.nome}`} onClick={() => abrirCaptacao(linha, null)}>Adicionar captação</Button>
                                 </>}
                               </td>;
                             })}
@@ -1517,8 +1548,8 @@ export function DemonstracoesFinanceiras({
         <Dialog open={editorCaptacao !== null} onOpenChange={open => { if (!open && !salvando) setEditorCaptacao(null); }}>
           {editorCaptacao && <DialogContent>
             <DialogHeader>
-              <DialogTitle>Editar captação — {editorCaptacao.nome}</DialogTitle>
-              <DialogDescription>As parcelas restantes e os juros provisionados são registrados para {rotuloPeriodo(editorCaptacao.periodo)}. Os demais dados valem para a captação.</DialogDescription>
+              <DialogTitle>{editorCaptacao.indice === null ? 'Adicionar captação' : `Editar captação ${editorCaptacao.indice + 1}`} — {editorCaptacao.nome}</DialogTitle>
+              <DialogDescription>As parcelas restantes e os juros provisionados / IOF são registrados para {rotuloPeriodo(editorCaptacao.periodo)}. Os demais dados valem para a captação.</DialogDescription>
             </DialogHeader>
             <form className="space-y-4" onSubmit={event => { event.preventDefault(); void salvarCaptacao(); }}>
               <fieldset disabled={salvando} className="grid gap-3 sm:grid-cols-2">
@@ -1539,6 +1570,22 @@ export function DemonstracoesFinanceiras({
             </form>
           </DialogContent>}
         </Dialog>
+        <AlertDialog open={captacaoExcluir !== null} onOpenChange={open => { if (!open && !salvando) setCaptacaoExcluir(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir captação?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Excluir a captação {captacaoExcluir && captacaoExcluir.indice + 1} de {captacaoExcluir?.nome} removerá seus dados de todos os meses. O saldo do balancete não será alterado.
+                {alterado && ' A exclusão também salvará as alterações pendentes do cadastro.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {erroCaptacao && <p role="alert" className="text-sm text-red-700">{erroCaptacao}</p>}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={salvando}>Cancelar</AlertDialogCancel>
+              <Button type="button" disabled={salvando} className="bg-red-600 hover:bg-red-700" onClick={() => void excluirCaptacao()}>Excluir captação</Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <Dialog open={editor !== null} onOpenChange={open => { if (!open) setEditor(null); }}>
           <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] overflow-y-auto sm:max-w-6xl">
             <DialogHeader><DialogTitle>Configurar linha — {editor ? TIPOS[editor.demonstracao] : ''}</DialogTitle><DialogDescription>{bancosEditor

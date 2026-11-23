@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { extractAccounts } from '@/components/FluxoCaixaDashboard/balanceteParser';
 import {
   aplicarModeloBalancoSorana, aplicarModeloDfcPadrao, cadastroVazio, chavePeriodo,
-  type DadosDemonstracoes, type LinhaDemonstracao,
+  type CadastroDemonstracoes, type DadosDemonstracoes, type LinhaDemonstracao,
 } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/modelo';
 import { criarWorkbookDemonstracoesFinanceiras } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/exportacaoExcel';
 import { construirConferencias } from '@/components/FluxoCaixaDashboard/DemonstracoesFinanceiras/conferenciasModelo';
@@ -569,6 +569,35 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     expect(dfcDireto.getCell(inicioCaixa, 4).value).toBe(100);
 
     expect(reopened.getWorksheet('DFC Indireto')!.getColumn(1).values).toContain('Resultado líquido do período (lucro + / prejuízo –)');
+  });
+
+  it('exporta cada captação e seus dados mensais, inclusive cadastro legado', () => {
+    const cadastro: CadastroDemonstracoes = { ...cadastroVazio(), linhas: [
+      { id: 'principal', nome: 'Dívida', demonstracao: 'endividamento' as const, tipo: 'total' as const, itens: [
+        { referencia: 'banco', operacao: 1 as const }, { referencia: 'legado', operacao: 1 as const },
+      ] },
+      { id: 'banco', nome: 'Banco', demonstracao: 'endividamento' as const, tipo: 'contas' as const, bancoDe: 'principal', itens: [{ referencia: '2.1', operacao: 1 as const }], captacoes: [
+        { data: '2025-01-01', valorCentavos: 100000, restantesPorMes: { '2026_1': 8 }, jurosProvisionadosPorMes: { '2026_1': 1000 } },
+        { data: '2025-02-01', valorCentavos: 200000, restantesPorMes: { '2026_2': 4 }, jurosProvisionadosPorMes: { '2026_2': 2000 } },
+      ] },
+      { id: 'legado', nome: 'Banco legado', demonstracao: 'endividamento' as const, tipo: 'contas' as const, bancoDe: 'principal', itens: [{ referencia: '2.2', operacao: 1 as const }],
+        captacao: { valorCentavos: 300000, restantesPorMes: { '2026_1': 2 } } },
+    ] };
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro, dados: {}, anos: [2026], mesLimite: 2, incluirNotasAnuais: false, notas: [],
+    });
+    const ws = workbook.getWorksheet('Endividamento')!;
+    expect(ws.getColumn(8).values).toContain('Juros Provisionados / IOF (R$)');
+    const valores = ws.getColumn(1).values;
+    const primeira = valores.indexOf('Banco — Captação 1');
+    const segunda = valores.indexOf('Banco — Captação 2');
+    const legado = valores.indexOf('Banco legado — Captação 1');
+    expect(primeira).toBeGreaterThan(0);
+    expect(segunda).toBeGreaterThan(primeira);
+    expect(legado).toBeGreaterThan(segunda);
+    expect([ws.getCell(primeira, 4).value, ws.getCell(primeira, 7).value, ws.getCell(primeira, 8).value]).toEqual([1000, 8, 10]);
+    expect([ws.getCell(segunda + 1, 4).value, ws.getCell(segunda + 1, 7).value, ws.getCell(segunda + 1, 8).value]).toEqual([2000, 4, 20]);
+    expect([ws.getCell(legado, 4).value, ws.getCell(legado, 7).value]).toEqual([3000, 2]);
   });
 
   it('exporta a composição do PL e as diferenças das duas conferências do balanço', () => {
