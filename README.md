@@ -176,14 +176,14 @@ cadastre os bancos ou dívidas, cada um com suas próprias contas. A linha
 principal mostra a soma dos saldos dos bancos ou dívidas, apresentados logo
 abaixo, por período.
 No demonstrativo mensal, use **Adicionar captação** na linha do banco ou dívida
-para registrar uma ou mais captações com data, valor, taxa (texto livre), total
+para registrar uma ou mais captações com linha de crédito (texto livre opcional), data, valor, taxa (texto livre), total
 de parcelas, parcelas restantes e juros provisionados / IOF. Abra a lista de
 captações para consultar, editar ou excluir cada uma; a exclusão remove seus
 dados de todos os meses. As captações já cadastradas são preservadas. Parcelas
 restantes e juros provisionados / IOF são informados individualmente por mês. Esses dados são
 informativos e não alteram os saldos do balancete. Os detalhes aparecem só na
 coluna do período mensal selecionado no topo; as colunas comparativas mostram
-apenas o saldo. O Excel inclui todas as captações nos detalhes do endividamento.
+apenas o saldo. O Excel inclui todas as captações e suas linhas de crédito nos detalhes do endividamento.
 
 A **DRE** usa o movimento líquido de cada conta no mês e de janeiro até o mês
 selecionado. No modo **Anual**, usa somente o arquivo anual importado.

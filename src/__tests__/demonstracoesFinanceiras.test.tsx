@@ -1205,6 +1205,8 @@ it('preserva a captação legada e permite adicionar, editar e excluir captaçõ
   for (const [valor, restantes] of [['2.000,00', '6'], ['3.000,00', '3']]) {
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar captação de Banco Exemplo' }));
     const dialogo = within(await screen.findByRole('dialog'));
+    expect(dialogo.getByLabelText('Linha de crédito')).toHaveValue('');
+    fireEvent.change(dialogo.getByLabelText('Linha de crédito'), { target: { value: `  Crédito ${valor}  ` } });
     fireEvent.change(dialogo.getByLabelText('Valor da captação (R$)'), { target: { value: valor } });
     fireEvent.change(dialogo.getByLabelText('Parcelas restantes'), { target: { value: restantes } });
     fireEvent.click(dialogo.getByRole('button', { name: 'Salvar captação' }));
@@ -1217,6 +1219,8 @@ it('preserva a captação legada e permite adicionar, editar e excluir captaçõ
   expect(within(screen.getByRole('row', { name: /Banco Exemplo/ })).getByText('1.250')).toBeInTheDocument();
   expect(persistido?.linhas.find(linha => linha.id === 'banco')?.captacao).toBeUndefined();
   expect(persistido?.linhas.find(linha => linha.id === 'banco')?.captacoes).toHaveLength(3);
+  expect(persistido?.linhas.find(linha => linha.id === 'banco')?.captacoes?.[1].linhaCredito).toBe('Crédito 2.000,00');
+  expect(screen.getByText('Linha de crédito: Crédito 3.000,00')).toBeInTheDocument();
 
   tela.unmount();
   render(<DemonstracoesFinanceiras selectedYear={2026} selectedMonth={1} />);
@@ -1226,11 +1230,15 @@ it('preserva a captação legada e permite adicionar, editar e excluir captaçõ
   expect(screen.getByText('Juros Provisionados / IOF: R$ 5,00')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Editar captação 2 de Banco Exemplo' }));
   const edicao = within(await screen.findByRole('dialog'));
+  expect(edicao.getByLabelText('Linha de crédito')).toHaveValue('Crédito 2.000,00');
+  fireEvent.change(edicao.getByLabelText('Linha de crédito'), { target: { value: '   ' } });
   expect(edicao.getByLabelText('Parcelas restantes')).toHaveValue(null);
   fireEvent.change(edicao.getByLabelText('Parcelas restantes'), { target: { value: '7' } });
   fireEvent.click(edicao.getByRole('button', { name: 'Salvar captação' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   const captacoes = persistido?.linhas.find(linha => linha.id === 'banco')?.captacoes;
+  expect(captacoes?.[1].linhaCredito).toBeUndefined();
+  expect(captacoes?.[2].linhaCredito).toBe('Crédito 3.000,00');
   expect(captacoes?.[1].restantesPorMes).toEqual({ '2026_1': 7, '2026_2': 6 });
   expect(captacoes?.[0].restantesPorMes).toEqual({ '2026_1': 10, '2026_2': 9 });
 

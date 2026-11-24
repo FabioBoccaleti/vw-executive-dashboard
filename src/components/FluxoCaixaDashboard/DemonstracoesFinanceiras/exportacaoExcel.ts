@@ -477,6 +477,7 @@ function adicionarDetalhesCaptacoes(
   const cabecalho = ws.addRow([
     'Linha / banco', 'Período', 'Data da captação', 'Valor captado (R$)', 'Taxa',
     'Parcelas totais', 'Parcelas restantes', 'Juros Provisionados / IOF (R$)',
+    'Linha de crédito',
   ]);
   cabecalho.eachCell(celula => {
     celula.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CORES.verde } };
@@ -499,10 +500,11 @@ function adicionarDetalhesCaptacoes(
             captacao.parcelasTotais ?? null,
             captacao.restantesPorMes[chave] ?? null,
             juros === undefined ? null : juros / 100,
+            captacao.linhaCredito ?? '',
           ]);
           row.eachCell({ includeEmpty: true }, (celula, indice) => {
             celula.border = { bottom: BORDA_FINA };
-            celula.alignment = { vertical: 'middle', horizontal: indice < 4 || indice === 5 ? 'left' : 'right', wrapText: indice === 1 || indice === 5 };
+            celula.alignment = { vertical: 'middle', horizontal: indice < 4 || indice === 5 || indice === 9 ? 'left' : 'right', wrapText: indice === 1 || indice === 5 || indice === 9 };
             if (indice === 4 || indice === 8) celula.numFmt = FORMATO_MOEDA;
           });
         }

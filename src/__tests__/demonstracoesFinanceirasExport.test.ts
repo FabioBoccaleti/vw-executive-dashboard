@@ -627,7 +627,7 @@ describe('Exportação Excel das demonstrações financeiras', () => {
         { referencia: 'banco', operacao: 1 as const }, { referencia: 'legado', operacao: 1 as const },
       ] },
       { id: 'banco', nome: 'Banco', demonstracao: 'endividamento' as const, tipo: 'contas' as const, bancoDe: 'principal', itens: [{ referencia: '2.1', operacao: 1 as const }], captacoes: [
-        { data: '2025-01-01', valorCentavos: 100000, restantesPorMes: { '2026_1': 8 }, jurosProvisionadosPorMes: { '2026_1': 1000 } },
+        { linhaCredito: 'Capital de giro', data: '2025-01-01', valorCentavos: 100000, restantesPorMes: { '2026_1': 8 }, jurosProvisionadosPorMes: { '2026_1': 1000 } },
         { data: '2025-02-01', valorCentavos: 200000, restantesPorMes: { '2026_2': 4 }, jurosProvisionadosPorMes: { '2026_2': 2000 } },
       ] },
       { id: 'legado', nome: 'Banco legado', demonstracao: 'endividamento' as const, tipo: 'contas' as const, bancoDe: 'principal', itens: [{ referencia: '2.2', operacao: 1 as const }],
@@ -645,6 +645,11 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     expect(primeira).toBeGreaterThan(0);
     expect(segunda).toBeGreaterThan(primeira);
     expect(legado).toBeGreaterThan(segunda);
+    expect(ws.getColumn(9).values).toContain('Linha de crédito');
+    expect(ws.getCell(primeira, 9).value).toBe('Capital de giro');
+    expect(ws.getCell(primeira + 1, 9).value).toBe('Capital de giro');
+    expect(ws.getCell(segunda, 9).value).toBe('');
+    expect(ws.getCell(legado, 9).value).toBe('');
     expect([ws.getCell(primeira, 4).value, ws.getCell(primeira, 7).value, ws.getCell(primeira, 8).value]).toEqual([1000, 8, 10]);
     expect([ws.getCell(segunda + 1, 4).value, ws.getCell(segunda + 1, 7).value, ws.getCell(segunda + 1, 8).value]).toEqual([2000, 4, 20]);
     expect([ws.getCell(legado, 4).value, ws.getCell(legado, 7).value]).toEqual([3000, 2]);

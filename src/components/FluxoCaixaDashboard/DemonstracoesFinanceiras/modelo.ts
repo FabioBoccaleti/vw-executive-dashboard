@@ -20,6 +20,7 @@ const DFC_SUBTOTAIS_PADRAO = new Map<string, string>(DFC_SECOES_PADRAO.map(secao
 const itemSchema = z.object({ referencia: z.string().min(1), operacao: z.union([z.literal(1), z.literal(-1)]) });
 const mesCaptacaoSchema = z.string().regex(/^\d{4}_(?:[1-9]|1[0-2])$/);
 export const captacaoSchema = z.object({
+  linhaCredito: z.string().trim().min(1).optional(),
   data: z.string().date('Informe uma data de captação válida.').optional(),
   valorCentavos: z.number().int().safe().nonnegative('Informe um valor de captação válido.').optional(),
   taxa: z.string().trim().min(1).optional(),

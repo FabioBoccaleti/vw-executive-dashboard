@@ -60,6 +60,7 @@ function lerCentavos(texto: string): number | undefined | null {
   return Number.isSafeInteger(total) ? total : null;
 }
 const camposCaptacao = [
+  { campo: 'linhaCredito', rotulo: 'Linha de crédito', tipo: 'text', placeholder: 'Ex.: Capital de giro' },
   { campo: 'data', rotulo: 'Data da captação', tipo: 'date' },
   { campo: 'valor', rotulo: 'Valor da captação (R$)', tipo: 'text', placeholder: 'Ex.: 1.000,00' },
   { campo: 'taxa', rotulo: 'Taxa', tipo: 'text', placeholder: 'Ex.: CDI + 2% a.a.' },
@@ -326,6 +327,7 @@ export function DemonstracoesFinanceiras({
     const juros = captacao?.jurosProvisionadosPorMes?.[chave];
     setErroCaptacao('');
     setEditorCaptacao({ id: linha.id, nome: linha.nome, indice, periodo: principal, campos: {
+      linhaCredito: captacao?.linhaCredito ?? '',
       data: captacao?.data ?? '',
       valor: captacao?.valorCentavos === undefined ? '' : moedaComCentavos.format(captacao.valorCentavos / 100),
       taxa: captacao?.taxa ?? '',
@@ -361,6 +363,7 @@ export function DemonstracoesFinanceiras({
     if (juros === undefined) delete jurosProvisionadosPorMes[chave];
     else jurosProvisionadosPorMes[chave] = juros;
     const resultado = captacaoSchema.safeParse({
+      linhaCredito: campos.linhaCredito.trim() || undefined,
       data: campos.data || undefined,
       valorCentavos,
       taxa: campos.taxa.trim() || undefined,
@@ -1174,6 +1177,7 @@ export function DemonstracoesFinanceiras({
                                       const juros = captacao.jurosProvisionadosPorMes?.[chavePeriodo(principal)];
                                       return <div key={indice} className="mt-2 border-t pt-2">
                                         <p className="font-semibold">Captação {indice + 1}</p>
+                                        {captacao.linhaCredito && <p>Linha de crédito: {captacao.linhaCredito}</p>}
                                         {captacao.data && <p>Data da captação: {captacao.data.split('-').reverse().join('/')}</p>}
                                         {captacao.valorCentavos !== undefined && <p>Valor da captação: R$ {moedaComCentavos.format(captacao.valorCentavos / 100)}</p>}
                                         {captacao.taxa && <p>Taxa: {captacao.taxa}</p>}
