@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import {
   DFC_PREFIXOS_CAIXA_EQUIVALENTES_PADRAO, LINHA_PL_ID, LINHA_RESULTADO_PERIODO_ID, MESES, calcularConta, calcularDfcIndireto, calcularLinhas,
-  calcularSaldosCaixaEquivalentes, chavePeriodo, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasIncompletas, identificarContasNaoClassificadas, linhaPai, listarCaptacoes, listarContasDaLinha,
+  calcularSaldosCaixaEquivalentes, chavePeriodo, distribuirContasDfc, encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, identificarContasIncompletas, identificarContasNaoClassificadas, linhaPai, listarCaptacoes, listarContasDaLinha,
   type CadastroDemonstracoes, type DadosDemonstracoes, type LinhaDemonstracao, type PeriodoDemonstracao, type TipoDemonstracao,
 } from './modelo';
 import { criarLinhasDfcIndiretoTabela, deveExibirLinhaDfc } from './dfcTabela';
@@ -575,6 +575,92 @@ function adicionarPlanilhaFluxo(
   return ws;
 }
 
+function adicionarAberturaDfc(
+  ws: ExcelJS.Worksheet,
+  cadastro: CadastroDemonstracoes,
+  dados: DadosDemonstracoes,
+  metodo: 'direto' | 'indireto',
+  colunas: ColunaExportacao[],
+) {
+  const periodosPorColuna = colunas.map(coluna => periodosDaColuna(dados, coluna));
+  const periodosTodos = periodosPorColuna.flat();
+  const descricoes = new Map<string, string>();
+  for (const periodo of periodosTodos) {
+    for (const conta of Object.values(periodo ?? {})) {
+      if (conta.desc.trim() && !descricoes.has(conta.conta)) descricoes.set(conta.conta, conta.desc);
+    }
+  }
+
+  const resultadosDiretos = periodosPorColuna.map(periodos =>
+    calcularLinhas(cadastro.linhas, 'dfc', periodos));
+  const distribuicaoDireta = metodo === 'direto'
+    ? distribuirContasDfc(cadastro.linhas, periodosTodos).porLinha
+    : undefined;
+  const resultadosIndiretos = metodo === 'indireto'
+    ? periodosPorColuna.map(periodos =>
+      calcularDfcIndireto(cadastro.linhas, cadastro.dfcIndiretoRegras ?? [], periodos))
+    : undefined;
+  const linhas = metodo === 'indireto'
+    ? criarLinhasDfcIndiretoTabela(cadastro.linhas).map(linha => ({
+      ...linha,
+      estilo: linha.tipo === 'titulo' || linha.tipo === 'grupo' ? 'secao' as const
+        : linha.tipo === 'total' ? 'total' as const
+          : linha.tipo === 'subtotal' ? 'subtotal' as const : 'normal' as const,
+      ocultarValores: linha.tipo === 'titulo' || linha.tipo === 'grupo',
+    }))
+    : linhasTabela(cadastro, 'dfc');
+
+  for (const linhaExportacao of linhas) {
+    const valores = colunas.map((_, indice) => linhaExportacao.ocultarValores
+      ? null
+      : metodo === 'indireto'
+        ? resultadosIndiretos?.[indice].valores.get(linhaExportacao.id) ?? null
+        : resultadosDiretos[indice].get(linhaExportacao.id) ?? null);
+    adicionarLinhaDados(
+      ws,
+      linhaExportacao.nome,
+      valores,
+      linhaExportacao.estilo,
+      'recuo' in linhaExportacao ? linhaExportacao.recuo : false,
+    );
+
+    const linhaDfc = cadastro.linhas.find(linha =>
+      linha.id === linhaExportacao.id && linha.demonstracao === 'dfc'
+      && linha.tipo === 'contas' && !linha.foraDfc);
+    const linhaIdDetalhe = metodo === 'indireto'
+      ? 'tipo' in linhaExportacao && linhaExportacao.tipo === 'conta' ? linhaExportacao.id : undefined
+      : linhaDfc?.id;
+    if (!linhaIdDetalhe) continue;
+
+    const contas = metodo === 'indireto'
+      ? [...new Set(resultadosIndiretos?.flatMap(resultado =>
+        (resultado.contasPorLinha.get(linhaIdDetalhe) ?? []).map(conta => conta.conta)) ?? [])]
+        .sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }))
+      : (distribuicaoDireta?.get(linhaIdDetalhe) ?? []).map(conta => conta.conta);
+    for (const conta of contas) {
+      const valoresConta = periodosPorColuna.map((periodos, indice) => {
+        if (metodo === 'direto') {
+          return calcularConta({ referencia: conta, operacao: 1 }, 'dfc', periodos);
+        }
+        const resultado = resultadosIndiretos![indice];
+        const valorLinha = resultado.valores.get(linhaIdDetalhe);
+        return valorLinha === null || valorLinha === undefined
+          ? null
+          : resultado.valoresContasPorLinha.get(linhaIdDetalhe)?.get(conta) ?? 0;
+      });
+      if (valoresConta.every(valor => valor !== null && valor === 0)) continue;
+      const descricao = descricoes.get(conta);
+      adicionarLinhaDados(
+        ws,
+        descricao ? `${conta} — ${descricao}` : conta,
+        valoresConta,
+        'normal',
+        true,
+      );
+    }
+  }
+}
+
 function adicionarPlanilhaConferencias(
   workbook: ExcelJS.Workbook,
   cadastro: CadastroDemonstracoes,
@@ -848,6 +934,13 @@ export function criarWorkbookDemonstracoesFinanceiras(parametros: ParametrosExpo
   criarAbaAbertura('DRE - Abertura', 'Demonstração do Resultado do Exercício — Abertura de contas', 'dre', colunasFluxo);
   criarAbaAbertura('Ativo - Abertura', 'Balanço Patrimonial — Ativo — Abertura de contas', 'ativo', colunasSaldo);
   criarAbaAbertura('Passivo + PL - Abertura', 'Balanço Patrimonial — Passivo + Patrimônio Líquido — Abertura de contas', 'passivo', colunasSaldo);
+  for (const metodo of ['direto', 'indireto'] as const) {
+    const nome = metodo === 'direto' ? 'DFC Direto - Abertura' : 'DFC Indireto - Abertura';
+    const titulo = `Demonstração dos Fluxos de Caixa — Método ${metodo === 'direto' ? 'Direto' : 'Indireto'} — Abertura de contas`;
+    const ws = configurarPlanilha(workbook, nome, titulo, parametros.cadastro, colunasFluxo);
+    adicionarAberturaDfc(ws, parametros.cadastro, parametros.dados, metodo, colunasFluxo);
+    adicionarRodape(ws, colunasFluxo.length + 1);
+  }
   if (parametros.conferencias?.length) adicionarPlanilhaConferencias(workbook, parametros.cadastro, parametros.conferencias);
   return workbook;
 }

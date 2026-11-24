@@ -84,6 +84,55 @@ describe('Exportação Excel das demonstrações financeiras', () => {
     expect(cadastro.linhas.map(linha => linha.id)).toEqual(ids);
   });
 
+  it('exporta as aberturas das DFC direta e indireta com detalhes por conta e acumulados', async () => {
+    const cadastro = aplicarModeloDfcPadrao(cadastroVazio());
+    const periodo = (
+      saldoClientes: number,
+      saldoEstoqueAnterior: number,
+      saldoEstoque: number,
+      creditoCliente: number,
+      debitoJuros: number,
+      receita: number,
+    ) =>
+      extractAccounts([
+        `A;1.1.3.01.01.001;Clientes;${saldoClientes - creditoCliente};0;${creditoCliente};${saldoClientes}`,
+        `A;1.1.2.01;Estoque;${saldoEstoqueAnterior};0;0;${saldoEstoque}`,
+        `D;5.2.1.01;Juros de empréstimos;0;${debitoJuros};0;${debitoJuros}`,
+        `R;3.1.01;Receita;0;0;${receita};-${receita}`,
+      ].join('\n'), { strict: true });
+    const workbook = criarWorkbookDemonstracoesFinanceiras({
+      cadastro,
+      dados: {
+        [chavePeriodo({ ano: 2026, mes: 1 })]: periodo(205, 100, 150, 5, 20, 100),
+        [chavePeriodo({ ano: 2026, mes: 2 })]: periodo(215, 150, 210, 10, 10, 100),
+      },
+      anos: [2026],
+      mesLimite: 2,
+      incluirNotasAnuais: false,
+      notas: [],
+    });
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await workbook.xlsx.writeBuffer());
+
+    const direto = reopened.getWorksheet('DFC Direto - Abertura')!;
+    const contaClientesDireto = direto.getColumn(1).values.indexOf('1.1.3.01.01.001 — Clientes');
+    expect([2, 3, 4].map(coluna => direto.getCell(contaClientesDireto, coluna).value)).toEqual([5, 10, 15]);
+
+    const indireto = reopened.getWorksheet('DFC Indireto - Abertura')!;
+    const receita = indireto.getColumn(1).values.indexOf('3.1.01 — Receita');
+    const linhaJuros = indireto.getColumn(1).values.indexOf('(+) Juros e IOF sobre empréstimos');
+    const juros = indireto.getColumn(1).values.findIndex((valor, indice) =>
+      indice > linhaJuros && valor === '5.2.1.01 — Juros de empréstimos');
+    const clientes = indireto.getColumn(1).values.indexOf('1.1.3.01.01.001 — Clientes');
+    const linhaEstoque = indireto.getColumn(1).values.indexOf('Estoques');
+    const estoque = indireto.getColumn(1).values.findIndex((valor, indice) =>
+      indice > linhaEstoque && valor === '1.1.2.01 — Estoque');
+    expect([2, 3, 4].map(coluna => indireto.getCell(receita, coluna).value)).toEqual([100, 100, 200]);
+    expect([2, 3, 4].map(coluna => indireto.getCell(juros, coluna).value)).toEqual([20, 10, 30]);
+    expect([2, 3, 4].map(coluna => indireto.getCell(clientes, coluna).value)).toEqual([-5, -10, -15]);
+    expect([2, 3, 4].map(coluna => indireto.getCell(estoque, coluna).value)).toEqual([-50, -60, -110]);
+  });
+
   it('mantém detalhes da DFC no Excel quando há período indisponível', async () => {
     const workbook = criarWorkbookDemonstracoesFinanceiras({
       cadastro: aplicarModeloDfcPadrao(cadastroVazio()),
@@ -494,6 +543,7 @@ describe('Exportação Excel das demonstrações financeiras', () => {
       'DRE', 'DFC Direto', 'DFC Indireto', 'Endividamento',
       'Ativo', 'Passivo + PL',
       'DRE - Abertura', 'Ativo - Abertura', 'Passivo + PL - Abertura',
+      'DFC Direto - Abertura', 'DFC Indireto - Abertura',
     ]);
     const bytes = await workbook.xlsx.writeBuffer();
     const reopened = new ExcelJS.Workbook();
