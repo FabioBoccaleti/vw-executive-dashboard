@@ -1,6 +1,5 @@
 import { Redis } from '@upstash/redis'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { PARAMETROS_PDF_KEY, permitirAlteracaoParametrosPdf } from './_parametrosPdfGuard'
 
 // Limite maior para operações de importação em lote
 export const config = {
@@ -35,8 +34,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!items || !Array.isArray(items)) {
     return res.status(400).json({ error: 'Missing items array' })
   }
-  if (items.some((item: { key?: string } | null) => item?.key === PARAMETROS_PDF_KEY)
-    && !await permitirAlteracaoParametrosPdf(req, res, PARAMETROS_PDF_KEY)) return
 
   try {
     // Use pipeline for bulk operations

@@ -246,7 +246,6 @@ function AppContent() {
       ) : brand === 'fluxo_caixa' ? (
         <FluxoCaixaDashboard
           onChangeBrand={handleChangeBrand}
-          isAdmin={isAdmin()}
           currentUser={{ userId: session.userId, username: session.username, name: session.name }}
         />
       ) : brand === 'folha_pagamento' ? (

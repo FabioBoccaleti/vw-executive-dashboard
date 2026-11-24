@@ -1,6 +1,5 @@
 import { Redis } from '@upstash/redis'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { permitirAlteracaoParametrosPdf } from './_parametrosPdfGuard'
 
 // Aumenta o limite do body parser para suportar balancetes grandes (até ~10 MB)
 export const config = {
@@ -46,7 +45,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   )) {
     return res.status(400).json({ error: 'Invalid version parameters' })
   }
-  if (!await permitirAlteracaoParametrosPdf(req, res, key)) return
 
   try {
     if (expectedVersion !== undefined) {
