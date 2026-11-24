@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download, Sparkles, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download, Sparkles, FileText, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData, loadFluxoCaixaIndex } from "./fluxoCaixaStorage";
@@ -27,6 +27,7 @@ import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
 import { ProjecaoTab } from './ProjecaoTab';
 import { PerguntasRespostasTab } from "./PerguntasRespostasTab";
 import { DemonstracoesFinanceiras } from "./DemonstracoesFinanceiras";
+import { ParametrosTab } from './ParametrosTab';
 import {
   calcularDfcIndireto, calcularLinhas, calcularSaldosCaixaEquivalentes, chavePeriodo,
   encontrarLinhaBasePercentualDre, encontrarLinhaDrePorNomes, listarLinhasDre,
@@ -454,9 +455,10 @@ const StatusBadge = ({ label, status }: any) => {
 interface FluxoCaixaDashboardProps {
   onChangeBrand?: () => void;
   currentUser?: ImportActor;
+  isAdmin?: boolean;
 }
 
-export function FluxoCaixaDashboard({ onChangeBrand, currentUser }: FluxoCaixaDashboardProps) {
+export function FluxoCaixaDashboard({ onChangeBrand, currentUser, isAdmin = false }: FluxoCaixaDashboardProps) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -756,6 +758,7 @@ export function FluxoCaixaDashboard({ onChangeBrand, currentUser }: FluxoCaixaDa
     { id: 'comparativos', label: 'Comparativos', icon: <BarChart3 className="w-4 h-4" />, requiresData: false },
     { id: 'projecao', label: 'Projeção', icon: <TrendingUp className="w-4 h-4" />, requiresData: false },
     { id: 'perguntasRespostas', label: 'Perguntas e Respostas', icon: <Sparkles className="w-4 h-4" />, requiresData: false },
+    { id: 'parametros', label: 'Parâmetros', icon: <BookOpen className="w-4 h-4" />, requiresData: false },
   ];
 
   return (
@@ -946,6 +949,10 @@ export function FluxoCaixaDashboard({ onChangeBrand, currentUser }: FluxoCaixaDa
           ) : activeTab === 'perguntasRespostas' ? (
             <div className="animate-in fade-in duration-500">
               <PerguntasRespostasTab data={data} selectedMonth={selectedMonth} selectedYear={selectedYear} prevMonthAccounts={prevMonthAccounts} janAccounts={janAccounts} />
+            </div>
+          ) : activeTab === 'parametros' ? (
+            <div className="animate-in fade-in duration-500">
+              <ParametrosTab isAdmin={isAdmin} />
             </div>
           ) : activeTab === 'emissaoDemonstracoes' ? (
             <DemonstracoesFinanceiras selectedYear={selectedYear} selectedMonth={selectedMonth} currentUser={currentUser} />

@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { permitirAlteracaoParametrosPdf } from './_parametrosPdfGuard'
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
@@ -25,6 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!key || typeof key !== 'string') {
     return res.status(400).json({ error: 'Missing key parameter' })
   }
+  if (!await permitirAlteracaoParametrosPdf(req, res, key)) return
 
   try {
     await redis.del(key)

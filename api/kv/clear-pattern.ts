@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { PARAMETROS_PDF_KEY, permitirAlteracaoParametrosPdf } from './_parametrosPdfGuard'
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
@@ -29,6 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Get all keys matching the pattern
     const keys = await redis.keys(pattern)
+    if (keys.includes(PARAMETROS_PDF_KEY)
+      && !await permitirAlteracaoParametrosPdf(req, res, PARAMETROS_PDF_KEY)) return
     
     if (keys.length === 0) {
       return res.status(200).json({ success: true, deleted: 0 })
